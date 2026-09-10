@@ -2,26 +2,128 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>HLS Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live TV</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- hls.js for HLS playback -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
 
-    <video id="video" controls style="width: 100%; max-width: 800px;"></video>
+    <!-- Video Player Section -->
+    <div class="player-container">
+        <video id="videoPlayer" controls playsinline></video>
+        <div id="playerOverlay">Select a channel to start watching</div>
+    </div>
 
+    <!-- Controls & Search -->
+    <div class="controls">
+        <input type="text" id="searchInput" placeholder="Search channels...">
+        <div class="categories">
+            <button class="cat-btn active" data-cat="all">All</button>
+            <button class="cat-btn" data-cat="sports">Sports</button>
+            <button class="cat-btn" data-cat="news">News</button>
+            <button class="cat-btn" data-cat="entertainment">Entertainment</button>
+            <button class="cat-btn" data-cat="cartoons">Cartoons</button>
+        </div>
+    </div>
+
+    <!-- Channel Grid -->
+    <div class="channel-grid" id="channelGrid">
+        <!-- Channel cards will be populated by JavaScript -->
+    </div>
+
+    <script src="channels.js"></script>
     <script>
-        var video = document.getElementById('video');
-        var videoSrc = 'playlist.m3u8'; // Ensure this matches your file name
+        // --- Player Logic ---
+        const video = document.getElementById('videoPlayer');
+        const overlay = document.getElementById('playerOverlay');
+        let hls;
 
-        if (Hls.isSupported()) {
-            var hls = new Hls();
-            hls.loadSource(videoSrc);
-            hls.attachMedia(video);
-            // No .play() commands here
+        function playStream(url) {
+            overlay.style.display = 'none';
+            if (hls) {
+                hls.destroy();
+            }
+            if (Hls.isSupported()) {
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play();
+                });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS Error:', data);
+                    overlay.textContent = 'Error loading stream. Try another channel.';
+                    overlay.style.display = 'flex';
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', () => {
+                    video.play();
+                });
+            } else {
+                overlay.textContent = 'HLS not supported in this browser.';
+                overlay.style.display = 'flex';
+            }
         }
-        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = videoSrc;
+
+        // --- Channel Grid Logic ---
+        const channelGrid = document.getElementById('channelGrid');
+        const searchInput = document.getElementById('searchInput');
+        const catButtons = document.querySelectorAll('.cat-btn');
+        let currentCategory = 'all';
+        let searchTerm = '';
+
+        function renderChannels() {
+            channelGrid.innerHTML = '';
+            const filtered = channels.filter(ch => {
+                const matchesCategory = currentCategory === 'all' || ch.category === currentCategory;
+                const matchesSearch = ch.name.toLowerCase().includes(searchTerm.toLowerCase());
+                return matchesCategory && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                channelGrid.innerHTML = '<p class="no-results">No channels found.</p>';
+                return;
+            }
+
+            filtered.forEach(ch => {
+                const card = document.createElement('div');
+                card.className = 'channel-card';
+                card.innerHTML = `
+                    <img src="${ch.logo || 'https://via.placeholder.com/150x100/1a1a1a/ffffff?text=' + encodeURIComponent(ch.name)}" alt="${ch.name}" onerror="this.src='https://via.placeholder.com/150x100/1a1a1a/ffffff?text=TV'">
+                    <div class="card-info">
+                        <h3>${ch.name}</h3>
+                        <span class="category-tag">${ch.category}</span>
+                    </div>
+                `;
+                card.addEventListener('click', () => {
+                    playStream(ch.url);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+                channelGrid.appendChild(card);
+            });
         }
+
+        // Search input
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            renderChannels();
+        });
+
+        // Category buttons
+        catButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                catButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCategory = btn.dataset.cat;
+                renderChannels();
+            });
+        });
+
+        // Initial render
+        renderChannels();
     </script>
 </body>
 </html>
