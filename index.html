@@ -3,85 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live TV</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- hls.js for HLS playback -->
+    <title>Sports Live TV</title>
+    <!-- Load hls.js for raw .m3u8 streams -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        :root {
+            --bg: #0f0f0f;
+            --card-bg: #1a1a1a;
+            --accent: #e50914;
+            --text: #ffffff;
+            --text-muted: #888888;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding-bottom: 50px;
+        }
+
+        /* Header & Player Section */
+        .player-section {
+            width: 100%;
+            background: #000;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+
+        .player-wrapper {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            aspect-ratio: 16 / 9;
+            background: #000;
+        }
+
+        #videoPlayer, #iframePlayer {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none; /* Hidden by default */
+        }
+
+        /* Controls & Search */
+        .controls {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: 30px;
+            border: 1px solid #333;
+            background: var(--card-bg);
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent);
+        }
+
+        .category-filters {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+
+        .cat-btn {
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid #333;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .cat-btn:hover, .cat-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Channel Grid */
+        .channel-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .channel-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #2a2a2a;
+        }
+
+        .channel-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(229, 9, 20, 0.3);
+            border-color: var(--accent);
+        }
+
+        .channel-card img {
+            width: 100%;
+            height: 120px;
+            object-fit: contain;
+            background: #111;
+            padding: 15px;
+        }
+
+        .card-info {
+            padding: 15px;
+            text-align: center;
+        }
+
+        .card-info h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 5px;
+        }
+
+        .category-tag {
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .no-results {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: var(--text-muted);
+            padding: 50px;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 600px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .channel-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-    <!-- Video Player Section -->
-    <div class="player-container">
-        <video id="videoPlayer" controls playsinline></video>
-        <div id="playerOverlay">Select a channel to start watching</div>
+    <!-- Player Section -->
+    <div class="player-section">
+        <div class="player-wrapper">
+            <video id="videoPlayer" controls playsinline></video>
+            <!-- Sandboxed Iframe for embed links. Pop-ups are blocked. -->
+            <iframe id="iframePlayer" sandbox="allow-scripts allow-same-origin allow-presentation" allowfullscreen></iframe>
+        </div>
     </div>
 
-    <!-- Controls & Search -->
+    <!-- Controls -->
     <div class="controls">
-        <input type="text" id="searchInput" placeholder="Search channels...">
-        <div class="categories">
-            <button class="cat-btn active" data-cat="all">All</button>
-            <button class="cat-btn" data-cat="sports">Sports</button>
-            <button class="cat-btn" data-cat="news">News</button>
-            <button class="cat-btn" data-cat="entertainment">Entertainment</button>
-            <button class="cat-btn" data-cat="cartoons">Cartoons</button>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search sports channels...">
+        </div>
+        <div class="category-filters">
+            <button class="cat-btn active" data-cat="all">All Sports</button>
         </div>
     </div>
 
     <!-- Channel Grid -->
     <div class="channel-grid" id="channelGrid">
-        <!-- Channel cards will be populated by JavaScript -->
+        <!-- Channels populated by JS -->
     </div>
 
-    <script src="channels.js"></script>
+    <script src="channel.js"></script>
     <script>
-        // --- Player Logic ---
         const video = document.getElementById('videoPlayer');
-        const overlay = document.getElementById('playerOverlay');
+        const iframe = document.getElementById('iframePlayer');
+        const channelGrid = document.getElementById('channelGrid');
+        const searchInput = document.getElementById('searchInput');
         let hls;
 
-        function playStream(url) {
-            overlay.style.display = 'none';
-            if (hls) {
-                hls.destroy();
-            }
-            if (Hls.isSupported()) {
-                hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    video.play();
-                });
-                hls.on(Hls.Events.ERROR, (event, data) => {
-                    console.error('HLS Error:', data);
-                    overlay.textContent = 'Error loading stream. Try another channel.';
-                    overlay.style.display = 'flex';
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
-                video.addEventListener('loadedmetadata', () => {
-                    video.play();
-                });
-            } else {
-                overlay.textContent = 'HLS not supported in this browser.';
-                overlay.style.display = 'flex';
+        // --- Smart Player Logic ---
+        function playChannel(url) {
+            // Reset players
+            if (hls) { hls.destroy(); hls = null; }
+            video.pause();
+            video.src = "";
+            video.style.display = 'none';
+            iframe.src = "";
+            iframe.style.display = 'none';
+
+            // Check if it's a raw HLS stream (.m3u8)
+            if (url.includes('.m3u8')) {
+                video.style.display = 'block';
+                if (Hls.isSupported()) {
+                    hls = new Hls();
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = url;
+                    video.addEventListener('loadedmetadata', () => video.play());
+                }
+            } 
+            // Otherwise, treat it as an iframe embed
+            else {
+                iframe.style.display = 'block';
+                iframe.src = url;
             }
         }
 
-        // --- Channel Grid Logic ---
-        const channelGrid = document.getElementById('channelGrid');
-        const searchInput = document.getElementById('searchInput');
-        const catButtons = document.querySelectorAll('.cat-btn');
-        let currentCategory = 'all';
-        let searchTerm = '';
-
-        function renderChannels() {
+        // --- Render Channels ---
+        function renderChannels(filterText = '') {
             channelGrid.innerHTML = '';
-            const filtered = channels.filter(ch => {
-                const matchesCategory = currentCategory === 'all' || ch.category === currentCategory;
-                const matchesSearch = ch.name.toLowerCase().includes(searchTerm.toLowerCase());
-                return matchesCategory && matchesSearch;
-            });
+            const filtered = channels.filter(ch => 
+                ch.name.toLowerCase().includes(filterText.toLowerCase())
+            );
 
             if (filtered.length === 0) {
                 channelGrid.innerHTML = '<p class="no-results">No channels found.</p>';
@@ -92,37 +269,26 @@
                 const card = document.createElement('div');
                 card.className = 'channel-card';
                 card.innerHTML = `
-                    <img src="${ch.logo || 'https://via.placeholder.com/150x100/1a1a1a/ffffff?text=' + encodeURIComponent(ch.name)}" alt="${ch.name}" onerror="this.src='https://via.placeholder.com/150x100/1a1a1a/ffffff?text=TV'">
+                    <img src="${ch.logo || 'https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV'}" 
+                         alt="${ch.name}" 
+                         onerror="this.src='https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV'">
                     <div class="card-info">
                         <h3>${ch.name}</h3>
-                        <span class="category-tag">${ch.category}</span>
+                        <span class="category-tag">${ch.genre}</span>
                     </div>
                 `;
                 card.addEventListener('click', () => {
-                    playStream(ch.url);
+                    playChannel(ch.url);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 channelGrid.appendChild(card);
             });
         }
 
-        // Search input
-        searchInput.addEventListener('input', (e) => {
-            searchTerm = e.target.value;
-            renderChannels();
-        });
+        // Search listener
+        searchInput.addEventListener('input', (e) => renderChannels(e.target.value));
 
-        // Category buttons
-        catButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                catButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentCategory = btn.dataset.cat;
-                renderChannels();
-            });
-        });
-
-        // Initial render
+        // Initial load
         renderChannels();
     </script>
 </body>
