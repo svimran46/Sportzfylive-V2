@@ -4,31 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sports Live TV</title>
-    <!-- Load hls.js for raw .m3u8 streams -->
+    <!-- hls.js for raw .m3u8 streams -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Lucide Icons for the search bar -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        /* =========================================
+           DESIGN SYSTEM TOKENS (From Blueprint)
+           ========================================= */
         :root {
-            --bg: #0f0f0f;
-            --card-bg: #1a1a1a;
-            --accent: #e50914;
-            --text: #ffffff;
-            --text-muted: #888888;
+            /* Semantic Colors */
+            --bg-primary: #09090B;
+            --bg-surface: #131316;
+            --border-default: #27272A;
+            --text-primary: #FAFAFA;
+            --text-muted: #A1A1AA;
+            --brand-primary: #6366F1;
+            --status-error: #EF4444;
+
+            /* Spacing Scale (Base: 4px) */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-6: 24px;
+            --space-8: 32px;
+            --space-12: 48px;
+
+            /* Typography Scale */
+            --text-xs: 11px;
+            --text-sm: 13px;
+            --text-base: 15px;
+            --text-lg: 18px;
+            --text-xl: 22px;
+            --text-2xl: 28px;
+            --text-5xl: 48px;
+
+            /* Motion */
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 250ms;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
         }
 
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            padding-bottom: 50px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: var(--text-base);
+            line-height: 1.5;
+            padding-bottom: var(--space-12);
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Header & Player Section */
+        /* =========================================
+           PLAYER SECTION
+           ========================================= */
         .player-section {
             width: 100%;
             background: #000;
@@ -51,31 +88,19 @@
             width: 100%;
             height: 100%;
             border: none;
-            display: none; /* Hidden by default */
-        }
-
-        /* Error Message */
-        .error-message {
             display: none;
-            padding: 15px;
-            background: #8b0000;
-            color: #fff;
-            text-align: center;
-            font-weight: 500;
         }
 
-        .error-message.show {
-            display: block;
-        }
-
-        /* Controls & Search */
+        /* =========================================
+           CONTROLS & SEARCH
+           ========================================= */
         .controls {
             max-width: 1200px;
-            margin: 20px auto;
-            padding: 0 20px;
+            margin: var(--space-6) auto;
+            padding: 0 var(--space-4);
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: var(--space-4);
             align-items: center;
             justify-content: space-between;
         }
@@ -88,107 +113,143 @@
 
         .search-box input {
             width: 100%;
-            padding: 14px 20px;
-            border-radius: 30px;
-            border: 1px solid #333;
-            background: var(--card-bg);
-            color: var(--text);
-            font-size: 1rem;
+            padding: var(--space-3) var(--space-4) var(--space-3) 44px;
+            border-radius: 8px;
+            border: 1px solid var(--border-default);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: var(--text-base);
             outline: none;
-            transition: border 0.2s;
+            transition: border-color var(--duration-fast) var(--ease-out);
         }
 
         .search-box input:focus {
-            border-color: var(--accent);
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            width: 20px;
+            height: 20px;
         }
 
         .category-filters {
             display: flex;
-            gap: 10px;
+            gap: var(--space-2);
             overflow-x: auto;
-            padding-bottom: 5px;
+            padding-bottom: var(--space-1);
+            max-width: 100%;
+        }
+
+        .category-filters::-webkit-scrollbar {
+            height: 4px;
+        }
+        .category-filters::-webkit-scrollbar-thumb {
+            background: var(--border-default);
+            border-radius: 4px;
         }
 
         .cat-btn {
-            padding: 10px 20px;
-            border-radius: 30px;
-            border: 1px solid #333;
+            padding: var(--space-2) var(--space-4);
+            border-radius: 6px;
+            border: 1px solid var(--border-default);
             background: transparent;
             color: var(--text-muted);
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
+            font-weight: 500;
             white-space: nowrap;
-            transition: all 0.2s;
+            transition: all var(--duration-normal) var(--ease-in-out);
         }
 
-        .cat-btn:hover, .cat-btn.active {
-            background: var(--accent);
-            border-color: var(--accent);
+        .cat-btn:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
+        .cat-btn.active {
+            background: var(--brand-primary);
+            border-color: var(--brand-primary);
             color: white;
             font-weight: 600;
         }
 
-        /* Channel Grid */
+        /* =========================================
+           CHANNEL GRID
+           ========================================= */
         .channel-grid {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 var(--space-4);
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 20px;
+            gap: var(--space-4);
         }
 
         .channel-card {
-            background: var(--card-bg);
-            border-radius: 12px;
+            background: var(--bg-surface);
+            border-radius: 8px;
             overflow: hidden;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: 1px solid #2a2a2a;
+            border: 1px solid var(--border-default);
+            transition: transform var(--duration-normal) var(--ease-out), 
+                        box-shadow var(--duration-normal) var(--ease-out),
+                        border-color var(--duration-normal) var(--ease-out);
         }
 
         .channel-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(229, 9, 20, 0.3);
-            border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border-color: var(--brand-primary);
         }
 
         .channel-card img {
             width: 100%;
             height: 120px;
             object-fit: contain;
-            background: #111;
-            padding: 15px;
+            background: #0A0A0A;
+            padding: var(--space-3);
         }
 
         .card-info {
-            padding: 15px;
+            padding: var(--space-3);
             text-align: center;
         }
 
         .card-info h3 {
-            font-size: 1rem;
+            font-size: var(--text-sm);
             font-weight: 600;
+            color: var(--text-primary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-bottom: 5px;
+            margin-bottom: var(--space-1);
         }
 
         .category-tag {
-            font-size: 0.75rem;
-            color: var(--accent);
+            font-size: var(--text-xs);
+            color: var(--brand-primary);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             font-weight: 700;
         }
 
-        .no-results {
+        .status-message {
             grid-column: 1 / -1;
             text-align: center;
             color: var(--text-muted);
-            padding: 50px;
-            font-size: 1.2rem;
+            padding: var(--space-12);
+            font-size: var(--text-lg);
         }
 
         @media (max-width: 600px) {
@@ -198,7 +259,7 @@
             }
             .channel-grid {
                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-                gap: 15px;
+                gap: var(--space-3);
             }
         }
     </style>
@@ -207,7 +268,6 @@
 
     <!-- Player Section -->
     <div class="player-section">
-        <div id="errorMessage" class="error-message"></div>
         <div class="player-wrapper">
             <video id="videoPlayer" controls playsinline></video>
             <!-- Sandboxed Iframe for embed links. Pop-ups are blocked. -->
@@ -218,10 +278,11 @@
     <!-- Controls -->
     <div class="controls">
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Search sports channels...">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="searchInput" placeholder="Search channels...">
         </div>
         <div class="category-filters" id="categoryFilters">
-            <!-- Category buttons populated by JS -->
+            <!-- Category buttons will be generated here -->
         </div>
     </div>
 
@@ -230,190 +291,127 @@
         <!-- Channels populated by JS -->
     </div>
 
+    <!-- Load the Channel Logic -->
     <script src="channels.js"></script>
+
     <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
         const video = document.getElementById('videoPlayer');
         const iframe = document.getElementById('iframePlayer');
         const channelGrid = document.getElementById('channelGrid');
         const searchInput = document.getElementById('searchInput');
-        const errorMessage = document.getElementById('errorMessage');
         const categoryFilters = document.getElementById('categoryFilters');
+        
         let hls;
-        let selectedCategory = 'all';
+        let allChannels = [];
+        let currentCategory = 'All';
+        let searchTerm = '';
 
-        // --- HTML Escape Function (XSS Prevention) ---
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
-
-        // --- Error Display Function ---
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.classList.add('show');
-            setTimeout(() => {
-                errorMessage.classList.remove('show');
-            }, 5000);
-        }
-
-        // --- Smart Player Logic with Error Handling ---
+        // --- Smart Player Logic ---
         function playChannel(url) {
             // Reset players
             if (hls) { hls.destroy(); hls = null; }
             video.pause();
             video.src = "";
             video.style.display = 'none';
-            iframe.src = "";
+            iframe.src = "about:blank"; // Use about:blank to safely clear
             iframe.style.display = 'none';
-            errorMessage.classList.remove('show');
 
             // Check if it's a raw HLS stream (.m3u8)
             if (url.includes('.m3u8')) {
                 video.style.display = 'block';
                 if (Hls.isSupported()) {
                     hls = new Hls();
-                    
-                    // HLS Error Handler
-                    hls.on(Hls.Events.ERROR, (event, data) => {
-                        console.error('HLS Error:', data);
-                        if (data.fatal) {
-                            switch(data.type) {
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    showError('Network error: Could not load stream. Check your connection.');
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    showError('Media error: Invalid or corrupted stream format.');
-                                    break;
-                                default:
-                                    showError('Error loading stream: ' + data.reason);
-                            }
-                            hls.destroy();
-                            video.style.display = 'none';
-                        }
-                    });
-                    
                     hls.loadSource(url);
                     hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        video.play().catch(err => {
-                            console.error('Playback error:', err);
-                            showError('Could not start playback. The stream may be unavailable.');
-                        });
-                    });
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = url;
                     video.addEventListener('loadedmetadata', () => video.play());
-                    video.addEventListener('error', (e) => {
-                        showError('Failed to load HLS stream on this device.');
-                    });
-                } else {
-                    showError('HLS streams not supported on this browser.');
                 }
             } 
             // Otherwise, treat it as an iframe embed
             else {
                 iframe.style.display = 'block';
                 iframe.src = url;
-                iframe.addEventListener('error', () => {
-                    showError('Failed to load embed. The source may be unavailable.');
-                }, { once: true });
             }
         }
 
-        // --- Initialize Category Filters ---
-        function initCategories() {
-            const uniqueGenres = [...new Set((channels || []).map(ch => ch.genre))];
-            categoryFilters.innerHTML = '<button class="cat-btn active" data-cat="all">All Sports</button>';
-            
-            uniqueGenres.forEach(genre => {
-                const btn = document.createElement('button');
-                btn.className = 'cat-btn';
-                btn.setAttribute('data-cat', genre.toLowerCase());
-                btn.textContent = genre;
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-                    e.target.classList.add('active');
-                    selectedCategory = e.target.dataset.cat;
-                    renderChannels(searchInput.value);
-                });
-                categoryFilters.appendChild(btn);
-            });
-        }
-
-        // --- Render Channels with Category & Search Filtering ---
-        function renderChannels(filterText = '') {
+        // --- Render Channels ---
+        function renderChannels() {
             channelGrid.innerHTML = '';
-            
-            // Validate channels data
-            if (!channels || !Array.isArray(channels)) {
-                channelGrid.innerHTML = '<p class="no-results">⚠️ Failed to load channels data. Please refresh the page.</p>';
-                return;
-            }
-
-            const filtered = channels.filter(ch => {
-                const matchesSearch = ch.name.toLowerCase().includes(filterText.toLowerCase());
-                const matchesCategory = selectedCategory === 'all' || ch.genre.toLowerCase() === selectedCategory.toLowerCase();
+            const filtered = allChannels.filter(ch => {
+                const matchesSearch = ch.name.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesCategory = currentCategory === 'All' || ch.genre === currentCategory;
                 return matchesSearch && matchesCategory;
             });
 
             if (filtered.length === 0) {
-                channelGrid.innerHTML = '<p class="no-results">No channels found matching your search.</p>';
+                channelGrid.innerHTML = '<p class="status-message">No channels found.</p>';
                 return;
             }
 
             filtered.forEach(ch => {
                 const card = document.createElement('div');
                 card.className = 'channel-card';
-                
-                // Safely create image with escaped HTML
-                const img = document.createElement('img');
-                img.src = ch.logo || 'https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV';
-                img.alt = ch.name;
-                img.onerror = function() {
-                    this.src = 'https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV';
-                };
-
-                const cardInfo = document.createElement('div');
-                cardInfo.className = 'card-info';
-                
-                const title = document.createElement('h3');
-                title.textContent = ch.name;
-                
-                const tag = document.createElement('span');
-                tag.className = 'category-tag';
-                tag.textContent = ch.genre;
-                
-                cardInfo.appendChild(title);
-                cardInfo.appendChild(tag);
-                card.appendChild(img);
-                card.appendChild(cardInfo);
-                
+                // Use Design System placeholder colors for fallback
+                const fallbackImg = 'https://via.placeholder.com/180x120/131316/FAFAFA?text=TV';
+                card.innerHTML = `
+                    <img src="${ch.logo || fallbackImg}" 
+                         alt="${ch.name}" 
+                         onerror="this.src='${fallbackImg}'">
+                    <div class="card-info">
+                        <h3>${ch.name}</h3>
+                        <span class="category-tag">${ch.genre || 'General'}</span>
+                    </div>
+                `;
                 card.addEventListener('click', () => {
                     playChannel(ch.url);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
-                
                 channelGrid.appendChild(card);
             });
         }
 
-        // --- Event Listeners ---
-        searchInput.addEventListener('input', (e) => renderChannels(e.target.value));
+        // --- Load Data & Initialize ---
+        channelGrid.innerHTML = '<p class="status-message">Loading channels...</p>';
+        
+        loadChannels().then(channels => {
+            allChannels = channels;
 
-        // --- Initialize App ---
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!channels || !Array.isArray(channels)) {
-                showError('Failed to load channels. Please refresh the page.');
-                channelGrid.innerHTML = '<p class="no-results">⚠️ Channels data could not be loaded.</p>';
+            if (allChannels.length === 0) {
+                channelGrid.innerHTML = '<p class="status-message">No channels available.</p>';
                 return;
             }
-            initCategories();
+
+            // Generate Category Buttons dynamically
+            const categories = ['All', ...new Set(allChannels.map(ch => ch.genre))];
+            categoryFilters.innerHTML = '';
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = `cat-btn ${cat === 'All' ? 'active' : ''}`;
+                btn.textContent = cat;
+                btn.dataset.cat = cat;
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentCategory = cat;
+                    renderChannels();
+                });
+                categoryFilters.appendChild(btn);
+            });
+
+            renderChannels();
+        }).catch(error => {
+            console.error('Error initializing app:', error);
+            channelGrid.innerHTML = '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please check the API or your network connection.</p>';
+        });
+
+        // Search listener
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
             renderChannels();
         });
     </script>
