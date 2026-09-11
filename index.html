@@ -4,16 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sports Live TV</title>
-    <!-- hls.js for raw .m3u8 streams -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <!-- Lucide Icons for the search bar -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* =========================================
-           DESIGN SYSTEM TOKENS (From Blueprint)
-           ========================================= */
         :root {
-            /* Semantic Colors */
             --bg-primary: #09090B;
             --bg-surface: #131316;
             --border-default: #27272A;
@@ -22,7 +16,6 @@
             --brand-primary: #6366F1;
             --status-error: #EF4444;
 
-            /* Spacing Scale (Base: 4px) */
             --space-1: 4px;
             --space-2: 8px;
             --space-3: 12px;
@@ -31,16 +24,11 @@
             --space-8: 32px;
             --space-12: 48px;
 
-            /* Typography Scale */
             --text-xs: 11px;
             --text-sm: 13px;
             --text-base: 15px;
             --text-lg: 18px;
-            --text-xl: 22px;
-            --text-2xl: 28px;
-            --text-5xl: 48px;
 
-            /* Motion */
             --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
             --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
             --duration-fast: 150ms;
@@ -63,9 +51,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* =========================================
-           PLAYER SECTION
-           ========================================= */
         .player-section {
             width: 100%;
             background: #000;
@@ -91,9 +76,6 @@
             display: none;
         }
 
-        /* =========================================
-           CONTROLS & SEARCH
-           ========================================= */
         .controls {
             max-width: 1200px;
             margin: var(--space-6) auto;
@@ -150,14 +132,6 @@
             max-width: 100%;
         }
 
-        .category-filters::-webkit-scrollbar {
-            height: 4px;
-        }
-        .category-filters::-webkit-scrollbar-thumb {
-            background: var(--border-default);
-            border-radius: 4px;
-        }
-
         .cat-btn {
             padding: var(--space-2) var(--space-4);
             border-radius: 6px;
@@ -184,9 +158,6 @@
             font-weight: 600;
         }
 
-        /* =========================================
-           CHANNEL GRID
-           ========================================= */
         .channel-grid {
             max-width: 1200px;
             margin: 0 auto;
@@ -253,10 +224,7 @@
         }
 
         @media (max-width: 600px) {
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
+            .controls { flex-direction: column; align-items: stretch; }
             .channel-grid {
                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: var(--space-3);
@@ -266,36 +234,28 @@
 </head>
 <body>
 
-    <!-- Player Section -->
     <div class="player-section">
         <div class="player-wrapper">
             <video id="videoPlayer" controls playsinline></video>
-            <!-- Sandboxed Iframe for embed links. Pop-ups are blocked. -->
             <iframe id="iframePlayer" sandbox="allow-scripts allow-same-origin allow-presentation" allowfullscreen></iframe>
         </div>
     </div>
 
-    <!-- Controls -->
     <div class="controls">
         <div class="search-box">
             <i data-lucide="search" class="search-icon"></i>
             <input type="text" id="searchInput" placeholder="Search channels...">
         </div>
-        <div class="category-filters" id="categoryFilters">
-            <!-- Category buttons will be generated here -->
-        </div>
+        <div class="category-filters" id="categoryFilters"></div>
     </div>
 
-    <!-- Channel Grid -->
-    <div class="channel-grid" id="channelGrid">
-        <!-- Channels populated by JS -->
-    </div>
+    <div class="channel-grid" id="channelGrid"></div>
 
-    <!-- Load the Channel Logic -->
+    <!-- Load channels data first -->
     <script src="channels.js"></script>
 
+    <!-- Then run the app logic -->
     <script>
-        // Initialize Lucide Icons
         lucide.createIcons();
 
         const video = document.getElementById('videoPlayer');
@@ -303,23 +263,23 @@
         const channelGrid = document.getElementById('channelGrid');
         const searchInput = document.getElementById('searchInput');
         const categoryFilters = document.getElementById('categoryFilters');
-        
+
+        // The single source of truth
+        const fallbackImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
+
         let hls;
         let allChannels = [];
         let currentCategory = 'All';
         let searchTerm = '';
 
-        // --- Smart Player Logic ---
         function playChannel(url) {
-            // Reset players
             if (hls) { hls.destroy(); hls = null; }
             video.pause();
             video.src = "";
             video.style.display = 'none';
-            iframe.src = "about:blank"; // Use about:blank to safely clear
+            iframe.src = "about:blank";
             iframe.style.display = 'none';
 
-            // Check if it's a raw HLS stream (.m3u8)
             if (url.includes('.m3u8')) {
                 video.style.display = 'block';
                 if (Hls.isSupported()) {
@@ -331,15 +291,12 @@
                     video.src = url;
                     video.addEventListener('loadedmetadata', () => video.play());
                 }
-            } 
-            // Otherwise, treat it as an iframe embed
-            else {
+            } else {
                 iframe.style.display = 'block';
                 iframe.src = url;
             }
         }
 
-        // --- Render Channels ---
         function renderChannels() {
             channelGrid.innerHTML = '';
             const filtered = allChannels.filter(ch => {
@@ -356,8 +313,6 @@
             filtered.forEach(ch => {
                 const card = document.createElement('div');
                 card.className = 'channel-card';
-                // Use Design System placeholder colors for fallback
-                const fallbackImg = const fallbackImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
                 card.innerHTML = `
                     <img src="${ch.logo || fallbackImg}" 
                          alt="${ch.name}" 
@@ -375,16 +330,10 @@
             });
         }
 
-        // --- Load Data & Initialize ---
-        channelGrid.innerHTML = '<p class="status-message">Loading channels...</p>';
-        
-        loadChannels().then(channels => {
+        // --- Initialize App ---
+        // Check if channels.js loaded properly
+        if (typeof channels !== 'undefined' && channels.length > 0) {
             allChannels = channels;
-
-            if (allChannels.length === 0) {
-                channelGrid.innerHTML = '<p class="status-message">No channels available.</p>';
-                return;
-            }
 
             // Generate Category Buttons dynamically
             const categories = ['All', ...new Set(allChannels.map(ch => ch.genre))];
@@ -404,10 +353,9 @@
             });
 
             renderChannels();
-        }).catch(error => {
-            console.error('Error initializing app:', error);
-            channelGrid.innerHTML = '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please check the API or your network connection.</p>';
-        });
+        } else {
+            channelGrid.innerHTML = '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
+        }
 
         // Search listener
         searchInput.addEventListener('input', (e) => {
