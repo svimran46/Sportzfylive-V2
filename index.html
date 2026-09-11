@@ -357,7 +357,7 @@
                 const card = document.createElement('div');
                 card.className = 'channel-card';
                 // Use Design System placeholder colors for fallback
-                const fallbackImg = 'https://via.placeholder.com/180x120/131316/FAFAFA?text=TV';
+                const fallbackImg = const fallbackImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
                 card.innerHTML = `
                     <img src="${ch.logo || fallbackImg}" 
                          alt="${ch.name}" 
