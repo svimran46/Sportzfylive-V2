@@ -42,6 +42,11 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
         }
 
+        html, body {
+            width: 100%;
+            overflow-x: hidden;
+        }
+
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
@@ -51,6 +56,9 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* =========================================
+           PLAYER SECTION (always 16:9, sticky top)
+           ========================================= */
         .player-section {
             width: 100%;
             background: #000;
@@ -76,6 +84,9 @@
             display: none;
         }
 
+        /* =========================================
+           CONTROLS & SEARCH
+           ========================================= */
         .controls {
             max-width: 1200px;
             margin: var(--space-6) auto;
@@ -88,8 +99,8 @@
         }
 
         .search-box {
-            flex: 1;
-            min-width: 250px;
+            flex: 1 1 300px;
+            min-width: 0;
             position: relative;
         }
 
@@ -122,6 +133,7 @@
             color: var(--text-muted);
             width: 20px;
             height: 20px;
+            pointer-events: none;
         }
 
         .category-filters {
@@ -130,6 +142,17 @@
             overflow-x: auto;
             padding-bottom: var(--space-1);
             max-width: 100%;
+            flex: 1 1 auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .category-filters::-webkit-scrollbar {
+            height: 4px;
+        }
+        .category-filters::-webkit-scrollbar-thumb {
+            background: var(--border-default);
+            border-radius: 4px;
         }
 
         .cat-btn {
@@ -142,6 +165,7 @@
             font-size: var(--text-sm);
             font-weight: 500;
             white-space: nowrap;
+            flex-shrink: 0;
             transition: all var(--duration-normal) var(--ease-in-out);
         }
 
@@ -158,12 +182,15 @@
             font-weight: 600;
         }
 
+        /* =========================================
+           CHANNEL GRID (responsive columns)
+           ========================================= */
         .channel-grid {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 var(--space-4);
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             gap: var(--space-4);
         }
 
@@ -190,6 +217,7 @@
             object-fit: contain;
             background: #0A0A0A;
             padding: var(--space-3);
+            display: block;
         }
 
         .card-info {
@@ -223,11 +251,105 @@
             font-size: var(--text-lg);
         }
 
-        @media (max-width: 600px) {
-            .controls { flex-direction: column; align-items: stretch; }
+        /* =========================================
+           RESPONSIVE BREAKPOINTS
+           ========================================= */
+
+        @media (max-width: 1024px) {
+            .channel-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: var(--space-3);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: var(--space-3);
+                margin: var(--space-4) auto;
+            }
+
+            .search-box {
+                flex: 1 1 auto;
+            }
+
+            .category-filters {
+                flex: 1 1 auto;
+                width: 100%;
+            }
+
             .channel-grid {
                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: var(--space-3);
+                padding: 0 var(--space-3);
+            }
+
+            .channel-card img {
+                height: 100px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                font-size: 14px;
+            }
+
+            .controls {
+                padding: 0 var(--space-3);
+            }
+
+            .search-box input {
+                padding: var(--space-3) var(--space-3) var(--space-3) 40px;
+                font-size: 14px;
+            }
+
+            .search-icon {
+                left: 12px;
+                width: 18px;
+                height: 18px;
+            }
+
+            .cat-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .channel-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: var(--space-2);
+                padding: 0 var(--space-2);
+            }
+
+            .channel-card img {
+                height: 80px;
+                padding: var(--space-2);
+            }
+
+            .card-info {
+                padding: var(--space-2);
+            }
+
+            .card-info h3 {
+                font-size: 12px;
+            }
+
+            .category-tag {
+                font-size: 10px;
+            }
+
+            .status-message {
+                padding: var(--space-6);
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .channel-grid {
+                grid-template-columns: 1fr;
+            }
+            .channel-card img {
+                height: 100px;
             }
         }
     </style>
@@ -251,10 +373,7 @@
 
     <div class="channel-grid" id="channelGrid"></div>
 
-    <!-- Load channels data first -->
     <script src="channels.js"></script>
-
-    <!-- Then run the app logic -->
     <script>
         lucide.createIcons();
 
@@ -264,7 +383,6 @@
         const searchInput = document.getElementById('searchInput');
         const categoryFilters = document.getElementById('categoryFilters');
 
-        // The single source of truth
         const fallbackImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
 
         let hls;
@@ -330,12 +448,9 @@
             });
         }
 
-        // --- Initialize App ---
-        // Check if channels.js loaded properly
         if (typeof channels !== 'undefined' && channels.length > 0) {
             allChannels = channels;
 
-            // Generate Category Buttons dynamically
             const categories = ['All', ...new Set(allChannels.map(ch => ch.genre))];
             categoryFilters.innerHTML = '';
             categories.forEach(cat => {
@@ -357,7 +472,6 @@
             channelGrid.innerHTML = '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
         }
 
-        // Search listener
         searchInput.addEventListener('input', (e) => {
             searchTerm = e.target.value;
             renderChannels();
