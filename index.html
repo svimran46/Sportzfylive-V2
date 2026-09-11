@@ -54,6 +54,20 @@
             display: none; /* Hidden by default */
         }
 
+        /* Error Message */
+        .error-message {
+            display: none;
+            padding: 15px;
+            background: #8b0000;
+            color: #fff;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
         /* Controls & Search */
         .controls {
             max-width: 1200px;
@@ -193,6 +207,7 @@
 
     <!-- Player Section -->
     <div class="player-section">
+        <div id="errorMessage" class="error-message"></div>
         <div class="player-wrapper">
             <video id="videoPlayer" controls playsinline></video>
             <!-- Sandboxed Iframe for embed links. Pop-ups are blocked. -->
@@ -205,8 +220,8 @@
         <div class="search-box">
             <input type="text" id="searchInput" placeholder="Search sports channels...">
         </div>
-        <div class="category-filters">
-            <button class="cat-btn active" data-cat="all">All Sports</button>
+        <div class="category-filters" id="categoryFilters">
+            <!-- Category buttons populated by JS -->
         </div>
     </div>
 
@@ -221,9 +236,33 @@
         const iframe = document.getElementById('iframePlayer');
         const channelGrid = document.getElementById('channelGrid');
         const searchInput = document.getElementById('searchInput');
+        const errorMessage = document.getElementById('errorMessage');
+        const categoryFilters = document.getElementById('categoryFilters');
         let hls;
+        let selectedCategory = 'all';
 
-        // --- Smart Player Logic ---
+        // --- HTML Escape Function (XSS Prevention) ---
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // --- Error Display Function ---
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+            }, 5000);
+        }
+
+        // --- Smart Player Logic with Error Handling ---
         function playChannel(url) {
             // Reset players
             if (hls) { hls.destroy(); hls = null; }
@@ -232,64 +271,151 @@
             video.style.display = 'none';
             iframe.src = "";
             iframe.style.display = 'none';
+            errorMessage.classList.remove('show');
 
             // Check if it's a raw HLS stream (.m3u8)
             if (url.includes('.m3u8')) {
                 video.style.display = 'block';
                 if (Hls.isSupported()) {
                     hls = new Hls();
+                    
+                    // HLS Error Handler
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        console.error('HLS Error:', data);
+                        if (data.fatal) {
+                            switch(data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    showError('Network error: Could not load stream. Check your connection.');
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    showError('Media error: Invalid or corrupted stream format.');
+                                    break;
+                                default:
+                                    showError('Error loading stream: ' + data.reason);
+                            }
+                            hls.destroy();
+                            video.style.display = 'none';
+                        }
+                    });
+                    
                     hls.loadSource(url);
                     hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play().catch(err => {
+                            console.error('Playback error:', err);
+                            showError('Could not start playback. The stream may be unavailable.');
+                        });
+                    });
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = url;
                     video.addEventListener('loadedmetadata', () => video.play());
+                    video.addEventListener('error', (e) => {
+                        showError('Failed to load HLS stream on this device.');
+                    });
+                } else {
+                    showError('HLS streams not supported on this browser.');
                 }
             } 
             // Otherwise, treat it as an iframe embed
             else {
                 iframe.style.display = 'block';
                 iframe.src = url;
+                iframe.addEventListener('error', () => {
+                    showError('Failed to load embed. The source may be unavailable.');
+                }, { once: true });
             }
         }
 
-        // --- Render Channels ---
+        // --- Initialize Category Filters ---
+        function initCategories() {
+            const uniqueGenres = [...new Set((channels || []).map(ch => ch.genre))];
+            categoryFilters.innerHTML = '<button class="cat-btn active" data-cat="all">All Sports</button>';
+            
+            uniqueGenres.forEach(genre => {
+                const btn = document.createElement('button');
+                btn.className = 'cat-btn';
+                btn.setAttribute('data-cat', genre.toLowerCase());
+                btn.textContent = genre;
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    selectedCategory = e.target.dataset.cat;
+                    renderChannels(searchInput.value);
+                });
+                categoryFilters.appendChild(btn);
+            });
+        }
+
+        // --- Render Channels with Category & Search Filtering ---
         function renderChannels(filterText = '') {
             channelGrid.innerHTML = '';
-            const filtered = channels.filter(ch => 
-                ch.name.toLowerCase().includes(filterText.toLowerCase())
-            );
+            
+            // Validate channels data
+            if (!channels || !Array.isArray(channels)) {
+                channelGrid.innerHTML = '<p class="no-results">⚠️ Failed to load channels data. Please refresh the page.</p>';
+                return;
+            }
+
+            const filtered = channels.filter(ch => {
+                const matchesSearch = ch.name.toLowerCase().includes(filterText.toLowerCase());
+                const matchesCategory = selectedCategory === 'all' || ch.genre.toLowerCase() === selectedCategory.toLowerCase();
+                return matchesSearch && matchesCategory;
+            });
 
             if (filtered.length === 0) {
-                channelGrid.innerHTML = '<p class="no-results">No channels found.</p>';
+                channelGrid.innerHTML = '<p class="no-results">No channels found matching your search.</p>';
                 return;
             }
 
             filtered.forEach(ch => {
                 const card = document.createElement('div');
                 card.className = 'channel-card';
-                card.innerHTML = `
-                    <img src="${ch.logo || 'https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV'}" 
-                         alt="${ch.name}" 
-                         onerror="this.src='https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV'">
-                    <div class="card-info">
-                        <h3>${ch.name}</h3>
-                        <span class="category-tag">${ch.genre}</span>
-                    </div>
-                `;
+                
+                // Safely create image with escaped HTML
+                const img = document.createElement('img');
+                img.src = ch.logo || 'https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV';
+                img.alt = ch.name;
+                img.onerror = function() {
+                    this.src = 'https://via.placeholder.com/180x120/1a1a1a/ffffff?text=TV';
+                };
+
+                const cardInfo = document.createElement('div');
+                cardInfo.className = 'card-info';
+                
+                const title = document.createElement('h3');
+                title.textContent = ch.name;
+                
+                const tag = document.createElement('span');
+                tag.className = 'category-tag';
+                tag.textContent = ch.genre;
+                
+                cardInfo.appendChild(title);
+                cardInfo.appendChild(tag);
+                card.appendChild(img);
+                card.appendChild(cardInfo);
+                
                 card.addEventListener('click', () => {
                     playChannel(ch.url);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
+                
                 channelGrid.appendChild(card);
             });
         }
 
-        // Search listener
+        // --- Event Listeners ---
         searchInput.addEventListener('input', (e) => renderChannels(e.target.value));
 
-        // Initial load
-        renderChannels();
+        // --- Initialize App ---
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!channels || !Array.isArray(channels)) {
+                showError('Failed to load channels. Please refresh the page.');
+                channelGrid.innerHTML = '<p class="no-results">⚠️ Channels data could not be loaded.</p>';
+                return;
+            }
+            initCategories();
+            renderChannels();
+        });
     </script>
 </body>
 </html>
