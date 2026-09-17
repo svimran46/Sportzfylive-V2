@@ -490,6 +490,47 @@
         }
 
         /* =========================================
+           EVENT (no-teams) CARD
+           ========================================= */
+        .event-single {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) 0;
+        }
+
+        .event-poster {
+            width: 100%;
+            max-height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .event-title {
+            font-size: var(--text-sm);
+            font-weight: 600;
+            text-align: center;
+            color: var(--text-primary);
+        }
+
+        /* =========================================
+           CATEGORY SUBHEADER INSIDE MATCHES
+           ========================================= */
+        .matches-category-header {
+            grid-column: 1 / -1;
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-weight: 700;
+            color: var(--brand-primary);
+            border-left: 3px solid var(--brand-primary);
+            padding-left: 10px;
+            margin: var(--space-4) 0 var(--space-1);
+        }
+
+        /* =========================================
            CHANNEL GRID
            ========================================= */
         .channel-grid {
@@ -1343,126 +1384,21 @@
 
         // ==================================================
         // 👇 ADD YOUR CUSTOM STREAMS HERE
-        // Format: "streamed_match_id": "your_stream_url"
-        // To find match IDs, open:
-        // https://streamedproxy.svimranmy.workers.dev/api/matches/all-today
+        // You can key by team names (lowercase) OR by match ID.
         // ==================================================
         const MY_STREAMS = {
-            // "example-id-123": "https://your-stream.com/stream.m3u8",
+            // "kalamata vs larisa": "https://your-stream.com/stream.m3u8",
+            // "manchester city vs norwich city": "https://your-stream.com/embed/123",
         };
 
-        let streamedMatchesData = [];
-
-        async function fetchStreamedMatches(endpoint = 'all-today') {
-            try {
-                const res = await fetch(`${PROXY_URL}/api/matches/${endpoint}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-
-                // Handle various possible response shapes
-                let matches = [];
-                if (Array.isArray(data)) {
-                    matches = data;
-                } else if (data && Array.isArray(data.matches)) {
-                    matches = data.matches;
-                } else if (data && Array.isArray(data.data)) {
-                    matches = data.data;
-                }
-
-                return matches;
-            } catch (err) {
-                console.error('❌ Failed to fetch Streamed matches:', err);
-                return null;
-            }
+        function badgeToUrl(badge) {
+            if (!badge) return '';
+            return `${PROXY_URL}/api/images/proxy/${badge}`;
         }
 
-        function extractMatchInfo(match) {
-            // Try many possible field names - adapt as needed
-            const id = match.id || match.matchId || match._id || '';
-
-            const homeTeam =
-                match.teams?.home?.name ||
-                match.home?.name ||
-                match.homeTeam?.name ||
-                match.homeTeam ||
-                match.team1 ||
-                match.home ||
-                '';
-
-            const awayTeam =
-                match.teams?.away?.name ||
-                match.away?.name ||
-                match.awayTeam?.name ||
-                match.awayTeam ||
-                match.team2 ||
-                match.away ||
-                '';
-
-            const homeLogo =
-                match.teams?.home?.badge ||
-                match.teams?.home?.logo ||
-                match.home?.logo ||
-                match.homeTeam?.logo ||
-                match.homeLogo ||
-                match.team1Logo ||
-                '';
-
-            const awayLogo =
-                match.teams?.away?.badge ||
-                match.teams?.away?.logo ||
-                match.away?.logo ||
-                match.awayTeam?.logo ||
-                match.awayLogo ||
-                match.team2Logo ||
-                '';
-
-            const title =
-                match.title ||
-                match.name ||
-                match.matchTitle ||
-                (homeTeam && awayTeam ? `${homeTeam} vs ${awayTeam}` : 'Match');
-
-            const category =
-                match.category ||
-                match.sport ||
-                match.league ||
-                match.competition ||
-                'Match';
-
-            const dateValue = match.date || match.startTime || match.timestamp || match.time;
-            let formattedTime = 'TBA';
-            let isLive = false;
-
-            if (dateValue) {
-                const d = new Date(typeof dateValue === 'number' && dateValue < 1e12
-                    ? dateValue * 1000
-                    : dateValue);
-
-                if (!isNaN(d.getTime())) {
-                    formattedTime = d.toLocaleString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-
-                    const now = Date.now();
-                    const diff = now - d.getTime();
-                    if (diff > -30 * 60 * 1000 && diff < 3 * 60 * 60 * 1000) {
-                        isLive = true;
-                    }
-                }
-            }
-
-            const customStream = MY_STREAMS[String(id)] || null;
-
-            return {
-                id, title, category,
-                homeTeam, awayTeam,
-                homeLogo, awayLogo,
-                formattedTime, isLive,
-                customStream
-            };
+        function posterToUrl(poster) {
+            if (!poster) return '';
+            return poster.startsWith('http') ? poster : `${PROXY_URL}${poster}`;
         }
 
         function getInitials(name) {
@@ -1476,6 +1412,137 @@
                 .toUpperCase();
         }
 
+        function formatMatchTime(dateValue) {
+            if (!dateValue || dateValue <= 0) return 'TBA';
+            const d = new Date(dateValue);
+            if (isNaN(d.getTime())) return 'TBA';
+            return d.toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function isMatchLive(dateValue) {
+            if (!dateValue || dateValue <= 0) return false;
+            const now  = Date.now();
+            const diff = now - dateValue;
+            // live if within -30min to +3hrs of start
+            return diff > -30 * 60 * 1000 && diff < 3 * 60 * 60 * 1000;
+        }
+
+        function findMyStream(match) {
+            const home = (match.teams?.home?.name || '').toLowerCase().trim();
+            const away = (match.teams?.away?.name || '').toLowerCase().trim();
+            const nameKey = `${home} vs ${away}`;
+
+            return MY_STREAMS[nameKey] || MY_STREAMS[match.id] || null;
+        }
+
+        async function fetchStreamedMatches(endpoint = 'all-today') {
+            try {
+                const res = await fetch(`${PROXY_URL}/api/matches/${endpoint}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                return Array.isArray(data) ? data : [];
+            } catch (err) {
+                console.error('❌ Failed to fetch Streamed matches:', err);
+                return null;
+            }
+        }
+
+        function groupMatchesByCategory(matches) {
+            return matches.reduce((groups, match) => {
+                const cat = (match.category || 'other').toLowerCase();
+                (groups[cat] = groups[cat] || []).push(match);
+                return groups;
+            }, {});
+        }
+
+        function buildTeamHtml(name, badge) {
+            const url = badgeToUrl(badge);
+            const fallback = `<div class="team-logo-fallback">${getInitials(name)}</div>`;
+
+            if (!url) return fallback;
+
+            return `
+                <img class="team-logo"
+                     src="${url}"
+                     alt="${name || ''}"
+                     onerror="this.outerHTML='${fallback.replace(/'/g, "\\'")}'">
+            `;
+        }
+
+        function buildEventHtml(match) {
+            const poster = posterToUrl(match.poster);
+            return `
+                <div class="event-single">
+                    ${poster ? `<img class="event-poster" src="${poster}" alt="${match.title || ''}" onerror="this.style.display='none'">` : ''}
+                    <span class="event-title">${match.title || 'Event'}</span>
+                </div>
+            `;
+        }
+
+        function buildMatchCard(match) {
+            const hasTeams = match.teams && match.teams.home && match.teams.away;
+
+            const categoryText = (match.category || 'other').toUpperCase();
+            const timeText     = formatMatchTime(match.date);
+            const live         = isMatchLive(match.date);
+            const statusClass  = live ? 'live' : 'upcoming';
+            const statusText   = live ? 'LIVE' : 'Upcoming';
+
+            const myStream = findMyStream(match);
+            const hasStream = !!myStream;
+            const btnClass  = hasStream ? 'watch-btn active' : 'watch-btn disabled';
+            const btnText   = hasStream ? '▶ Watch Now' : '⏳ No Stream';
+
+            const middleHtml = hasTeams
+                ? `
+                    <div class="match-teams">
+                        <div class="team">
+                            ${buildTeamHtml(match.teams.home.name, match.teams.home.badge)}
+                            <span class="team-name">${match.teams.home.name || 'TBD'}</span>
+                        </div>
+                        <span class="vs-badge">VS</span>
+                        <div class="team">
+                            ${buildTeamHtml(match.teams.away.name, match.teams.away.badge)}
+                            <span class="team-name">${match.teams.away.name || 'TBD'}</span>
+                        </div>
+                    </div>
+                `
+                : buildEventHtml(match);
+
+            const card = document.createElement('div');
+            card.className = 'match-card';
+
+            card.innerHTML = `
+                <div class="match-card-top">
+                    <span class="match-category">${categoryText}</span>
+                    <span class="match-status ${statusClass}">${statusText}</span>
+                </div>
+
+                ${middleHtml}
+
+                <div class="match-time">${timeText}</div>
+
+                <button class="${btnClass}" ${hasStream ? '' : 'disabled'}>
+                    ${btnText}
+                </button>
+            `;
+
+            if (hasStream) {
+                const btn = card.querySelector('.watch-btn');
+                btn.addEventListener('click', () => {
+                    playChannel(myStream);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+
+            return card;
+        }
+
         function renderStreamedMatches(matches) {
             if (!streamedMatchesEl) return;
 
@@ -1487,61 +1554,33 @@
 
             streamedMatchesEl.innerHTML = '';
 
-            matches.forEach(match => {
-                const info = extractMatchInfo(match);
+            const grouped = groupMatchesByCategory(matches);
 
-                const card = document.createElement('div');
-                card.className = 'match-card';
+            // Sort categories so football + popular ones come first
+            const preferredOrder = [
+                'football', 'basketball', 'american-football',
+                'baseball', 'hockey', 'tennis', 'cricket',
+                'rugby', 'fight', 'motor-sports', 'golf', 'afl'
+            ];
 
-                const homeLogoHTML = info.homeLogo
-                    ? `<img class="team-logo" src="${info.homeLogo}" alt="${info.homeTeam}" onerror="this.outerHTML='&lt;div class=\\'team-logo-fallback\\'&gt;${getInitials(info.homeTeam)}&lt;/div&gt;'">`
-                    : `<div class="team-logo-fallback">${getInitials(info.homeTeam)}</div>`;
+            const categories = Object.keys(grouped).sort((a, b) => {
+                const ia = preferredOrder.indexOf(a);
+                const ib = preferredOrder.indexOf(b);
+                if (ia === -1 && ib === -1) return a.localeCompare(b);
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+            });
 
-                const awayLogoHTML = info.awayLogo
-                    ? `<img class="team-logo" src="${info.awayLogo}" alt="${info.awayTeam}" onerror="this.outerHTML='&lt;div class=\\'team-logo-fallback\\'&gt;${getInitials(info.awayTeam)}&lt;/div&gt;'">`
-                    : `<div class="team-logo-fallback">${getInitials(info.awayTeam)}</div>`;
+            categories.forEach(cat => {
+                const header = document.createElement('div');
+                header.className = 'matches-category-header';
+                header.textContent = cat.toUpperCase();
+                streamedMatchesEl.appendChild(header);
 
-                const statusClass = info.isLive ? 'live' : 'upcoming';
-                const statusText  = info.isLive ? 'LIVE' : 'Upcoming';
-
-                const hasStream = !!info.customStream;
-                const btnClass  = hasStream ? 'watch-btn active' : 'watch-btn disabled';
-                const btnText   = hasStream ? '▶ Watch Now' : '⏳ No Stream';
-
-                card.innerHTML = `
-                    <div class="match-card-top">
-                        <span class="match-category">${info.category}</span>
-                        <span class="match-status ${statusClass}">${statusText}</span>
-                    </div>
-
-                    <div class="match-teams">
-                        <div class="team">
-                            ${homeLogoHTML}
-                            <span class="team-name">${info.homeTeam || 'TBD'}</span>
-                        </div>
-                        <span class="vs-badge">VS</span>
-                        <div class="team">
-                            ${awayLogoHTML}
-                            <span class="team-name">${info.awayTeam || 'TBD'}</span>
-                        </div>
-                    </div>
-
-                    <div class="match-time">${info.formattedTime}</div>
-
-                    <button class="${btnClass}" ${hasStream ? '' : 'disabled'}>
-                        ${btnText}
-                    </button>
-                `;
-
-                if (hasStream) {
-                    const btn = card.querySelector('.watch-btn');
-                    btn.addEventListener('click', () => {
-                        playChannel(info.customStream);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                    });
-                }
-
-                streamedMatchesEl.appendChild(card);
+                grouped[cat].forEach(match => {
+                    streamedMatchesEl.appendChild(buildMatchCard(match));
+                });
             });
         }
 
@@ -1557,7 +1596,6 @@
                 return;
             }
 
-            streamedMatchesData = matches;
             renderStreamedMatches(matches);
 
             // Log the first match so you can inspect field names
