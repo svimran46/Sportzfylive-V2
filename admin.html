@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Sportzfy Admin</title>
+
+<style>
+
+*{
+box-sizing:border-box;
+font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+margin:0;
+background:#0b0e14;
+color:white;
+}
+
+
+/* Sidebar */
+
+.sidebar{
+
+position:fixed;
+left:0;
+top:0;
+
+height:100vh;
+width:240px;
+
+background:#151922;
+
+padding:25px;
+
+}
+
+
+.logo{
+
+font-size:24px;
+font-weight:bold;
+
+margin-bottom:40px;
+
+}
+
+
+.menu div{
+
+padding:14px;
+margin-bottom:8px;
+
+border-radius:10px;
+
+color:#aaa;
+
+cursor:pointer;
+
+}
+
+
+.menu div:hover{
+
+background:#242b38;
+color:white;
+
+}
+
+
+
+/* Main */
+
+.main{
+
+margin-left:240px;
+
+padding:30px;
+
+}
+
+
+
+.top{
+
+display:flex;
+justify-content:space-between;
+align-items:center;
+
+}
+
+
+
+button{
+
+background:#e50914;
+
+border:none;
+
+color:white;
+
+padding:12px 18px;
+
+border-radius:8px;
+
+cursor:pointer;
+
+}
+
+
+
+.card{
+
+background:#151922;
+
+padding:20px;
+
+border-radius:15px;
+
+margin-top:20px;
+
+}
+
+
+
+.match{
+
+background:#0f131c;
+
+padding:15px;
+
+border-radius:10px;
+
+margin-top:10px;
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+}
+
+
+
+.stream{
+
+background:#0f131c;
+
+padding:15px;
+
+border-radius:10px;
+
+margin-top:10px;
+
+}
+
+
+
+input,select{
+
+width:100%;
+
+padding:12px;
+
+margin-top:8px;
+
+margin-bottom:15px;
+
+border-radius:8px;
+
+border:1px solid #303744;
+
+background:#0b0e14;
+
+color:white;
+
+}
+
+
+
+.hidden{
+
+display:none;
+
+}
+
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="sidebar">
+
+<div class="logo">
+Sportzfy Admin
+</div>
+
+
+<div class="menu">
+
+<div>Dashboard</div>
+<div>Matches</div>
+<div>Streams</div>
+<div>Settings</div>
+
+</div>
+
+
+</div>
+
+
+
+
+<div class="main">
+
+
+<div class="top">
+
+<h1>
+Admin Dashboard
+</h1>
+
+
+<button onclick="loadMatches()">
+Refresh
+</button>
+
+
+</div>
+
+
+
+
+<div class="card">
+
+
+<h2>
+Today's Matches
+</h2>
+
+
+<div id="matches">
+Loading...
+</div>
+
+
+</div>
+
+
+
+
+
+<div id="streamBox" class="card hidden">
+
+
+<h2 id="matchTitle">
+Streams
+</h2>
+
+
+
+<button onclick="openForm()">
++ Add Stream
+</button>
+
+
+
+<div id="streams"></div>
+
+
+
+<div id="form" class="hidden">
+
+
+<h3>
+New Stream
+</h3>
+
+
+<input id="name"
+placeholder="Channel Name">
+
+
+<input id="language"
+placeholder="Language"
+value="English">
+
+
+
+<select id="quality">
+
+<option>HD</option>
+<option>SD</option>
+
+</select>
+
+
+
+<input id="url"
+placeholder="Stream URL">
+
+
+<button onclick="saveStream()">
+Save
+</button>
+
+
+</div>
+
+
+</div>
+
+
+
+</div>
+
+
+
+<script src="admin.js"></script>
+
+</body>
+</html>
