@@ -15,6 +15,7 @@
             --text-muted: #A1A1AA;
             --brand-primary: #6366F1;
             --status-error: #EF4444;
+            --accent-live: #EF4444;
 
             --space-1: 4px;
             --space-2: 8px;
@@ -251,6 +252,244 @@
         }
 
         /* =========================================
+           SECTION HEADERS
+           ========================================= */
+        .section-header {
+            max-width: 1200px;
+            margin: var(--space-8) auto var(--space-4);
+            padding: 0 var(--space-4);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: var(--space-3);
+        }
+
+        .section-header h2 {
+            font-size: var(--text-lg);
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .section-header h2 .dot-live {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-live);
+            box-shadow: 0 0 8px var(--accent-live);
+            animation: pulse-live 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-live {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        .section-header .refresh-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-default);
+            background: transparent;
+            color: var(--text-muted);
+            font-size: var(--text-xs);
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all var(--duration-fast) var(--ease-out);
+        }
+
+        .section-header .refresh-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--brand-primary);
+            background: var(--bg-surface);
+        }
+
+        .section-header .refresh-btn svg {
+            width: 13px;
+            height: 13px;
+        }
+
+        /* =========================================
+           MATCHES GRID
+           ========================================= */
+        .matches-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--space-4);
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .match-card {
+            background: var(--bg-surface);
+            border-radius: 10px;
+            padding: var(--space-4);
+            border: 1px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            transition:
+                transform var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out),
+                border-color var(--duration-normal) var(--ease-out);
+        }
+
+        .match-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border-color: var(--brand-primary);
+        }
+
+        .match-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-2);
+        }
+
+        .match-category {
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-weight: 700;
+            color: var(--brand-primary);
+            background: rgba(99, 102, 241, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .match-status {
+            font-size: var(--text-xs);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .match-status.live {
+            color: var(--accent-live);
+        }
+
+        .match-status.live::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-live);
+            animation: pulse-live 1.5s ease-in-out infinite;
+        }
+
+        .match-status.upcoming {
+            color: var(--text-muted);
+        }
+
+        .match-teams {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-3);
+            padding: var(--space-2) 0;
+        }
+
+        .team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-2);
+            flex: 1;
+            min-width: 0;
+        }
+
+        .team-logo {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.03);
+            padding: 4px;
+        }
+
+        .team-logo-fallback {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #27272A, #1a1a2e);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: var(--text-sm);
+            color: var(--text-muted);
+        }
+
+        .team-name {
+            font-size: var(--text-sm);
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            width: 100%;
+        }
+
+        .vs-badge {
+            font-size: var(--text-xs);
+            font-weight: 700;
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.04);
+            flex-shrink: 0;
+        }
+
+        .match-time {
+            font-size: var(--text-xs);
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .watch-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            font-size: var(--text-sm);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all var(--duration-fast) var(--ease-out);
+        }
+
+        .watch-btn.active {
+            background: var(--accent-live);
+            color: #fff;
+        }
+
+        .watch-btn.active:hover {
+            background: #ff5c75;
+            transform: translateY(-1px);
+        }
+
+        .watch-btn.disabled {
+            background: rgba(255,255,255,0.04);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* =========================================
            CHANNEL GRID
            ========================================= */
         .channel-grid {
@@ -335,13 +574,12 @@
            ========================= */
         .player-section.is-floating {
             position: fixed;
-            /* left/top are set dynamically by JS (drag) */
             width: min(380px, calc(100vw - 36px));
             z-index: 9999;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 14px 45px rgba(0, 0, 0, .65);
-            touch-action: none;         /* prevents page scroll from starting on the mini player */
+            touch-action: none;
             cursor: grab;
             user-select: none;
             -webkit-user-select: none;
@@ -358,7 +596,6 @@
             max-width: none;
         }
 
-        /* Reserves the original slot while the player floats */
         .player-spacer {
             display: none;
             width: 100%;
@@ -469,6 +706,21 @@
                 padding: var(--space-6);
                 font-size: 15px;
             }
+
+            .matches-grid {
+                grid-template-columns: 1fr;
+                padding: 0 var(--space-2);
+                gap: var(--space-3);
+            }
+
+            .section-header {
+                padding: 0 var(--space-3);
+                margin: var(--space-6) auto var(--space-3);
+            }
+
+            .section-header h2 {
+                font-size: var(--text-base);
+            }
         }
 
         @media (max-width: 360px) {
@@ -557,6 +809,26 @@
     <!-- Reserves layout space while the player is floating -->
     <div class="player-spacer" id="playerSpacer" aria-hidden="true"></div>
 
+    <!-- =========================================
+         LIVE MATCHES SECTION (from Streamed.pk)
+         ========================================= -->
+    <div class="section-header">
+        <h2><span class="dot-live"></span> Live Matches</h2>
+        <button class="refresh-btn" id="refreshMatchesBtn" type="button">
+            <i data-lucide="refresh-cw"></i> Refresh
+        </button>
+    </div>
+    <div class="matches-grid" id="streamedMatches">
+        <p class="status-message">Loading matches...</p>
+    </div>
+
+    <!-- =========================================
+         CHANNELS SECTION
+         ========================================= -->
+    <div class="section-header">
+        <h2>📺 All Channels</h2>
+    </div>
+
     <div class="controls">
         <div class="search-box">
             <i data-lucide="search" class="search-icon"></i>
@@ -580,6 +852,8 @@
         const channelGrid        = document.getElementById('channelGrid');
         const searchInput        = document.getElementById('searchInput');
         const categoryFilters    = document.getElementById('categoryFilters');
+        const streamedMatchesEl  = document.getElementById('streamedMatches');
+        const refreshMatchesBtn  = document.getElementById('refreshMatchesBtn');
 
         const fallbackImg =
             'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
@@ -620,10 +894,8 @@
 
         let floatingPlayerClosed = false;
         let floatThreshold       = 0;
-        let savedFloatPosition   = null;   // { left, top } in viewport coords; null = use default
+        let savedFloatPosition   = null;
         let dragState            = null;
-
-        /* ---------- helpers ---------- */
 
         function clearInlineFloatPosition() {
             playerSection.style.left   = '';
@@ -644,13 +916,9 @@
             };
         }
 
-        /* ---------- activate / deactivate float ---------- */
-
         function activateFloat() {
-            // add class first so CSS applies floating width/height
             playerSection.classList.add('is-floating');
 
-            // read the actual floating size (forces sync layout — no paint occurs yet)
             const w = playerSection.offsetWidth;
             const h = playerSection.offsetHeight;
             const margin = getFloatMargin();
@@ -661,7 +929,6 @@
                 left = savedFloatPosition.left;
                 top  = savedFloatPosition.top;
             } else {
-                // default: right middle of the screen
                 left = window.innerWidth - w - margin;
                 top  = (window.innerHeight - h) / 2;
             }
@@ -681,8 +948,6 @@
             dragState = null;
         }
 
-        /* ---------- visibility checks ---------- */
-
         function hasActivePlayback() {
             if (video.style.display !== 'none' &&
                 video.src &&
@@ -697,8 +962,6 @@
             }
             return false;
         }
-
-        /* ---------- measure page position of the player ---------- */
 
         function recalcFloatThreshold() {
             if (!playerSection) return;
@@ -718,18 +981,14 @@
             }
         }
 
-        /* ---------- main state machine ---------- */
-
         function updateFloatingPlayer() {
             if (!playerSection) return;
 
-            // Native browser PiP takes over — don't double up
             if (document.pictureInPictureElement) {
                 deactivateFloat();
                 return;
             }
 
-            // Re-arm the close button once the user scrolls back to the top
             if (window.scrollY <= floatThreshold) {
                 floatingPlayerClosed = false;
             }
@@ -750,23 +1009,15 @@
 
         function resetFloatingState() {
             floatingPlayerClosed = false;
-            savedFloatPosition   = null;   // new channel starts at default right-middle
+            savedFloatPosition   = null;
             deactivateFloat();
         }
 
-        /* =========================================
-           DRAG-TO-MOVE  (pointer events — mouse + touch)
-           ========================================= */
-
-        const DRAG_THRESHOLD_PX = 6;   // movement needed before we treat it as a drag
+        const DRAG_THRESHOLD_PX = 6;
 
         function onPointerDown(e) {
             if (!playerSection.classList.contains('is-floating')) return;
-
-            // Never intercept our own buttons
             if (e.target.closest('.pip-action')) return;
-
-            // Left mouse button only
             if (e.pointerType === 'mouse' && e.button !== 0) return;
 
             const rect = playerSection.getBoundingClientRect();
@@ -788,8 +1039,6 @@
             const dx = e.clientX - dragState.startX;
             const dy = e.clientY - dragState.startY;
 
-            // Wait for the movement threshold before committing to a drag,
-            // so taps on native video controls / buttons still work.
             if (!dragState.dragging) {
                 if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
 
@@ -826,282 +1075,3 @@
             }
 
             if (dragState.dragging) {
-                playerSection.classList.remove('is-dragging');
-
-                savedFloatPosition = {
-                    left: parseFloat(playerSection.style.left) || 0,
-                    top:  parseFloat(playerSection.style.top)  || 0
-                };
-            }
-
-            dragState = null;
-        }
-
-        playerSection.addEventListener('pointerdown', onPointerDown);
-        playerSection.addEventListener('pointermove', onPointerMove);
-        playerSection.addEventListener('pointerup',   onPointerUp);
-        playerSection.addEventListener('pointercancel', onPointerUp);
-
-        /* =========================================
-           WINDOW / VIDEO LISTENERS
-           ========================================= */
-        window.addEventListener('scroll', updateFloatingPlayer, { passive: true });
-
-        window.addEventListener('resize', () => {
-            recalcFloatThreshold();
-            updateFloatingPlayer();
-
-            // re-clamp the floating window if it's open and not being dragged
-            if (playerSection.classList.contains('is-floating') && !dragState) {
-                const w = playerSection.offsetWidth;
-                const h = playerSection.offsetHeight;
-                const left = parseFloat(playerSection.style.left) || 0;
-                const top  = parseFloat(playerSection.style.top)  || 0;
-                const pos  = clampPosition(left, top, w, h);
-
-                playerSection.style.left = pos.left + 'px';
-                playerSection.style.top  = pos.top  + 'px';
-
-                if (savedFloatPosition) savedFloatPosition = pos;
-            }
-        });
-
-        window.addEventListener('load', () => {
-            recalcFloatThreshold();
-            updateFloatingPlayer();
-        });
-
-        window.addEventListener('orientationchange', () => {
-            recalcFloatThreshold();
-            updateFloatingPlayer();
-        });
-
-        video.addEventListener('play',    updateFloatingPlayer);
-        video.addEventListener('playing', updateFloatingPlayer);
-        video.addEventListener('pause',   updateFloatingPlayer);
-        video.addEventListener('ended',   deactivateFloat);
-
-        /* ---------- PIP buttons ---------- */
-
-        if (closeFloatingButton) {
-            closeFloatingButton.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                floatingPlayerClosed = true;
-                deactivateFloat();
-            });
-        }
-
-        if (nativePipButton) {
-            nativePipButton.addEventListener('click', async (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-
-                try {
-                    if (document.pictureInPictureElement) {
-                        await document.exitPictureInPicture();
-                        return;
-                    }
-                    if (!video.requestPictureInPicture) {
-                        alert('Picture-in-Picture is not supported by this browser.');
-                        return;
-                    }
-                    if (video.readyState < 1) {
-                        alert('Start a video first.');
-                        return;
-                    }
-                    await video.requestPictureInPicture();
-                } catch (error) {
-                    console.warn('Picture-in-Picture unavailable:', error);
-                }
-            });
-        }
-
-        video.addEventListener('enterpictureinpicture', () => {
-            deactivateFloat();
-        });
-
-        video.addEventListener('leavepictureinpicture', () => {
-            floatingPlayerClosed = false;
-            updateFloatingPlayer();
-        });
-
-        /* =========================================
-           PLAY CHANNEL
-           ========================================= */
-        function playChannel(url) {
-            resetFloatingState();
-
-            if (hls) {
-                hls.destroy();
-                hls = null;
-            }
-
-            video.pause();
-            video.removeAttribute('src');
-            video.load();
-            video.style.display = 'none';
-
-            iframe.src = 'about:blank';
-            iframe.style.display = 'none';
-
-            showBallLoader();
-
-            if (url.includes('.m3u8')) {
-
-                video.style.display = 'block';
-
-                if (Hls.isSupported()) {
-
-                    hls = new Hls();
-                    hls.loadSource(url);
-                    hls.attachMedia(video);
-
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        video.play().catch(() => {});
-                    });
-
-                    hls.on(Hls.Events.ERROR, (event, data) => {
-                        if (data.fatal) hideBallLoader();
-                    });
-
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-
-                    video.src = url;
-
-                    video.addEventListener('loadedmetadata', () => {
-                        video.play().catch(() => {});
-                    }, { once: true });
-
-                } else {
-                    hideBallLoader();
-                }
-
-            } else {
-
-                iframe.style.display = 'block';
-
-                iframe.onload = () => {
-                    hideBallLoader();
-                    updateFloatingPlayer();
-                };
-
-                iframe.src = url;
-            }
-        }
-
-        /* =========================================
-           RENDER CHANNELS
-           ========================================= */
-        function renderChannels() {
-
-            channelGrid.innerHTML = '';
-
-            const filtered = allChannels.filter(ch => {
-
-                const matchesSearch =
-                    ch.name.toLowerCase().includes(searchTerm.toLowerCase());
-
-                const matchesCategory =
-                    currentCategory === 'All' || ch.genre === currentCategory;
-
-                return matchesSearch && matchesCategory;
-            });
-
-            if (filtered.length === 0) {
-                channelGrid.innerHTML =
-                    '<p class="status-message">No channels found.</p>';
-                return;
-            }
-
-            filtered.forEach(ch => {
-
-                const card = document.createElement('div');
-                card.className = 'channel-card';
-
-                card.innerHTML = `
-                    <img
-                        src="${ch.logo || fallbackImg}"
-                        alt="${ch.name}"
-                        onerror="this.src='${fallbackImg}'">
-
-                    <div class="card-info">
-                        <h3>${ch.name}</h3>
-                        <span class="category-tag">
-                            ${ch.genre || 'General'}
-                        </span>
-                    </div>
-                `;
-
-                card.addEventListener('click', () => {
-                    playChannel(ch.url);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-
-                channelGrid.appendChild(card);
-            });
-        }
-
-        /* =========================================
-           LOAD CHANNEL DATA
-           ========================================= */
-        if (typeof channels !== 'undefined' && channels.length > 0) {
-
-            allChannels = channels;
-
-            const categories = [
-                'All',
-                ...new Set(allChannels.map(ch => ch.genre))
-            ];
-
-            categoryFilters.innerHTML = '';
-
-            categories.forEach(cat => {
-
-                const btn = document.createElement('button');
-                btn.className = `cat-btn ${cat === 'All' ? 'active' : ''}`;
-                btn.textContent = cat;
-                btn.dataset.cat = cat;
-
-                btn.addEventListener('click', () => {
-
-                    document.querySelectorAll('.cat-btn')
-                        .forEach(b => b.classList.remove('active'));
-
-                    btn.classList.add('active');
-                    currentCategory = cat;
-                    renderChannels();
-                });
-
-                categoryFilters.appendChild(btn);
-            });
-
-            renderChannels();
-
-        } else {
-
-            channelGrid.innerHTML =
-                '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
-        }
-
-        /* =========================================
-           SEARCH
-           ========================================= */
-        searchInput.addEventListener('input', (e) => {
-            searchTerm = e.target.value;
-            renderChannels();
-        });
-
-        /* =========================================
-           INITIAL MEASUREMENT
-           ========================================= */
-        recalcFloatThreshold();
-        window.requestAnimationFrame(() => {
-            recalcFloatThreshold();
-            updateFloatingPlayer();
-        });
-
-    </script>
-
-</body>
-</html>
