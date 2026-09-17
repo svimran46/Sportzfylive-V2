@@ -85,6 +85,90 @@
         }
 
         /* =========================================
+           VIDEO LOADING INDICATOR — BALL LOADER ONLY
+           ========================================= */
+        .ball-loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.28);
+            z-index: 20;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 180ms ease, visibility 180ms ease;
+        }
+
+        .ball-loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .ball-loader {
+            width: clamp(92px, 15vw, 150px);
+            height: clamp(92px, 15vw, 150px);
+            display: block;
+            animation: ball-loader-spin 3.6s linear infinite;
+        }
+
+        .ball-loader .loader-ball {
+            transform-origin: 50% 50%;
+            animation: loader-ball-spin 2.2s linear infinite;
+        }
+
+        .ball-loader .loader-arrow {
+            transform-origin: 50% 50%;
+            animation: loader-arrows-spin 1.8s linear infinite;
+        }
+
+        .ball-loader .loader-ticks {
+            transform-origin: 50% 50%;
+            animation: loader-ticks-pulse 1.1s ease-in-out infinite;
+        }
+
+        @keyframes ball-loader-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes loader-ball-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(-360deg);
+            }
+        }
+
+        @keyframes loader-arrows-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(-360deg);
+            }
+        }
+
+        @keyframes loader-ticks-pulse {
+            0%, 100% {
+                opacity: 0.45;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* =========================================
            CONTROLS & SEARCH
            ========================================= */
         .controls {
@@ -150,6 +234,7 @@
         .category-filters::-webkit-scrollbar {
             height: 4px;
         }
+
         .category-filters::-webkit-scrollbar-thumb {
             background: var(--border-default);
             border-radius: 4px;
@@ -200,9 +285,10 @@
             overflow: hidden;
             cursor: pointer;
             border: 1px solid var(--border-default);
-            transition: transform var(--duration-normal) var(--ease-out), 
-                        box-shadow var(--duration-normal) var(--ease-out),
-                        border-color var(--duration-normal) var(--ease-out);
+            transition:
+                transform var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out),
+                border-color var(--duration-normal) var(--ease-out);
         }
 
         .channel-card:hover {
@@ -271,37 +357,12 @@
             }
 
             .search-box {
-                flex: 1 1 auto;
+                flex-basis: auto;
             }
 
             .category-filters {
-                flex: 1 1 auto;
+                flex-basis: auto;
                 width: 100%;
-            }
-
-            .channel-grid {
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-                gap: var(--space-3);
-                padding: 0 var(--space-3);
-            }
-
-            .channel-card img {
-                height: 100px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            body {
-                font-size: 14px;
-            }
-
-            .controls {
-                padding: 0 var(--space-3);
-            }
-
-            .search-box input {
-                padding: var(--space-3) var(--space-3) var(--space-3) 40px;
-                font-size: 14px;
             }
 
             .search-icon {
@@ -348,134 +409,613 @@
             .channel-grid {
                 grid-template-columns: 1fr;
             }
+
             .channel-card img {
                 height: 100px;
             }
         }
     </style>
 </head>
+
 <body>
 
     <div class="player-section">
         <div class="player-wrapper">
-            <video id="videoPlayer" controls playsinline></video>
-            <iframe id="iframePlayer" sandbox="allow-scripts allow-same-origin allow-presentation" allowfullscreen></iframe>
+
+            <video
+                id="videoPlayer"
+                controls
+                playsinline>
+            </video>
+
+            <iframe
+                id="iframePlayer"
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                allowfullscreen>
+            </iframe>
+
+            <!-- WATERMARK-FREE FOOTBALL LOADING ANIMATION -->
+            <div
+                class="ball-loading-overlay"
+                id="ballLoadingOverlay"
+                aria-hidden="true">
+
+                <svg
+                    class="ball-loader"
+                    viewBox="0 0 200 200"
+                    role="img"
+                    aria-label="Loading video">
+
+                    <!-- BLUE ROTATING ARROWS -->
+                    <g
+                        class="loader-arrow"
+                        fill="none"
+                        stroke-linecap="butt">
+
+                        <path
+                            d="M36 77 A76 76 0 0 1 145 29"
+                            stroke="#8DB3E5"
+                            stroke-width="18"/>
+
+                        <path
+                            d="M145 29 A76 76 0 0 1 171 145"
+                            stroke="#2F67A8"
+                            stroke-width="18"/>
+
+                        <path
+                            d="M171 145 A76 76 0 0 1 55 172"
+                            stroke="#8DB3E5"
+                            stroke-width="18"/>
+
+                        <path
+                            d="M55 172 A76 76 0 0 1 29 58"
+                            stroke="#2F67A8"
+                            stroke-width="18"/>
+
+                        <path
+                            d="M142 20 L174 26 L150 48 Z"
+                            fill="#2F67A8"
+                            stroke="none"/>
+
+                        <path
+                            d="M58 181 L27 176 L51 151 Z"
+                            fill="#2F67A8"
+                            stroke="none"/>
+                    </g>
+
+                    <!-- BLACK MOTION TICKS -->
+                    <g
+                        class="loader-ticks"
+                        stroke="#050505"
+                        stroke-width="5"
+                        stroke-linecap="round">
+
+                        <line
+                            x1="100"
+                            y1="13"
+                            x2="100"
+                            y2="29"/>
+
+                        <line
+                            x1="171"
+                            y1="49"
+                            x2="158"
+                            y2="57"/>
+
+                        <line
+                            x1="187"
+                            y1="101"
+                            x2="171"
+                            y2="101"/>
+
+                        <line
+                            x1="163"
+                            y1="156"
+                            x2="151"
+                            y2="146"/>
+
+                        <line
+                            x1="101"
+                            y1="187"
+                            x2="101"
+                            y2="171"/>
+
+                        <line
+                            x1="39"
+                            y1="157"
+                            x2="51"
+                            y2="147"/>
+
+                        <line
+                            x1="13"
+                            y1="101"
+                            x2="29"
+                            y2="101"/>
+
+                        <line
+                            x1="39"
+                            y1="49"
+                            x2="51"
+                            y2="59"/>
+                    </g>
+
+                    <!-- FOOTBALL -->
+                    <g class="loader-ball">
+
+                        <circle
+                            cx="100"
+                            cy="100"
+                            r="38"
+                            fill="#fff"
+                            stroke="#050505"
+                            stroke-width="3"/>
+
+                        <polygon
+                            points="100,82 112,91 107,106 93,106 88,91"
+                            fill="#050505"/>
+
+                        <polygon
+                            points="100,82 112,91 125,87 116,75 103,72"
+                            fill="#050505"/>
+
+                        <polygon
+                            points="112,91 125,87 132,101 122,111 107,106"
+                            fill="#fff"
+                            stroke="#050505"
+                            stroke-width="2.5"/>
+
+                        <polygon
+                            points="107,106 122,111 121,126 108,134 95,125 93,106"
+                            fill="#fff"
+                            stroke="#050505"
+                            stroke-width="2.5"/>
+
+                        <polygon
+                            points="93,106 95,125 82,132 70,121 72,105"
+                            fill="#fff"
+                            stroke="#050505"
+                            stroke-width="2.5"/>
+
+                        <polygon
+                            points="88,91 93,106 72,105 67,91 80,81"
+                            fill="#fff"
+                            stroke="#050505"
+                            stroke-width="2.5"/>
+
+                        <polygon
+                            points="88,91 80,81 91,70 103,72 100,82"
+                            fill="#050505"/>
+
+                        <polygon
+                            points="72,105 70,121 61,111 63,98"
+                            fill="#050505"/>
+
+                        <polygon
+                            points="95,125 108,134 96,138 82,132"
+                            fill="#050505"/>
+
+                        <polygon
+                            points="121,126 121,111 134,105 137,119 128,130"
+                            fill="#050505"/>
+
+                        <polygon
+                            points="125,87 116,75 126,78 133,90"
+                            fill="#050505"/>
+
+                        <circle
+                            cx="100"
+                            cy="100"
+                            r="38"
+                            fill="none"
+                            stroke="#050505"
+                            stroke-width="3"/>
+                    </g>
+
+                </svg>
+            </div>
         </div>
     </div>
 
     <div class="controls">
+
         <div class="search-box">
-            <i data-lucide="search" class="search-icon"></i>
-            <input type="text" id="searchInput" placeholder="Search channels...">
+
+            <i
+                data-lucide="search"
+                class="search-icon">
+            </i>
+
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search channels...">
+
         </div>
-        <div class="category-filters" id="categoryFilters"></div>
+
+        <div
+            class="category-filters"
+            id="categoryFilters">
+        </div>
+
     </div>
 
-    <div class="channel-grid" id="channelGrid"></div>
+    <div
+        class="channel-grid"
+        id="channelGrid">
+    </div>
 
     <script src="channels.js"></script>
+
     <script>
+
         lucide.createIcons();
 
-        const video = document.getElementById('videoPlayer');
-        const iframe = document.getElementById('iframePlayer');
-        const channelGrid = document.getElementById('channelGrid');
-        const searchInput = document.getElementById('searchInput');
-        const categoryFilters = document.getElementById('categoryFilters');
+        const video =
+            document.getElementById('videoPlayer');
 
-        const fallbackImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
+        const iframe =
+            document.getElementById('iframePlayer');
+
+        const ballLoadingOverlay =
+            document.getElementById('ballLoadingOverlay');
+
+        const channelGrid =
+            document.getElementById('channelGrid');
+
+        const searchInput =
+            document.getElementById('searchInput');
+
+        const categoryFilters =
+            document.getElementById('categoryFilters');
+
+        const fallbackImg =
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
 
         let hls;
+
         let allChannels = [];
+
         let currentCategory = 'All';
+
         let searchTerm = '';
 
+
+        /* =========================================
+           BALL LOADER FUNCTIONS
+           ========================================= */
+
+        function showBallLoader() {
+            ballLoadingOverlay.classList.add('active');
+        }
+
+        function hideBallLoader() {
+            ballLoadingOverlay.classList.remove('active');
+        }
+
+
+        /* =========================================
+           VIDEO LOADING EVENTS
+           ========================================= */
+
+        video.addEventListener(
+            'waiting',
+            showBallLoader
+        );
+
+        video.addEventListener(
+            'stalled',
+            showBallLoader
+        );
+
+        video.addEventListener(
+            'loadstart',
+            showBallLoader
+        );
+
+        video.addEventListener(
+            'playing',
+            hideBallLoader
+        );
+
+        video.addEventListener(
+            'canplay',
+            hideBallLoader
+        );
+
+        video.addEventListener(
+            'error',
+            hideBallLoader
+        );
+
+        iframe.addEventListener(
+            'load',
+            hideBallLoader
+        );
+
+
+        /* =========================================
+           PLAY CHANNEL
+           ========================================= */
+
         function playChannel(url) {
-            if (hls) { hls.destroy(); hls = null; }
+
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
             video.pause();
+
             video.src = "";
+
             video.style.display = 'none';
+
             iframe.src = "about:blank";
+
             iframe.style.display = 'none';
 
+            showBallLoader();
+
+
             if (url.includes('.m3u8')) {
+
                 video.style.display = 'block';
+
+
                 if (Hls.isSupported()) {
+
                     hls = new Hls();
+
                     hls.loadSource(url);
+
                     hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+
+
+                    hls.on(
+                        Hls.Events.MANIFEST_PARSED,
+                        () => {
+                            video.play()
+                                .catch(() => {});
+                        }
+                    );
+
+
+                    hls.on(
+                        Hls.Events.ERROR,
+                        (event, data) => {
+
+                            if (data.fatal) {
+                                hideBallLoader();
+                            }
+
+                        }
+                    );
+
+
+                } else if (
+                    video.canPlayType(
+                        'application/vnd.apple.mpegurl'
+                    )
+                ) {
+
                     video.src = url;
-                    video.addEventListener('loadedmetadata', () => video.play());
+
+                    video.addEventListener(
+                        'loadedmetadata',
+                        () => {
+                            video.play()
+                                .catch(() => {});
+                        },
+                        { once: true }
+                    );
+
+                } else {
+
+                    hideBallLoader();
+
                 }
+
+
             } else {
+
                 iframe.style.display = 'block';
+
+                iframe.onload = () => {
+                    hideBallLoader();
+                };
+
                 iframe.src = url;
+
             }
         }
 
+
+        /* =========================================
+           RENDER CHANNELS
+           ========================================= */
+
         function renderChannels() {
+
             channelGrid.innerHTML = '';
-            const filtered = allChannels.filter(ch => {
-                const matchesSearch = ch.name.toLowerCase().includes(searchTerm.toLowerCase());
-                const matchesCategory = currentCategory === 'All' || ch.genre === currentCategory;
-                return matchesSearch && matchesCategory;
-            });
+
+            const filtered =
+                allChannels.filter(ch => {
+
+                    const matchesSearch =
+                        ch.name
+                            .toLowerCase()
+                            .includes(
+                                searchTerm.toLowerCase()
+                            );
+
+                    const matchesCategory =
+                        currentCategory === 'All' ||
+                        ch.genre === currentCategory;
+
+                    return (
+                        matchesSearch &&
+                        matchesCategory
+                    );
+
+                });
+
 
             if (filtered.length === 0) {
-                channelGrid.innerHTML = '<p class="status-message">No channels found.</p>';
+
+                channelGrid.innerHTML =
+                    '<p class="status-message">No channels found.</p>';
+
                 return;
             }
 
+
             filtered.forEach(ch => {
-                const card = document.createElement('div');
-                card.className = 'channel-card';
+
+                const card =
+                    document.createElement('div');
+
+                card.className =
+                    'channel-card';
+
+
                 card.innerHTML = `
-                    <img src="${ch.logo || fallbackImg}" 
-                         alt="${ch.name}" 
-                         onerror="this.src='${fallbackImg}'">
+                    <img
+                        src="${ch.logo || fallbackImg}"
+                        alt="${ch.name}"
+                        onerror="this.src='${fallbackImg}'">
+
                     <div class="card-info">
+
                         <h3>${ch.name}</h3>
-                        <span class="category-tag">${ch.genre || 'General'}</span>
+
+                        <span class="category-tag">
+                            ${ch.genre || 'General'}
+                        </span>
+
                     </div>
                 `;
-                card.addEventListener('click', () => {
-                    playChannel(ch.url);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
+
+
+                card.addEventListener(
+                    'click',
+                    () => {
+
+                        playChannel(ch.url);
+
+                        window.scrollTo({
+                            top: 0,
+                            behavior: 'smooth'
+                        });
+
+                    }
+                );
+
+
                 channelGrid.appendChild(card);
+
             });
+
         }
 
-        if (typeof channels !== 'undefined' && channels.length > 0) {
+
+        /* =========================================
+           LOAD CHANNEL DATA
+           ========================================= */
+
+        if (
+            typeof channels !== 'undefined' &&
+            channels.length > 0
+        ) {
+
             allChannels = channels;
 
-            const categories = ['All', ...new Set(allChannels.map(ch => ch.genre))];
+
+            const categories = [
+                'All',
+                ...new Set(
+                    allChannels.map(
+                        ch => ch.genre
+                    )
+                )
+            ];
+
+
             categoryFilters.innerHTML = '';
+
+
             categories.forEach(cat => {
-                const btn = document.createElement('button');
-                btn.className = `cat-btn ${cat === 'All' ? 'active' : ''}`;
+
+                const btn =
+                    document.createElement('button');
+
+                btn.className =
+                    `cat-btn ${
+                        cat === 'All'
+                            ? 'active'
+                            : ''
+                    }`;
+
                 btn.textContent = cat;
+
                 btn.dataset.cat = cat;
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentCategory = cat;
-                    renderChannels();
-                });
+
+
+                btn.addEventListener(
+                    'click',
+                    () => {
+
+                        document
+                            .querySelectorAll('.cat-btn')
+                            .forEach(
+                                b =>
+                                    b.classList.remove(
+                                        'active'
+                                    )
+                            );
+
+                        btn.classList.add('active');
+
+                        currentCategory = cat;
+
+                        renderChannels();
+
+                    }
+                );
+
+
                 categoryFilters.appendChild(btn);
+
             });
 
+
             renderChannels();
+
+
         } else {
-            channelGrid.innerHTML = '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
+
+            channelGrid.innerHTML =
+                '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
+
         }
 
-        searchInput.addEventListener('input', (e) => {
-            searchTerm = e.target.value;
-            renderChannels();
-        });
+
+        /* =========================================
+           SEARCH
+           ========================================= */
+
+        searchInput.addEventListener(
+            'input',
+            (e) => {
+
+                searchTerm =
+                    e.target.value;
+
+                renderChannels();
+
+            }
+        );
+
     </script>
+
 </body>
 </html>
