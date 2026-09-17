@@ -57,15 +57,15 @@
         }
 
         /* =========================================
-           PLAYER SECTION (always 16:9, sticky top)
+           PLAYER SECTION (always 16:9)
            ========================================= */
         .player-section {
             width: 100%;
             background: #000;
-            position: sticky;
-            top: 0;
+            position: relative;    /* was: sticky; top: 0;  — sticky blocks floating */
             z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            transition: box-shadow 220ms ease, border-radius 220ms ease;
         }
 
         .player-wrapper {
@@ -78,10 +78,13 @@
         }
 
         #videoPlayer, #iframePlayer {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             border: none;
             display: none;
+            background: #000;
         }
 
         /* =========================================
@@ -129,43 +132,23 @@
         }
 
         @keyframes ball-loader-spin {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(360deg);
-            }
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
         }
 
         @keyframes loader-ball-spin {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(-360deg);
-            }
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(-360deg); }
         }
 
         @keyframes loader-arrows-spin {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(-360deg);
-            }
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(-360deg); }
         }
 
         @keyframes loader-ticks-pulse {
-            0%, 100% {
-                opacity: 0.45;
-            }
-
-            50% {
-                opacity: 1;
-            }
+            0%, 100% { opacity: 0.45; }
+            50%      { opacity: 1; }
         }
 
         /* =========================================
@@ -337,25 +320,30 @@
             font-size: var(--text-lg);
         }
 
-
         /* =========================================
-           AUTO FLOATING PLAYER / PIP
+           RESPONSIVE BREAKPOINTS
            ========================================= */
-        .player-section {
-            transition: opacity 250ms ease, transform 250ms ease;
+        @media (max-width: 1024px) {
+            .channel-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: var(--space-3);
+            }
         }
 
+        /* =========================
+           AUTO FLOATING / PIP PLAYER
+           ========================= */
         .player-section.is-floating {
             position: fixed;
             top: auto;
             right: 18px;
             bottom: 18px;
+            left: auto;
             width: min(380px, calc(100vw - 36px));
-            max-width: 380px;
-            z-index: 1000;
-            border-radius: 10px;
+            z-index: 9999;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 12px 40px rgba(0,0,0,.65);
+            box-shadow: 0 14px 45px rgba(0, 0, 0, .65);
         }
 
         .player-section.is-floating .player-wrapper {
@@ -363,13 +351,26 @@
             max-width: none;
         }
 
+        /* Reserves the original slot while the player floats */
+        .player-spacer {
+            display: none;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            aspect-ratio: 16 / 9;
+        }
+
+        .player-section.is-floating + .player-spacer {
+            display: block;
+        }
+
         .pip-actions {
             position: absolute;
             top: 10px;
             right: 10px;
-            z-index: 40;
+            z-index: 100;
             display: none;
-            gap: 6px;
+            gap: 7px;
         }
 
         .player-section.is-floating .pip-actions {
@@ -377,11 +378,12 @@
         }
 
         .pip-action {
-            width: 34px;
-            height: 34px;
-            border: 1px solid rgba(255,255,255,.18);
-            border-radius: 8px;
-            background: rgba(0,0,0,.72);
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: 9px;
+            background: rgba(0,0,0,.75);
             color: #fff;
             display: grid;
             place-items: center;
@@ -390,20 +392,12 @@
         }
 
         .pip-action:hover {
-            background: rgba(0,0,0,.9);
+            background: rgba(0,0,0,.95);
         }
 
         .pip-action svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .player-spacer {
-            display: none;
-        }
-
-        .player-section.is-floating + .player-spacer {
-            display: block;
+            width: 19px;
+            height: 19px;
         }
 
         @media (max-width: 600px) {
@@ -411,18 +405,6 @@
                 right: 10px;
                 bottom: 10px;
                 width: min(320px, calc(100vw - 20px));
-                border-radius: 8px;
-            }
-        }
-
-        /* =========================================
-           RESPONSIVE BREAKPOINTS
-           ========================================= */
-
-        @media (max-width: 1024px) {
-            .channel-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                gap: var(--space-3);
             }
         }
 
@@ -499,11 +481,14 @@
 
     <div class="player-section" id="playerSection">
         <div class="player-wrapper">
+
             <div class="pip-actions" aria-label="Floating player controls">
-                <button class="pip-action" id="nativePipButton" type="button" title="Picture in Picture" aria-label="Picture in Picture">
+                <button class="pip-action" id="nativePipButton" type="button"
+                        title="Picture in Picture" aria-label="Picture in Picture">
                     <i data-lucide="picture-in-picture"></i>
                 </button>
-                <button class="pip-action" id="closeFloatingButton" type="button" title="Close floating player" aria-label="Close floating player">
+                <button class="pip-action" id="closeFloatingButton" type="button"
+                        title="Close floating player" aria-label="Close floating player">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -576,53 +561,14 @@
                         stroke-width="5"
                         stroke-linecap="round">
 
-                        <line
-                            x1="100"
-                            y1="13"
-                            x2="100"
-                            y2="29"/>
-
-                        <line
-                            x1="171"
-                            y1="49"
-                            x2="158"
-                            y2="57"/>
-
-                        <line
-                            x1="187"
-                            y1="101"
-                            x2="171"
-                            y2="101"/>
-
-                        <line
-                            x1="163"
-                            y1="156"
-                            x2="151"
-                            y2="146"/>
-
-                        <line
-                            x1="101"
-                            y1="187"
-                            x2="101"
-                            y2="171"/>
-
-                        <line
-                            x1="39"
-                            y1="157"
-                            x2="51"
-                            y2="147"/>
-
-                        <line
-                            x1="13"
-                            y1="101"
-                            x2="29"
-                            y2="101"/>
-
-                        <line
-                            x1="39"
-                            y1="49"
-                            x2="51"
-                            y2="59"/>
+                        <line x1="100" y1="13"  x2="100" y2="29"/>
+                        <line x1="171" y1="49"  x2="158" y2="57"/>
+                        <line x1="187" y1="101" x2="171" y2="101"/>
+                        <line x1="163" y1="156" x2="151" y2="146"/>
+                        <line x1="101" y1="187" x2="101" y2="171"/>
+                        <line x1="39"  y1="157" x2="51"  y2="147"/>
+                        <line x1="13"  y1="101" x2="29"  y2="101"/>
+                        <line x1="39"  y1="49"  x2="51"  y2="59"/>
                     </g>
 
                     <!-- FOOTBALL -->
@@ -636,57 +582,17 @@
                             stroke="#050505"
                             stroke-width="3"/>
 
-                        <polygon
-                            points="100,82 112,91 107,106 93,106 88,91"
-                            fill="#050505"/>
-
-                        <polygon
-                            points="100,82 112,91 125,87 116,75 103,72"
-                            fill="#050505"/>
-
-                        <polygon
-                            points="112,91 125,87 132,101 122,111 107,106"
-                            fill="#fff"
-                            stroke="#050505"
-                            stroke-width="2.5"/>
-
-                        <polygon
-                            points="107,106 122,111 121,126 108,134 95,125 93,106"
-                            fill="#fff"
-                            stroke="#050505"
-                            stroke-width="2.5"/>
-
-                        <polygon
-                            points="93,106 95,125 82,132 70,121 72,105"
-                            fill="#fff"
-                            stroke="#050505"
-                            stroke-width="2.5"/>
-
-                        <polygon
-                            points="88,91 93,106 72,105 67,91 80,81"
-                            fill="#fff"
-                            stroke="#050505"
-                            stroke-width="2.5"/>
-
-                        <polygon
-                            points="88,91 80,81 91,70 103,72 100,82"
-                            fill="#050505"/>
-
-                        <polygon
-                            points="72,105 70,121 61,111 63,98"
-                            fill="#050505"/>
-
-                        <polygon
-                            points="95,125 108,134 96,138 82,132"
-                            fill="#050505"/>
-
-                        <polygon
-                            points="121,126 121,111 134,105 137,119 128,130"
-                            fill="#050505"/>
-
-                        <polygon
-                            points="125,87 116,75 126,78 133,90"
-                            fill="#050505"/>
+                        <polygon points="100,82 112,91 107,106 93,106 88,91" fill="#050505"/>
+                        <polygon points="100,82 112,91 125,87 116,75 103,72" fill="#050505"/>
+                        <polygon points="112,91 125,87 132,101 122,111 107,106" fill="#fff" stroke="#050505" stroke-width="2.5"/>
+                        <polygon points="107,106 122,111 121,126 108,134 95,125 93,106" fill="#fff" stroke="#050505" stroke-width="2.5"/>
+                        <polygon points="93,106 95,125 82,132 70,121 72,105" fill="#fff" stroke="#050505" stroke-width="2.5"/>
+                        <polygon points="88,91 93,106 72,105 67,91 80,81" fill="#fff" stroke="#050505" stroke-width="2.5"/>
+                        <polygon points="88,91 80,81 91,70 103,72 100,82" fill="#050505"/>
+                        <polygon points="72,105 70,121 61,111 63,98" fill="#050505"/>
+                        <polygon points="95,125 108,134 96,138 82,132" fill="#050505"/>
+                        <polygon points="121,126 121,111 134,105 137,119 128,130" fill="#050505"/>
+                        <polygon points="125,87 116,75 126,78 133,90" fill="#050505"/>
 
                         <circle
                             cx="100"
@@ -702,35 +608,21 @@
         </div>
     </div>
 
+    <!-- Reserves layout space while the player is floating -->
     <div class="player-spacer" id="playerSpacer" aria-hidden="true"></div>
 
     <div class="controls">
 
         <div class="search-box">
-
-            <i
-                data-lucide="search"
-                class="search-icon">
-            </i>
-
-            <input
-                type="text"
-                id="searchInput"
-                placeholder="Search channels...">
-
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="searchInput" placeholder="Search channels...">
         </div>
 
-        <div
-            class="category-filters"
-            id="categoryFilters">
-        </div>
+        <div class="category-filters" id="categoryFilters"></div>
 
     </div>
 
-    <div
-        class="channel-grid"
-        id="channelGrid">
-    </div>
+    <div class="channel-grid" id="channelGrid"></div>
 
     <script src="channels.js"></script>
 
@@ -738,126 +630,24 @@
 
         lucide.createIcons();
 
-        const video =
-            document.getElementById('videoPlayer');
-
-        const iframe =
-            document.getElementById('iframePlayer');
-
-        const ballLoadingOverlay =
-            document.getElementById('ballLoadingOverlay');
-
-        const playerSection =
-            document.getElementById('playerSection');
-
-        const playerWrapper =
-            playerSection.querySelector('.player-wrapper');
-
-        const nativePipButton =
-            document.getElementById('nativePipButton');
-
-        const closeFloatingButton =
-            document.getElementById('closeFloatingButton');
-
-        let floatingPlayerClosed = false;
-        let autoFloatingEnabled = true;
-
-        // Observe the original player position. When it leaves the viewport,
-        // keep playback visible as a compact in-page floating player.
-        const playerObserver = new IntersectionObserver(
-            ([entry]) => {
-                if (!autoFloatingEnabled || floatingPlayerClosed) return;
-
-                const shouldFloat =
-                    !entry.isIntersecting &&
-                    video.style.display !== 'none' &&
-                    !video.paused;
-
-                playerSection.classList.toggle('is-floating', shouldFloat);
-            },
-            {
-                threshold: 0.05
-            }
-        );
-
-        playerObserver.observe(playerWrapper);
-
-        function stopFloatingPlayer() {
-            floatingPlayerClosed = true;
-            playerSection.classList.remove('is-floating');
-        }
-
-        function resumeAutoFloating() {
-            floatingPlayerClosed = false;
-        }
-
-        closeFloatingButton.addEventListener('click', stopFloatingPlayer);
-
-        // Clicking the player again re-enables automatic floating behaviour.
-        playerWrapper.addEventListener('click', () => {
-            if (floatingPlayerClosed) {
-                resumeAutoFloating();
-            }
-        });
-
-        // Native browser Picture-in-Picture.
-        nativePipButton.addEventListener('click', async () => {
-            try {
-                if (document.pictureInPictureElement) {
-                    await document.exitPictureInPicture();
-                    return;
-                }
-
-                if (video.readyState < 1) return;
-
-                if (video.requestPictureInPicture) {
-                    await video.requestPictureInPicture();
-                }
-            } catch (error) {
-                console.warn('Picture-in-Picture is unavailable:', error);
-            }
-        });
-
-        video.addEventListener('enterpictureinpicture', () => {
-            playerSection.classList.remove('is-floating');
-        });
-
-        video.addEventListener('leavepictureinpicture', () => {
-            floatingPlayerClosed = false;
-        });
-
-        // When a new channel starts, allow automatic floating again.
-        function resetFloatingState() {
-            floatingPlayerClosed = false;
-            autoFloatingEnabled = true;
-            playerSection.classList.remove('is-floating');
-        }
-
-        const channelGrid =
-            document.getElementById('channelGrid');
-
-        const searchInput =
-            document.getElementById('searchInput');
-
-        const categoryFilters =
-            document.getElementById('categoryFilters');
+        const video              = document.getElementById('videoPlayer');
+        const iframe             = document.getElementById('iframePlayer');
+        const ballLoadingOverlay = document.getElementById('ballLoadingOverlay');
+        const channelGrid        = document.getElementById('channelGrid');
+        const searchInput        = document.getElementById('searchInput');
+        const categoryFilters    = document.getElementById('categoryFilters');
 
         const fallbackImg =
             'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTMxMzE2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiM2MzY2RjEiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5UVjwvdGV4dD48L3N2Zz4=';
 
         let hls;
-
-        let allChannels = [];
-
+        let allChannels    = [];
         let currentCategory = 'All';
-
-        let searchTerm = '';
-
+        let searchTerm      = '';
 
         /* =========================================
            BALL LOADER FUNCTIONS
            ========================================= */
-
         function showBallLoader() {
             ballLoadingOverlay.classList.add('active');
         }
@@ -866,53 +656,159 @@
             ballLoadingOverlay.classList.remove('active');
         }
 
-
         /* =========================================
            VIDEO LOADING EVENTS
            ========================================= */
+        video.addEventListener('waiting',   showBallLoader);
+        video.addEventListener('stalled',   showBallLoader);
+        video.addEventListener('loadstart', showBallLoader);
+        video.addEventListener('playing',   hideBallLoader);
+        video.addEventListener('canplay',   hideBallLoader);
+        video.addEventListener('error',     hideBallLoader);
+        iframe.addEventListener('load',     hideBallLoader);
 
-        video.addEventListener(
-            'waiting',
-            showBallLoader
-        );
+        /* =========================================
+           AUTO FLOATING / NATIVE PIP
+           ========================================= */
+        const playerSection       = document.getElementById('playerSection');
+        const nativePipButton     = document.getElementById('nativePipButton');
+        const closeFloatingButton = document.getElementById('closeFloatingButton');
 
-        video.addEventListener(
-            'stalled',
-            showBallLoader
-        );
+        let floatingPlayerClosed = false;
+        let floatThreshold       = 0;
 
-        video.addEventListener(
-            'loadstart',
-            showBallLoader
-        );
+        /* Measure where the player bottom sits in page coordinates.
+           Measured while un-floated, so the value stays stable. */
+        function recalcFloatThreshold() {
+            if (!playerSection) return;
 
-        video.addEventListener(
-            'playing',
-            hideBallLoader
-        );
+            const wasFloating = playerSection.classList.contains('is-floating');
+            if (wasFloating) playerSection.classList.remove('is-floating');
 
-        video.addEventListener(
-            'canplay',
-            hideBallLoader
-        );
+            const rect = playerSection.getBoundingClientRect();
+            floatThreshold = rect.bottom + window.scrollY;
 
-        video.addEventListener(
-            'error',
-            hideBallLoader
-        );
+            if (wasFloating) playerSection.classList.add('is-floating');
+        }
 
-        iframe.addEventListener(
-            'load',
-            hideBallLoader
-        );
+        /* Is something actually playing right now? */
+        function hasActivePlayback() {
+            if (video.style.display !== 'none' &&
+                video.src &&
+                !video.paused &&
+                !video.ended) {
+                return true;
+            }
+            if (iframe.style.display !== 'none' &&
+                iframe.src &&
+                iframe.src !== 'about:blank') {
+                return true;
+            }
+            return false;
+        }
 
+        function updateFloatingPlayer() {
+            if (!playerSection) return;
+
+            // Native browser PiP takes over — don't double up
+            if (document.pictureInPictureElement) {
+                playerSection.classList.remove('is-floating');
+                return;
+            }
+
+            // Re-arm the close button once the user scrolls back to the top
+            if (window.scrollY <= floatThreshold) {
+                floatingPlayerClosed = false;
+            }
+
+            if (floatingPlayerClosed || !hasActivePlayback()) {
+                playerSection.classList.remove('is-floating');
+                return;
+            }
+
+            playerSection.classList.toggle(
+                'is-floating',
+                window.scrollY > floatThreshold
+            );
+        }
+
+        function resetFloatingState() {
+            floatingPlayerClosed = false;
+            playerSection.classList.remove('is-floating');
+        }
+
+        /* --- listeners --- */
+        window.addEventListener('scroll', updateFloatingPlayer, { passive: true });
+
+        window.addEventListener('resize', () => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
+
+        window.addEventListener('load', () => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
+
+        window.addEventListener('orientationchange', () => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
+
+        video.addEventListener('play',    updateFloatingPlayer);
+        video.addEventListener('playing', updateFloatingPlayer);
+        video.addEventListener('pause',   updateFloatingPlayer);
+        video.addEventListener('ended', () => {
+            playerSection.classList.remove('is-floating');
+        });
+
+        if (closeFloatingButton) {
+            closeFloatingButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                floatingPlayerClosed = true;
+                playerSection.classList.remove('is-floating');
+            });
+        }
+
+        if (nativePipButton) {
+            nativePipButton.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                try {
+                    if (document.pictureInPictureElement) {
+                        await document.exitPictureInPicture();
+                        return;
+                    }
+                    if (!video.requestPictureInPicture) {
+                        alert('Picture-in-Picture is not supported by this browser.');
+                        return;
+                    }
+                    if (video.readyState < 1) {
+                        alert('Start a video first.');
+                        return;
+                    }
+                    await video.requestPictureInPicture();
+                } catch (error) {
+                    console.warn('Picture-in-Picture unavailable:', error);
+                }
+            });
+        }
+
+        video.addEventListener('enterpictureinpicture', () => {
+            playerSection.classList.remove('is-floating');
+        });
+
+        video.addEventListener('leavepictureinpicture', () => {
+            floatingPlayerClosed = false;
+            updateFloatingPlayer();
+        });
 
         /* =========================================
            PLAY CHANNEL
            ========================================= */
-
         function playChannel(url) {
-
             resetFloatingState();
 
             if (hls) {
@@ -921,76 +817,44 @@
             }
 
             video.pause();
-
-            video.src = "";
-
+            video.removeAttribute('src');
+            video.load();
             video.style.display = 'none';
 
-            iframe.src = "about:blank";
-
+            iframe.src = 'about:blank';
             iframe.style.display = 'none';
 
             showBallLoader();
-
 
             if (url.includes('.m3u8')) {
 
                 video.style.display = 'block';
 
-
                 if (Hls.isSupported()) {
 
                     hls = new Hls();
-
                     hls.loadSource(url);
-
                     hls.attachMedia(video);
 
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play().catch(() => {});
+                    });
 
-                    hls.on(
-                        Hls.Events.MANIFEST_PARSED,
-                        () => {
-                            video.play()
-                                .catch(() => {});
-                        }
-                    );
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) hideBallLoader();
+                    });
 
-
-                    hls.on(
-                        Hls.Events.ERROR,
-                        (event, data) => {
-
-                            if (data.fatal) {
-                                hideBallLoader();
-                            }
-
-                        }
-                    );
-
-
-                } else if (
-                    video.canPlayType(
-                        'application/vnd.apple.mpegurl'
-                    )
-                ) {
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
 
                     video.src = url;
 
-                    video.addEventListener(
-                        'loadedmetadata',
-                        () => {
-                            video.play()
-                                .catch(() => {});
-                        },
-                        { once: true }
-                    );
+                    video.addEventListener('loadedmetadata', () => {
+                        video.play().catch(() => {});
+                    }, { once: true });
 
                 } else {
-
                     hideBallLoader();
-
                 }
-
 
             } else {
 
@@ -998,61 +862,41 @@
 
                 iframe.onload = () => {
                     hideBallLoader();
+                    updateFloatingPlayer();
                 };
 
                 iframe.src = url;
-
             }
         }
-
 
         /* =========================================
            RENDER CHANNELS
            ========================================= */
-
         function renderChannels() {
 
             channelGrid.innerHTML = '';
 
-            const filtered =
-                allChannels.filter(ch => {
+            const filtered = allChannels.filter(ch => {
 
-                    const matchesSearch =
-                        ch.name
-                            .toLowerCase()
-                            .includes(
-                                searchTerm.toLowerCase()
-                            );
+                const matchesSearch =
+                    ch.name.toLowerCase().includes(searchTerm.toLowerCase());
 
-                    const matchesCategory =
-                        currentCategory === 'All' ||
-                        ch.genre === currentCategory;
+                const matchesCategory =
+                    currentCategory === 'All' || ch.genre === currentCategory;
 
-                    return (
-                        matchesSearch &&
-                        matchesCategory
-                    );
-
-                });
-
+                return matchesSearch && matchesCategory;
+            });
 
             if (filtered.length === 0) {
-
                 channelGrid.innerHTML =
                     '<p class="status-message">No channels found.</p>';
-
                 return;
             }
 
-
             filtered.forEach(ch => {
 
-                const card =
-                    document.createElement('div');
-
-                card.className =
-                    'channel-card';
-
+                const card = document.createElement('div');
+                card.className = 'channel-card';
 
                 card.innerHTML = `
                     <img
@@ -1061,137 +905,80 @@
                         onerror="this.src='${fallbackImg}'">
 
                     <div class="card-info">
-
                         <h3>${ch.name}</h3>
-
                         <span class="category-tag">
                             ${ch.genre || 'General'}
                         </span>
-
                     </div>
                 `;
 
-
-                card.addEventListener(
-                    'click',
-                    () => {
-
-                        playChannel(ch.url);
-
-                        resumeAutoFloating();
-
-                        window.scrollTo({
-                            top: 0,
-                            behavior: 'smooth'
-                        });
-
-                    }
-                );
-
+                card.addEventListener('click', () => {
+                    playChannel(ch.url);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
 
                 channelGrid.appendChild(card);
-
             });
-
         }
-
 
         /* =========================================
            LOAD CHANNEL DATA
            ========================================= */
-
-        if (
-            typeof channels !== 'undefined' &&
-            channels.length > 0
-        ) {
+        if (typeof channels !== 'undefined' && channels.length > 0) {
 
             allChannels = channels;
 
-
             const categories = [
                 'All',
-                ...new Set(
-                    allChannels.map(
-                        ch => ch.genre
-                    )
-                )
+                ...new Set(allChannels.map(ch => ch.genre))
             ];
-
 
             categoryFilters.innerHTML = '';
 
-
             categories.forEach(cat => {
 
-                const btn =
-                    document.createElement('button');
-
-                btn.className =
-                    `cat-btn ${
-                        cat === 'All'
-                            ? 'active'
-                            : ''
-                    }`;
-
+                const btn = document.createElement('button');
+                btn.className = `cat-btn ${cat === 'All' ? 'active' : ''}`;
                 btn.textContent = cat;
-
                 btn.dataset.cat = cat;
 
+                btn.addEventListener('click', () => {
 
-                btn.addEventListener(
-                    'click',
-                    () => {
+                    document.querySelectorAll('.cat-btn')
+                        .forEach(b => b.classList.remove('active'));
 
-                        document
-                            .querySelectorAll('.cat-btn')
-                            .forEach(
-                                b =>
-                                    b.classList.remove(
-                                        'active'
-                                    )
-                            );
-
-                        btn.classList.add('active');
-
-                        currentCategory = cat;
-
-                        renderChannels();
-
-                    }
-                );
-
+                    btn.classList.add('active');
+                    currentCategory = cat;
+                    renderChannels();
+                });
 
                 categoryFilters.appendChild(btn);
-
             });
 
-
             renderChannels();
-
 
         } else {
 
             channelGrid.innerHTML =
                 '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
-
         }
-
 
         /* =========================================
            SEARCH
            ========================================= */
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            renderChannels();
+        });
 
-        searchInput.addEventListener(
-            'input',
-            (e) => {
-
-                searchTerm =
-                    e.target.value;
-
-                renderChannels();
-
-            }
-        );
+        /* =========================================
+           INITIAL MEASUREMENT
+           ========================================= */
+        recalcFloatThreshold();
+        window.requestAnimationFrame(() => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
 
     </script>
 
