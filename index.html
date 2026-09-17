@@ -1075,3 +1075,516 @@
             }
 
             if (dragState.dragging) {
+                playerSection.classList.remove('is-dragging');
+
+                savedFloatPosition = {
+                    left: parseFloat(playerSection.style.left) || 0,
+                    top:  parseFloat(playerSection.style.top)  || 0
+                };
+            }
+
+            dragState = null;
+        }
+
+        playerSection.addEventListener('pointerdown', onPointerDown);
+        playerSection.addEventListener('pointermove', onPointerMove);
+        playerSection.addEventListener('pointerup',   onPointerUp);
+        playerSection.addEventListener('pointercancel', onPointerUp);
+
+        window.addEventListener('scroll', updateFloatingPlayer, { passive: true });
+
+        window.addEventListener('resize', () => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+
+            if (playerSection.classList.contains('is-floating') && !dragState) {
+                const w = playerSection.offsetWidth;
+                const h = playerSection.offsetHeight;
+                const left = parseFloat(playerSection.style.left) || 0;
+                const top  = parseFloat(playerSection.style.top)  || 0;
+                const pos  = clampPosition(left, top, w, h);
+
+                playerSection.style.left = pos.left + 'px';
+                playerSection.style.top  = pos.top  + 'px';
+
+                if (savedFloatPosition) savedFloatPosition = pos;
+            }
+        });
+
+        window.addEventListener('load', () => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
+
+        window.addEventListener('orientationchange', () => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
+
+        video.addEventListener('play',    updateFloatingPlayer);
+        video.addEventListener('playing', updateFloatingPlayer);
+        video.addEventListener('pause',   updateFloatingPlayer);
+        video.addEventListener('ended',   deactivateFloat);
+
+        if (closeFloatingButton) {
+            closeFloatingButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                floatingPlayerClosed = true;
+                deactivateFloat();
+            });
+        }
+
+        if (nativePipButton) {
+            nativePipButton.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                try {
+                    if (document.pictureInPictureElement) {
+                        await document.exitPictureInPicture();
+                        return;
+                    }
+                    if (!video.requestPictureInPicture) {
+                        alert('Picture-in-Picture is not supported by this browser.');
+                        return;
+                    }
+                    if (video.readyState < 1) {
+                        alert('Start a video first.');
+                        return;
+                    }
+                    await video.requestPictureInPicture();
+                } catch (error) {
+                    console.warn('Picture-in-Picture unavailable:', error);
+                }
+            });
+        }
+
+        video.addEventListener('enterpictureinpicture', () => {
+            deactivateFloat();
+        });
+
+        video.addEventListener('leavepictureinpicture', () => {
+            floatingPlayerClosed = false;
+            updateFloatingPlayer();
+        });
+
+        /* =========================================
+           PLAY CHANNEL / STREAM
+           ========================================= */
+        function playChannel(url) {
+            resetFloatingState();
+
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.style.display = 'none';
+
+            iframe.src = 'about:blank';
+            iframe.style.display = 'none';
+
+            showBallLoader();
+
+            if (url.includes('.m3u8')) {
+
+                video.style.display = 'block';
+
+                if (Hls.isSupported()) {
+
+                    hls = new Hls();
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play().catch(() => {});
+                    });
+
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) hideBallLoader();
+                    });
+
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+
+                    video.src = url;
+
+                    video.addEventListener('loadedmetadata', () => {
+                        video.play().catch(() => {});
+                    }, { once: true });
+
+                } else {
+                    hideBallLoader();
+                }
+
+            } else {
+
+                iframe.style.display = 'block';
+
+                iframe.onload = () => {
+                    hideBallLoader();
+                    updateFloatingPlayer();
+                };
+
+                iframe.src = url;
+            }
+        }
+
+        /* =========================================
+           RENDER CHANNELS
+           ========================================= */
+        function renderChannels() {
+
+            channelGrid.innerHTML = '';
+
+            const filtered = allChannels.filter(ch => {
+
+                const matchesSearch =
+                    ch.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+                const matchesCategory =
+                    currentCategory === 'All' || ch.genre === currentCategory;
+
+                return matchesSearch && matchesCategory;
+            });
+
+            if (filtered.length === 0) {
+                channelGrid.innerHTML =
+                    '<p class="status-message">No channels found.</p>';
+                return;
+            }
+
+            filtered.forEach(ch => {
+
+                const card = document.createElement('div');
+                card.className = 'channel-card';
+
+                card.innerHTML = `
+                    <img
+                        src="${ch.logo || fallbackImg}"
+                        alt="${ch.name}"
+                        onerror="this.src='${fallbackImg}'">
+
+                    <div class="card-info">
+                        <h3>${ch.name}</h3>
+                        <span class="category-tag">
+                            ${ch.genre || 'General'}
+                        </span>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    playChannel(ch.url);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+
+                channelGrid.appendChild(card);
+            });
+        }
+
+        /* =========================================
+           LOAD CHANNEL DATA
+           ========================================= */
+        if (typeof channels !== 'undefined' && channels.length > 0) {
+
+            allChannels = channels;
+
+            const categories = [
+                'All',
+                ...new Set(allChannels.map(ch => ch.genre))
+            ];
+
+            categoryFilters.innerHTML = '';
+
+            categories.forEach(cat => {
+
+                const btn = document.createElement('button');
+                btn.className = `cat-btn ${cat === 'All' ? 'active' : ''}`;
+                btn.textContent = cat;
+                btn.dataset.cat = cat;
+
+                btn.addEventListener('click', () => {
+
+                    document.querySelectorAll('.cat-btn')
+                        .forEach(b => b.classList.remove('active'));
+
+                    btn.classList.add('active');
+                    currentCategory = cat;
+                    renderChannels();
+                });
+
+                categoryFilters.appendChild(btn);
+            });
+
+            renderChannels();
+
+        } else {
+
+            channelGrid.innerHTML =
+                '<p class="status-message" style="color: var(--status-error);">Failed to load channel data. Please make sure channels.js is uploaded correctly.</p>';
+        }
+
+        /* =========================================
+           SEARCH
+           ========================================= */
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            renderChannels();
+        });
+
+        /* =========================================
+           STREAMED.PK MATCHES INTEGRATION
+           ========================================= */
+
+        const PROXY_URL = 'https://streamedproxy.svimranmy.workers.dev';
+
+        // ==================================================
+        // 👇 ADD YOUR CUSTOM STREAMS HERE
+        // Format: "streamed_match_id": "your_stream_url"
+        // To find match IDs, open:
+        // https://streamedproxy.svimranmy.workers.dev/api/matches/all-today
+        // ==================================================
+        const MY_STREAMS = {
+            // "example-id-123": "https://your-stream.com/stream.m3u8",
+        };
+
+        let streamedMatchesData = [];
+
+        async function fetchStreamedMatches(endpoint = 'all-today') {
+            try {
+                const res = await fetch(`${PROXY_URL}/api/matches/${endpoint}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                // Handle various possible response shapes
+                let matches = [];
+                if (Array.isArray(data)) {
+                    matches = data;
+                } else if (data && Array.isArray(data.matches)) {
+                    matches = data.matches;
+                } else if (data && Array.isArray(data.data)) {
+                    matches = data.data;
+                }
+
+                return matches;
+            } catch (err) {
+                console.error('❌ Failed to fetch Streamed matches:', err);
+                return null;
+            }
+        }
+
+        function extractMatchInfo(match) {
+            // Try many possible field names - adapt as needed
+            const id = match.id || match.matchId || match._id || '';
+
+            const homeTeam =
+                match.teams?.home?.name ||
+                match.home?.name ||
+                match.homeTeam?.name ||
+                match.homeTeam ||
+                match.team1 ||
+                match.home ||
+                '';
+
+            const awayTeam =
+                match.teams?.away?.name ||
+                match.away?.name ||
+                match.awayTeam?.name ||
+                match.awayTeam ||
+                match.team2 ||
+                match.away ||
+                '';
+
+            const homeLogo =
+                match.teams?.home?.badge ||
+                match.teams?.home?.logo ||
+                match.home?.logo ||
+                match.homeTeam?.logo ||
+                match.homeLogo ||
+                match.team1Logo ||
+                '';
+
+            const awayLogo =
+                match.teams?.away?.badge ||
+                match.teams?.away?.logo ||
+                match.away?.logo ||
+                match.awayTeam?.logo ||
+                match.awayLogo ||
+                match.team2Logo ||
+                '';
+
+            const title =
+                match.title ||
+                match.name ||
+                match.matchTitle ||
+                (homeTeam && awayTeam ? `${homeTeam} vs ${awayTeam}` : 'Match');
+
+            const category =
+                match.category ||
+                match.sport ||
+                match.league ||
+                match.competition ||
+                'Match';
+
+            const dateValue = match.date || match.startTime || match.timestamp || match.time;
+            let formattedTime = 'TBA';
+            let isLive = false;
+
+            if (dateValue) {
+                const d = new Date(typeof dateValue === 'number' && dateValue < 1e12
+                    ? dateValue * 1000
+                    : dateValue);
+
+                if (!isNaN(d.getTime())) {
+                    formattedTime = d.toLocaleString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const now = Date.now();
+                    const diff = now - d.getTime();
+                    if (diff > -30 * 60 * 1000 && diff < 3 * 60 * 60 * 1000) {
+                        isLive = true;
+                    }
+                }
+            }
+
+            const customStream = MY_STREAMS[String(id)] || null;
+
+            return {
+                id, title, category,
+                homeTeam, awayTeam,
+                homeLogo, awayLogo,
+                formattedTime, isLive,
+                customStream
+            };
+        }
+
+        function getInitials(name) {
+            if (!name) return '?';
+            return name
+                .split(' ')
+                .filter(Boolean)
+                .slice(0, 2)
+                .map(w => w[0])
+                .join('')
+                .toUpperCase();
+        }
+
+        function renderStreamedMatches(matches) {
+            if (!streamedMatchesEl) return;
+
+            if (!matches || matches.length === 0) {
+                streamedMatchesEl.innerHTML =
+                    '<p class="status-message">No matches available right now. Check back soon!</p>';
+                return;
+            }
+
+            streamedMatchesEl.innerHTML = '';
+
+            matches.forEach(match => {
+                const info = extractMatchInfo(match);
+
+                const card = document.createElement('div');
+                card.className = 'match-card';
+
+                const homeLogoHTML = info.homeLogo
+                    ? `<img class="team-logo" src="${info.homeLogo}" alt="${info.homeTeam}" onerror="this.outerHTML='&lt;div class=\\'team-logo-fallback\\'&gt;${getInitials(info.homeTeam)}&lt;/div&gt;'">`
+                    : `<div class="team-logo-fallback">${getInitials(info.homeTeam)}</div>`;
+
+                const awayLogoHTML = info.awayLogo
+                    ? `<img class="team-logo" src="${info.awayLogo}" alt="${info.awayTeam}" onerror="this.outerHTML='&lt;div class=\\'team-logo-fallback\\'&gt;${getInitials(info.awayTeam)}&lt;/div&gt;'">`
+                    : `<div class="team-logo-fallback">${getInitials(info.awayTeam)}</div>`;
+
+                const statusClass = info.isLive ? 'live' : 'upcoming';
+                const statusText  = info.isLive ? 'LIVE' : 'Upcoming';
+
+                const hasStream = !!info.customStream;
+                const btnClass  = hasStream ? 'watch-btn active' : 'watch-btn disabled';
+                const btnText   = hasStream ? '▶ Watch Now' : '⏳ No Stream';
+
+                card.innerHTML = `
+                    <div class="match-card-top">
+                        <span class="match-category">${info.category}</span>
+                        <span class="match-status ${statusClass}">${statusText}</span>
+                    </div>
+
+                    <div class="match-teams">
+                        <div class="team">
+                            ${homeLogoHTML}
+                            <span class="team-name">${info.homeTeam || 'TBD'}</span>
+                        </div>
+                        <span class="vs-badge">VS</span>
+                        <div class="team">
+                            ${awayLogoHTML}
+                            <span class="team-name">${info.awayTeam || 'TBD'}</span>
+                        </div>
+                    </div>
+
+                    <div class="match-time">${info.formattedTime}</div>
+
+                    <button class="${btnClass}" ${hasStream ? '' : 'disabled'}>
+                        ${btnText}
+                    </button>
+                `;
+
+                if (hasStream) {
+                    const btn = card.querySelector('.watch-btn');
+                    btn.addEventListener('click', () => {
+                        playChannel(info.customStream);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    });
+                }
+
+                streamedMatchesEl.appendChild(card);
+            });
+        }
+
+        async function loadAndRenderStreamedMatches() {
+            streamedMatchesEl.innerHTML =
+                '<p class="status-message">Loading matches...</p>';
+
+            const matches = await fetchStreamedMatches('all-today');
+
+            if (matches === null) {
+                streamedMatchesEl.innerHTML =
+                    '<p class="status-message" style="color: var(--status-error);">Failed to load matches. The proxy may be down.</p>';
+                return;
+            }
+
+            streamedMatchesData = matches;
+            renderStreamedMatches(matches);
+
+            // Log the first match so you can inspect field names
+            if (matches.length > 0) {
+                console.log('📋 Sample match object:', matches[0]);
+            }
+        }
+
+        if (refreshMatchesBtn) {
+            refreshMatchesBtn.addEventListener('click', () => {
+                loadAndRenderStreamedMatches();
+            });
+        }
+
+        // Initial load
+        loadAndRenderStreamedMatches();
+
+        /* =========================================
+           INITIAL MEASUREMENT
+           ========================================= */
+        recalcFloatThreshold();
+        window.requestAnimationFrame(() => {
+            recalcFloatThreshold();
+            updateFloatingPlayer();
+        });
+
+    </script>
+
+</body>
+</html>
