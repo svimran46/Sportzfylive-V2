@@ -337,6 +337,84 @@
             font-size: var(--text-lg);
         }
 
+
+        /* =========================================
+           AUTO FLOATING PLAYER / PIP
+           ========================================= */
+        .player-section {
+            transition: opacity 250ms ease, transform 250ms ease;
+        }
+
+        .player-section.is-floating {
+            position: fixed;
+            top: auto;
+            right: 18px;
+            bottom: 18px;
+            width: min(380px, calc(100vw - 36px));
+            max-width: 380px;
+            z-index: 1000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(0,0,0,.65);
+        }
+
+        .player-section.is-floating .player-wrapper {
+            width: 100%;
+            max-width: none;
+        }
+
+        .pip-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 40;
+            display: none;
+            gap: 6px;
+        }
+
+        .player-section.is-floating .pip-actions {
+            display: flex;
+        }
+
+        .pip-action {
+            width: 34px;
+            height: 34px;
+            border: 1px solid rgba(255,255,255,.18);
+            border-radius: 8px;
+            background: rgba(0,0,0,.72);
+            color: #fff;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+        }
+
+        .pip-action:hover {
+            background: rgba(0,0,0,.9);
+        }
+
+        .pip-action svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .player-spacer {
+            display: none;
+        }
+
+        .player-section.is-floating + .player-spacer {
+            display: block;
+        }
+
+        @media (max-width: 600px) {
+            .player-section.is-floating {
+                right: 10px;
+                bottom: 10px;
+                width: min(320px, calc(100vw - 20px));
+                border-radius: 8px;
+            }
+        }
+
         /* =========================================
            RESPONSIVE BREAKPOINTS
            ========================================= */
@@ -419,8 +497,16 @@
 
 <body>
 
-    <div class="player-section">
+    <div class="player-section" id="playerSection">
         <div class="player-wrapper">
+            <div class="pip-actions" aria-label="Floating player controls">
+                <button class="pip-action" id="nativePipButton" type="button" title="Picture in Picture" aria-label="Picture in Picture">
+                    <i data-lucide="picture-in-picture"></i>
+                </button>
+                <button class="pip-action" id="closeFloatingButton" type="button" title="Close floating player" aria-label="Close floating player">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
 
             <video
                 id="videoPlayer"
@@ -616,6 +702,8 @@
         </div>
     </div>
 
+    <div class="player-spacer" id="playerSpacer" aria-hidden="true"></div>
+
     <div class="controls">
 
         <div class="search-box">
@@ -658,6 +746,92 @@
 
         const ballLoadingOverlay =
             document.getElementById('ballLoadingOverlay');
+
+        const playerSection =
+            document.getElementById('playerSection');
+
+        const playerWrapper =
+            playerSection.querySelector('.player-wrapper');
+
+        const nativePipButton =
+            document.getElementById('nativePipButton');
+
+        const closeFloatingButton =
+            document.getElementById('closeFloatingButton');
+
+        let floatingPlayerClosed = false;
+        let autoFloatingEnabled = true;
+
+        // Observe the original player position. When it leaves the viewport,
+        // keep playback visible as a compact in-page floating player.
+        const playerObserver = new IntersectionObserver(
+            ([entry]) => {
+                if (!autoFloatingEnabled || floatingPlayerClosed) return;
+
+                const shouldFloat =
+                    !entry.isIntersecting &&
+                    video.style.display !== 'none' &&
+                    !video.paused;
+
+                playerSection.classList.toggle('is-floating', shouldFloat);
+            },
+            {
+                threshold: 0.05
+            }
+        );
+
+        playerObserver.observe(playerWrapper);
+
+        function stopFloatingPlayer() {
+            floatingPlayerClosed = true;
+            playerSection.classList.remove('is-floating');
+        }
+
+        function resumeAutoFloating() {
+            floatingPlayerClosed = false;
+        }
+
+        closeFloatingButton.addEventListener('click', stopFloatingPlayer);
+
+        // Clicking the player again re-enables automatic floating behaviour.
+        playerWrapper.addEventListener('click', () => {
+            if (floatingPlayerClosed) {
+                resumeAutoFloating();
+            }
+        });
+
+        // Native browser Picture-in-Picture.
+        nativePipButton.addEventListener('click', async () => {
+            try {
+                if (document.pictureInPictureElement) {
+                    await document.exitPictureInPicture();
+                    return;
+                }
+
+                if (video.readyState < 1) return;
+
+                if (video.requestPictureInPicture) {
+                    await video.requestPictureInPicture();
+                }
+            } catch (error) {
+                console.warn('Picture-in-Picture is unavailable:', error);
+            }
+        });
+
+        video.addEventListener('enterpictureinpicture', () => {
+            playerSection.classList.remove('is-floating');
+        });
+
+        video.addEventListener('leavepictureinpicture', () => {
+            floatingPlayerClosed = false;
+        });
+
+        // When a new channel starts, allow automatic floating again.
+        function resetFloatingState() {
+            floatingPlayerClosed = false;
+            autoFloatingEnabled = true;
+            playerSection.classList.remove('is-floating');
+        }
 
         const channelGrid =
             document.getElementById('channelGrid');
@@ -738,6 +912,8 @@
            ========================================= */
 
         function playChannel(url) {
+
+            resetFloatingState();
 
             if (hls) {
                 hls.destroy();
@@ -901,6 +1077,8 @@
                     () => {
 
                         playChannel(ch.url);
+
+                        resumeAutoFloating();
 
                         window.scrollTo({
                             top: 0,
