@@ -257,6 +257,178 @@
       margin-top: 50px;
     }
   </style>
+
+<style>
+.loading-state,.empty-state,.error-state,.stream-message{text-align:center;padding:40px}
+.error-state{color:#ff7777}
+.error-state button{margin-top:12px}
+.channel-poster{width:100%;height:180px;object-fit:contain;background:#080808;border-radius:10px}
+.placeholder{display:flex;align-items:center;justify-content:center;background:#222;color:#777}
+.popular-badge{display:inline-block;margin-top:8px;font-size:10px;padding:4px 7px;border-radius:5px;background:#333}
+.stream-message{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa}
+.stream-message h3{color:#fff}
+</style>
+
+
+<style>
+/* Stream-picker UI inspired by the supplied reference image. */
+.stream-page{
+  width:min(1280px,94vw);
+  max-height:92vh;
+  overflow:auto;
+  background:#0d1117;
+  border:1px solid #242b35;
+  border-radius:18px;
+  box-shadow:0 20px 70px rgba(0,0,0,.65);
+  padding:22px 28px 28px;
+  color:#f5f7fa;
+}
+.stream-topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:24px;
+}
+.back-btn,.embed-btn,.theater-btn{
+  border:1px solid #303946;
+  background:#111821;
+  color:#e9edf2;
+  border-radius:9px;
+  padding:10px 15px;
+  font-weight:700;
+  cursor:pointer;
+}
+.back-btn:hover,.embed-btn:hover,.theater-btn:hover{background:#18212c}
+.stream-heading{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:20px;
+  margin-bottom:18px;
+}
+.stream-heading h2{
+  margin:0 0 7px;
+  font-size:30px;
+  letter-spacing:-.4px;
+}
+.stream-heading p{
+  margin:0;
+  color:#9ca7b5;
+  font-size:14px;
+}
+.stream-source-box{
+  border:1px solid #c4b33c;
+  border-radius:12px;
+  overflow:hidden;
+  background:linear-gradient(180deg,#151a20,#10151b);
+}
+.source-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:17px 18px;
+  border-bottom:1px solid #55501e;
+}
+.source-name{
+  font-size:18px;
+  font-weight:800;
+}
+.source-note{
+  color:#ffd400;
+  font-size:13px;
+  font-weight:700;
+  margin-top:4px;
+}
+.stream-count{
+  color:#ff6454;
+  font-size:14px;
+  font-weight:800;
+}
+.stream-list{padding:10px 9px}
+.stream-option{
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:13px;
+  border:1px solid transparent;
+  background:transparent;
+  color:#f3f5f7;
+  padding:13px 14px;
+  border-radius:9px;
+  cursor:pointer;
+  text-align:left;
+  transition:.16s ease;
+}
+.stream-option:hover{background:#19212a;border-color:#38434f}
+.stream-option.current{
+  border-color:#ff5a43;
+  box-shadow:inset 4px 0 #ff5a43;
+  background:#151b21;
+}
+.quality-pill{
+  min-width:38px;
+  padding:5px 7px;
+  border-radius:6px;
+  background:#28313b;
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  text-align:center;
+}
+.stream-option.current .quality-pill{background:#ff513d}
+.stream-label{font-size:16px;font-weight:800}
+.current-label{color:#ff654f;font-size:13px;font-weight:800}
+.stream-meta{
+  margin-left:auto;
+  color:#d9dee5;
+  font-size:13px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.more-streams{
+  margin-top:14px;
+  border:1px solid #303946;
+  background:#111821;
+  color:#dce2e9;
+  border-radius:9px;
+  padding:11px 15px;
+  cursor:pointer;
+}
+.no-manual-streams{
+  padding:38px 20px;
+  text-align:center;
+  color:#9ca7b5;
+}
+.no-manual-streams strong{display:block;color:#fff;font-size:17px;margin-bottom:7px}
+.player-container{
+  margin-top:18px;
+  min-height:500px;
+  width:100%;
+  background:#000;
+  border-radius:12px;
+  overflow:hidden;
+}
+.player-container iframe{width:100%;height:500px;border:0}
+.stream-page.theater{
+  width:100vw;
+  max-width:none;
+  max-height:none;
+  height:100vh;
+  border-radius:0;
+  padding:18px 28px;
+}
+@media(max-width:700px){
+  .stream-page{width:96vw;padding:16px;border-radius:12px}
+  .stream-heading{align-items:flex-start;flex-direction:column}
+  .stream-heading h2{font-size:24px}
+  .stream-meta{font-size:11px}
+  .stream-option{padding:12px 10px}
+  .player-container,.player-container iframe{min-height:260px;height:260px}
+}
+</style>
+
 </head>
 <body>
 
@@ -273,261 +445,472 @@
     <div class="loading-spinner">Loading matches...</div>
   </main>
 
-  <!-- Stream Modal (Hidden by default) -->
+  <!-- Stream Picker / Player -->
   <div id="stream-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="modal-title">Live Stream</h3>
-        <button class="close-btn" onclick="closeModal()">&times;</button>
+    <div class="stream-page">
+      <div class="stream-topbar">
+        <button class="back-btn" type="button" onclick="closeModal()">← <span>Back</span></button>
+        <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
       </div>
-      <div id="player-container" class="player-container">
-        <!-- Stream iframe will be injected here -->
+
+      <div class="stream-heading">
+        <div>
+          <h2>Available Streams</h2>
+          <p id="stream-subtitle">Select a stream to watch</p>
+        </div>
+        <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Enter theater mode</span></button>
       </div>
+
+      <div id="stream-picker"></div>
+
+      <div id="player-container" class="player-container" hidden></div>
     </div>
   </div>
 
   <!-- ================= JAVASCRIPT ================= -->
   <script>
-    // ==========================================
-    // CONFIGURATION
-    // ==========================================
-    // ⚠️ REPLACE THIS WITH YOUR CLOUDFLARE WORKER URL ⚠️
-    const PROXY_URL = 'https://streamedproxy.svimranmy.workers.dev/L'; 
+    const PROXY_URL = "https://streamedproxy.svimranmy.workers.dev";
 
-    // Define the exact order of categories you want
     const CATEGORY_ORDER = [
-      'LIVE',
-      'TODAY\'S MATCHES',
-      'FOOTBALL',
-      'AMERICAN FOOTBALL',
-      'BASKETBALL',
-      'CRICKET',
-      'BASEBALL',
-      'RUGBY',
-      'TENNIS',
-      'MOTOR-SPORTS',
-      'GOLF',
-      'FIGHT',
-      'OTHER'
+        "LIVE",
+        "TODAYS MATCHES",
+        "FOOTBALL",
+        "AMERICAN FOOTBALL",
+        "BASKETBALL",
+        "CRICKET",
+        "BASEBALL",
+        "RUGBY",
+        "TENNIS",
+        "MOTOR-SPORTS",
+        "GOLF",
+        "FIGHT",
+        "OTHER"
     ];
 
-    // ==========================================
-    // 1. FETCH MATCHES
-    // ==========================================
+    let loading = false;
+
+    function esc(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function normalizeCategory(value) {
+        const c = String(value || "").trim().toLowerCase();
+
+        const aliases = {
+            "american-football": "AMERICAN FOOTBALL",
+            "american football": "AMERICAN FOOTBALL",
+            "motor-sports": "MOTOR-SPORTS",
+            "motorsports": "MOTOR-SPORTS"
+        };
+
+        return aliases[c] || (c ? c.toUpperCase() : "OTHER");
+    }
+
+    function resolveAssetUrl(value) {
+        if (!value) return "";
+        const url = String(value);
+
+        if (/^(https?:)?\/\//i.test(url) || url.startsWith("data:")) {
+            return url;
+        }
+
+        if (url.startsWith("/")) {
+            return PROXY_URL + url;
+        }
+
+        return PROXY_URL + "/" + url;
+    }
+
+    function getLogoUrl(badge) {
+        if (!badge) return "";
+        const value = String(badge);
+        if (/^(https?:)?\/\//i.test(value)) return value;
+        return PROXY_URL + "/api/images/proxy/" + value;
+    }
+
+    function logoError(img, token) {
+        if (img.dataset.logoFallback === "1") {
+            img.style.display = "none";
+            return;
+        }
+        img.dataset.logoFallback = "1";
+        img.src = PROXY_URL + "/api/images/proxy/" + token + ".webp";
+    }
+
+    function safeDate(value) {
+        if (value === null || value === undefined || value === "") return null;
+
+        const n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return null;
+
+        const d = new Date(n);
+        return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    function isToday(date) {
+        if (!date) return false;
+
+        const now = new Date();
+        return date.getFullYear() === now.getFullYear() &&
+               date.getMonth() === now.getMonth() &&
+               date.getDate() === now.getDate();
+    }
+
+    function isLive(match) {
+        return match?.live === true ||
+               String(match?.status || "").toLowerCase() === "live";
+    }
+
+    function isChannel(match) {
+        return !match?.teams?.home || !match?.teams?.away;
+    }
+
+    async function fetchJson(url, timeoutMs = 12000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: { "Accept": "application/json" },
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
     async function loadMatches() {
-      const container = document.getElementById('matches-container');
-      container.innerHTML = '<div class="loading-spinner">Loading matches...</div>';
+        if (loading) return;
 
-      try {
-        const response = await fetch(`${PROXY_URL}/api/matches/all-today`);
-        
-        if (!response.ok) throw new Error("Failed to fetch matches");
-        
-        const matches = await response.json();
-        renderMatches(matches);
+        loading = true;
+        const app = document.getElementById("matches-container") ||
+                    document.getElementById("app");
 
-      } catch (error) {
-        console.error("Error loading matches:", error);
-        container.innerHTML = `<div class="loading-spinner" style="color: #ff4444;">Error loading matches. Please try again later.</div>`;
-      }
+        if (app) {
+            app.innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Loading matches...</p>
+                </div>`;
+        }
+
+        try {
+            const data = await fetchJson(
+                PROXY_URL + "/api/matches/all-today"
+            );
+
+            const matches = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.matches)
+                    ? data.matches
+                    : [];
+
+            if (!matches.length) {
+                if (app) app.innerHTML = `<div class="empty-state">No matches available.</div>`;
+                return;
+            }
+
+            renderMatches(matches);
+
+        } catch (error) {
+            console.error("Match API error:", error);
+
+            if (app) {
+                app.innerHTML = `
+                    <div class="error-state">
+                        <h3>Unable to load matches</h3>
+                        <p>${esc(error.name === "AbortError"
+                            ? "The request timed out."
+                            : error.message)}</p>
+                        <button type="button" onclick="loadMatches()">Retry</button>
+                    </div>`;
+            }
+        } finally {
+            loading = false;
+        }
     }
 
-    // ==========================================
-    // 2. HELPER: FIX BROKEN LOGOS
-    // ==========================================
-    function getLogoHtml(badgeUrl, teamName) {
-      let finalUrl = badgeUrl;
-      
-      // If the API gives us a relative URL (e.g., "/logos/team.png"), prepend the domain
-      if (finalUrl && !finalUrl.startsWith('http')) {
-        finalUrl = `https://streamed.pk${finalUrl.startsWith('/') ? '' : '/'}${finalUrl}`;
-      }
-
-      // If we have a valid URL, use an image tag with an error fallback
-      if (finalUrl) {
-        return `
-          <img src="${finalUrl}" 
-               alt="${teamName}" 
-               class="team-logo" 
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-          <div class="fallback-logo" style="display: none;">${teamName.charAt(0)}</div>
-        `;
-      }
-      
-      // If no URL at all, just use the fallback
-      return `<div class="fallback-logo">${teamName.charAt(0)}</div>`;
-    }
-
-    // ==========================================
-    // 3. RENDER MATCHES WITH CUSTOM SORTING
-    // ==========================================
     function renderMatches(matches) {
-      const container = document.getElementById('matches-container');
-      container.innerHTML = '';
+        const groups = Object.fromEntries(
+            CATEGORY_ORDER.map(category => [category, []])
+        );
 
-      if (!matches || matches.length === 0) {
-        container.innerHTML = '<div class="loading-spinner">No matches available today.</div>';
-        return;
-      }
+        for (const match of matches) {
+            if (!match || typeof match !== "object") continue;
 
-      // Initialize grouped object with our custom order
-      const grouped = {};
-      CATEGORY_ORDER.forEach(cat => grouped[cat] = []);
+            const date = safeDate(match.date ?? match.timestamp);
 
-      const todayStr = new Date().toDateString();
+            if (isLive(match)) {
+                groups.LIVE.push(match);
+                continue;
+            }
 
-      matches.forEach(match => {
-        const isLive = match.status === 'live' || match.live === true;
-        const matchDate = new Date(match.date);
-        const isToday = matchDate.toDateString() === todayStr;
+            if (isToday(date)) {
+                groups["TODAYS MATCHES"].push(match);
+                continue;
+            }
 
-        if (isLive) {
-          grouped['LIVE'].push(match);
-        } else if (isToday) {
-          grouped['TODAY\'S MATCHES'].push(match);
-        } else {
-          const cat = match.category ? match.category.toUpperCase() : 'OTHER';
-          if (grouped[cat]) {
-            grouped[cat].push(match);
-          } else {
-            grouped['OTHER'].push(match);
-          }
+            const category = normalizeCategory(match.category);
+            (groups[category] || groups.OTHER).push(match);
         }
-      });
+        window.__SPORTZFY_MATCHES = new Map(
+            matches.filter(Boolean).map(match => [String(match.id || ""), match])
+        );
 
-      // Loop through our custom order and render only the categories that have matches
-      for (const category of CATEGORY_ORDER) {
-        const categoryMatches = grouped[category];
-        
-        if (categoryMatches.length === 0) continue; // Skip empty categories
 
-        let sectionHtml = `
-          <div class="category-section">
-            <h2 class="category-title">${category}</h2>
-            <div class="matches-grid">
-        `;
+        const container = document.getElementById("matches-container") ||
+                          document.getElementById("app");
 
-        categoryMatches.forEach(match => {
-          const matchDate = new Date(match.date).toLocaleString('en-US', {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-          });
+        let output = "";
 
-          const isLive = match.status === 'live' || match.live === true;
-          const statusBadge = isLive 
-            ? '<span class="badge-live">● LIVE</span>' 
-            : '<span class="badge-upcoming">UPCOMING</span>';
+        for (const category of CATEGORY_ORDER) {
+            const list = groups[category];
 
-          // Use our new logo helper
-          const homeLogo = getLogoHtml(match.teams.home.badge, match.teams.home.name);
-          const awayLogo = getLogoHtml(match.teams.away.badge, match.teams.away.name);
+            if (!list.length) continue;
 
-          let buttonHtml = '';
-          
-          if (match.sources && match.sources.length > 0) {
-            buttonHtml = `<button class="btn btn-watch" onclick="loadStreamedStream('${match.sources[0].source}', '${match.sources[0].id}')">Watch Stream</button>`;
-          } else {
-            buttonHtml = `<button class="btn btn-disabled" disabled>No Stream</button>`;
-          }
+            output += `
+                <section class="category-section">
+                    <h2>${esc(category)}</h2>
+                    <div class="matches-grid">
+                        ${list.map(buildMatchCard).join("")}
+                    </div>
+                </section>`;
+        }
 
-          sectionHtml += `
-            <div class="match-card">
-              <div class="card-header">
-                <span>${match.category ? match.category.toUpperCase() : 'SPORT'}</span>
-                ${statusBadge}
-              </div>
-              
-              <div class="teams-container">
-                <div class="team">
-                  ${homeLogo}
-                  <div class="team-name">${match.teams.home.name}</div>
+        container.innerHTML = output ||
+            `<div class="empty-state">No matches available.</div>`;
+    }
+
+    function buildMatchCard(match) {
+        const id = String(match.id || "");
+
+        if (isChannel(match)) {
+            const poster = resolveAssetUrl(match.poster);
+
+            return `
+                <article class="match-card channel-card">
+                    ${poster
+                        ? `<img class="channel-poster" src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy">`
+                        : `<div class="channel-poster placeholder">TV</div>`}
+                    <div class="match-title">${esc(match.title || "Channel")}</div>
+                    ${match.popular ? `<span class="popular-badge">POPULAR</span>` : ""}
+                    <button type="button" class="watch-btn" data-match-id="${esc(id)}">Watch Stream</button>
+                </article>`;
+        }
+
+        const home = match.teams?.home || {};
+        const away = match.teams?.away || {};
+        const homeBadge = getLogoUrl(home.badge);
+        const awayBadge = getLogoUrl(away.badge);
+        const homeLogo = homeBadge
+            ? `<img class="team-logo" src="${esc(homeBadge)}" data-logo-token="${esc(home.badge || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(home.name || "Home")}" loading="lazy">`
+            : `<div class="team-logo placeholder">?</div>`;
+        const awayLogo = awayBadge
+            ? `<img class="team-logo" src="${esc(awayBadge)}" data-logo-token="${esc(away.badge || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(away.name || "Away")}" loading="lazy">`
+            : `<div class="team-logo placeholder">?</div>`;
+
+        return `
+            <article class="match-card">
+                <div class="match-title">${esc(match.title || `${home.name || "TBD"} vs ${away.name || "TBD"}`)}</div>
+                <div class="teams">
+                    <div class="team">${homeLogo}<div class="team-name">${esc(home.name || "TBD")}</div></div>
+                    <div class="vs">VS</div>
+                    <div class="team">${awayLogo}<div class="team-name">${esc(away.name || "TBD")}</div></div>
                 </div>
-                <div class="vs-text">VS</div>
-                <div class="team">
-                  ${awayLogo}
-                  <div class="team-name">${match.teams.away.name}</div>
-                </div>
-              </div>
-              
-              <div class="match-date">${matchDate}</div>
-              ${buttonHtml}
-            </div>
-          `;
+                <button type="button" class="watch-btn" data-match-id="${esc(id)}">Watch Stream</button>
+            </article>`;
+    }
+
+    /*
+     * MANUAL STREAMS ONLY
+     *
+     * Nothing is fetched from a stream-source API.
+     * The match/channel names come from /api/matches/all-today.
+     * Add your own playable URLs here.
+     *
+     * Supported format:
+     *
+     * "admin-tennis-channel": [
+     *   { name: "Stream 1", quality: "HD", language: "English", url: "YOUR_URL" },
+     *   { name: "Stream 2", quality: "SD", language: "English", url: "YOUR_URL" }
+     * ]
+     */
+    const MANUAL_STREAMS = {};
+
+    let activeMatch = null;
+
+    function getManualStreams(matchId) {
+        const value = MANUAL_STREAMS[String(matchId)];
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === "object" && value.url) return [value];
+        return [];
+    }
+
+    function openManualStream(matchId) {
+        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
+        if (!match) return;
+
+        activeMatch = match;
+
+        const modal = document.getElementById("stream-modal");
+        const picker = document.getElementById("stream-picker");
+        const player = document.getElementById("player-container");
+
+        if (!modal || !picker || !player) return;
+
+        const streams = getManualStreams(matchId);
+        const title = match.title || "Channel";
+        const count = streams.length;
+
+        document.getElementById("stream-subtitle").textContent =
+            `${title} • ${count} manual stream${count === 1 ? "" : "s"} added`;
+
+        player.hidden = true;
+        player.replaceChildren();
+
+        if (!count) {
+            picker.innerHTML = `
+                <div class="stream-source-box">
+                    <div class="source-head">
+                        <div>
+                            <div class="source-name">Admin</div>
+                            <div class="source-note">✣ Admin added streams</div>
+                        </div>
+                        <div class="stream-count">0 streams</div>
+                    </div>
+                    <div class="no-manual-streams">
+                        <strong>${esc(title)}</strong>
+                        No manual streams have been added yet.
+                    </div>
+                </div>`;
+        } else {
+            picker.innerHTML = `
+                <div class="stream-source-box">
+                    <div class="source-head">
+                        <div>
+                            <div class="source-name">Admin</div>
+                            <div class="source-note">✣ Admin added streams</div>
+                        </div>
+                        <div class="stream-count">${count} stream${count === 1 ? "" : "s"}</div>
+                    </div>
+                    <div class="stream-list">
+                        ${streams.map((stream, index) => `
+                            <button class="stream-option ${index === 0 ? "current" : ""}"
+                                    type="button"
+                                    data-stream-index="${index}">
+                                <span class="quality-pill">${esc(stream.quality || "SD")}</span>
+                                <span class="stream-label">${esc(stream.name || `Stream ${index + 1}`)}</span>
+                                ${index === 0 ? `<span class="current-label">✓ Current</span>` : ""}
+                                <span class="stream-meta">
+                                    <span>◉ ${esc(stream.language || "English")}</span>
+                                </span>
+                            </button>
+                        `).join("")}
+                    </div>
+                </div>`;
+        }
+
+        modal.style.display = "flex";
+        document.body.style.overflow = "hidden";
+    }
+
+    function playManualStream(index) {
+        if (!activeMatch) return;
+
+        const streams = getManualStreams(activeMatch.id);
+        const stream = streams[index];
+        if (!stream?.url) return;
+
+        const picker = document.getElementById("stream-picker");
+        const player = document.getElementById("player-container");
+        if (!picker || !player) return;
+
+        const iframe = document.createElement("iframe");
+        iframe.src = stream.url;
+        iframe.allowFullscreen = true;
+        iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
+        iframe.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
+        iframe.frameBorder = "0";
+
+        player.hidden = false;
+        player.replaceChildren(iframe);
+
+        picker.querySelectorAll(".stream-option").forEach((button, i) => {
+            button.classList.toggle("current", i === Number(index));
+            const current = button.querySelector(".current-label");
+            if (i === Number(index)) {
+                if (!current) {
+                    const label = document.createElement("span");
+                    label.className = "current-label";
+                    label.textContent = "✓ Current";
+                    button.insertBefore(label, button.querySelector(".stream-meta"));
+                }
+            } else if (current) {
+                current.remove();
+            }
         });
-
-        sectionHtml += `</div></div>`;
-        container.innerHTML += sectionHtml;
-      }
     }
 
-    // ==========================================
-    // 4. FETCH AND PLAY THE STREAM API
-    // ==========================================
-    async function loadStreamedStream(sourceName, sourceId) {
-      const modal = document.getElementById('stream-modal');
-      const playerContainer = document.getElementById('player-container');
-      const modalTitle = document.getElementById('modal-title');
-
-      modal.style.display = 'flex';
-      modalTitle.innerText = 'Loading Stream...';
-      playerContainer.innerHTML = '<div class="loading-spinner">Connecting to stream...</div>';
-
-      try {
-        const response = await fetch(`${PROXY_URL}/api/stream/${sourceName}/${sourceId}`);
-        
-        if (!response.ok) throw new Error("Stream API failed");
-        
-        const streamData = await response.json();
-
-        const streamUrl = streamData.url || streamData.embed || streamData.stream;
-
-        if (!streamUrl) {
-          throw new Error("No stream URL found in the API response.");
-        }
-
-        modalTitle.innerText = 'Live Stream';
-
-        if (streamUrl.includes('<iframe')) {
-          playerContainer.innerHTML = streamUrl;
-        } else {
-          playerContainer.innerHTML = `
-            <iframe src="${streamUrl}" allowfullscreen="true" scrolling="no" frameborder="0"></iframe>
-          `;
-        }
-
-      } catch (error) {
-        console.error("Stream Error:", error);
-        modalTitle.innerText = 'Error';
-        playerContainer.innerHTML = `
-          <div style="text-align: center; color: #ff4444;">
-            <p>Sorry, this stream is currently unavailable.</p>
-            <p style="font-size: 12px; color: #888; margin-top: 10px;">Error: ${error.message}</p>
-          </div>
-        `;
-      }
+    function toggleTheaterMode() {
+        document.querySelector(".stream-page")?.classList.toggle("theater");
     }
 
-    // ==========================================
-    // 5. MODAL CONTROLS
-    // ==========================================
+    async function copyEmbedCode() {
+        if (!activeMatch) return;
+        const url = location.href.split("#")[0] + "#match=" + encodeURIComponent(activeMatch.id);
+        try {
+            await navigator.clipboard.writeText(`<iframe src="${url}" width="100%" height="500" frameborder="0" allowfullscreen></iframe>`);
+        } catch (_) {}
+    }
+
     function closeModal() {
-      const modal = document.getElementById('stream-modal');
-      const playerContainer = document.getElementById('player-container');
-      
-      modal.style.display = 'none';
-      playerContainer.innerHTML = ''; 
+        const modal = document.getElementById("stream-modal");
+        const player = document.getElementById("player-container");
+
+        if (modal) modal.style.display = "none";
+        if (player) {
+            player.hidden = true;
+            player.replaceChildren();
+        }
+        document.querySelector(".stream-page")?.classList.remove("theater");
+        document.body.style.overflow = "";
+        activeMatch = null;
     }
 
-    window.onclick = function(event) {
-      const modal = document.getElementById('stream-modal');
-      if (event.target === modal) {
-        closeModal();
-      }
-    }
+    document.addEventListener("click", event => {
+        const matchButton = event.target.closest("[data-match-id]");
+        if (matchButton && !matchButton.disabled) {
+            openManualStream(matchButton.dataset.matchId);
+            return;
+        }
 
-    // ==========================================
-    // 6. INITIALIZE
-    // ==========================================
-    window.addEventListener('DOMContentLoaded', loadMatches);
-  </script>
+        const streamButton = event.target.closest("[data-stream-index]");
+        if (streamButton) {
+            playManualStream(Number(streamButton.dataset.streamIndex));
+            return;
+        }
+
+        const modal = document.getElementById("stream-modal");
+        if (modal && event.target === modal) closeModal();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") closeModal();
+    });
+
+    document.addEventListener("DOMContentLoaded", loadMatches);
+</script>
 </body>
 </html>
