@@ -62,7 +62,7 @@
         .player-section {
             width: 100%;
             background: #000;
-            position: relative;    /* was: sticky; top: 0;  — sticky blocks floating */
+            position: relative;
             z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.8);
             transition: box-shadow 220ms ease, border-radius 220ms ease;
@@ -251,7 +251,7 @@
         }
 
         /* =========================================
-           CHANNEL GRID (responsive columns)
+           CHANNEL GRID
            ========================================= */
         .channel-grid {
             max-width: 1200px;
@@ -331,19 +331,26 @@
         }
 
         /* =========================
-           AUTO FLOATING / PIP PLAYER
+           AUTO FLOATING / DRAGGABLE MINI PLAYER
            ========================= */
         .player-section.is-floating {
             position: fixed;
-            top: auto;
-            right: 18px;
-            bottom: 18px;
-            left: auto;
+            /* left/top are set dynamically by JS (drag) */
             width: min(380px, calc(100vw - 36px));
             z-index: 9999;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 14px 45px rgba(0, 0, 0, .65);
+            touch-action: none;         /* prevents page scroll from starting on the mini player */
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .player-section.is-floating.is-dragging {
+            cursor: grabbing;
+            transition: none;
         }
 
         .player-section.is-floating .player-wrapper {
@@ -389,6 +396,7 @@
             place-items: center;
             cursor: pointer;
             backdrop-filter: blur(8px);
+            touch-action: manipulation;
         }
 
         .pip-action:hover {
@@ -402,8 +410,6 @@
 
         @media (max-width: 600px) {
             .player-section.is-floating {
-                right: 10px;
-                bottom: 10px;
                 width: min(320px, calc(100vw - 20px));
             }
         }
@@ -506,61 +512,18 @@
             </iframe>
 
             <!-- WATERMARK-FREE FOOTBALL LOADING ANIMATION -->
-            <div
-                class="ball-loading-overlay"
-                id="ballLoadingOverlay"
-                aria-hidden="true">
-
-                <svg
-                    class="ball-loader"
-                    viewBox="0 0 200 200"
-                    role="img"
-                    aria-label="Loading video">
-
-                    <!-- BLUE ROTATING ARROWS -->
-                    <g
-                        class="loader-arrow"
-                        fill="none"
-                        stroke-linecap="butt">
-
-                        <path
-                            d="M36 77 A76 76 0 0 1 145 29"
-                            stroke="#8DB3E5"
-                            stroke-width="18"/>
-
-                        <path
-                            d="M145 29 A76 76 0 0 1 171 145"
-                            stroke="#2F67A8"
-                            stroke-width="18"/>
-
-                        <path
-                            d="M171 145 A76 76 0 0 1 55 172"
-                            stroke="#8DB3E5"
-                            stroke-width="18"/>
-
-                        <path
-                            d="M55 172 A76 76 0 0 1 29 58"
-                            stroke="#2F67A8"
-                            stroke-width="18"/>
-
-                        <path
-                            d="M142 20 L174 26 L150 48 Z"
-                            fill="#2F67A8"
-                            stroke="none"/>
-
-                        <path
-                            d="M58 181 L27 176 L51 151 Z"
-                            fill="#2F67A8"
-                            stroke="none"/>
+            <div class="ball-loading-overlay" id="ballLoadingOverlay" aria-hidden="true">
+                <svg class="ball-loader" viewBox="0 0 200 200" role="img" aria-label="Loading video">
+                    <g class="loader-arrow" fill="none" stroke-linecap="butt">
+                        <path d="M36 77 A76 76 0 0 1 145 29" stroke="#8DB3E5" stroke-width="18"/>
+                        <path d="M145 29 A76 76 0 0 1 171 145" stroke="#2F67A8" stroke-width="18"/>
+                        <path d="M171 145 A76 76 0 0 1 55 172" stroke="#8DB3E5" stroke-width="18"/>
+                        <path d="M55 172 A76 76 0 0 1 29 58" stroke="#2F67A8" stroke-width="18"/>
+                        <path d="M142 20 L174 26 L150 48 Z" fill="#2F67A8" stroke="none"/>
+                        <path d="M58 181 L27 176 L51 151 Z" fill="#2F67A8" stroke="none"/>
                     </g>
 
-                    <!-- BLACK MOTION TICKS -->
-                    <g
-                        class="loader-ticks"
-                        stroke="#050505"
-                        stroke-width="5"
-                        stroke-linecap="round">
-
+                    <g class="loader-ticks" stroke="#050505" stroke-width="5" stroke-linecap="round">
                         <line x1="100" y1="13"  x2="100" y2="29"/>
                         <line x1="171" y1="49"  x2="158" y2="57"/>
                         <line x1="187" y1="101" x2="171" y2="101"/>
@@ -571,17 +534,8 @@
                         <line x1="39"  y1="49"  x2="51"  y2="59"/>
                     </g>
 
-                    <!-- FOOTBALL -->
                     <g class="loader-ball">
-
-                        <circle
-                            cx="100"
-                            cy="100"
-                            r="38"
-                            fill="#fff"
-                            stroke="#050505"
-                            stroke-width="3"/>
-
+                        <circle cx="100" cy="100" r="38" fill="#fff" stroke="#050505" stroke-width="3"/>
                         <polygon points="100,82 112,91 107,106 93,106 88,91" fill="#050505"/>
                         <polygon points="100,82 112,91 125,87 116,75 103,72" fill="#050505"/>
                         <polygon points="112,91 125,87 132,101 122,111 107,106" fill="#fff" stroke="#050505" stroke-width="2.5"/>
@@ -593,16 +547,8 @@
                         <polygon points="95,125 108,134 96,138 82,132" fill="#050505"/>
                         <polygon points="121,126 121,111 134,105 137,119 128,130" fill="#050505"/>
                         <polygon points="125,87 116,75 126,78 133,90" fill="#050505"/>
-
-                        <circle
-                            cx="100"
-                            cy="100"
-                            r="38"
-                            fill="none"
-                            stroke="#050505"
-                            stroke-width="3"/>
+                        <circle cx="100" cy="100" r="38" fill="none" stroke="#050505" stroke-width="3"/>
                     </g>
-
                 </svg>
             </div>
         </div>
@@ -612,14 +558,12 @@
     <div class="player-spacer" id="playerSpacer" aria-hidden="true"></div>
 
     <div class="controls">
-
         <div class="search-box">
             <i data-lucide="search" class="search-icon"></i>
             <input type="text" id="searchInput" placeholder="Search channels...">
         </div>
 
         <div class="category-filters" id="categoryFilters"></div>
-
     </div>
 
     <div class="channel-grid" id="channelGrid"></div>
@@ -668,7 +612,7 @@
         iframe.addEventListener('load',     hideBallLoader);
 
         /* =========================================
-           AUTO FLOATING / NATIVE PIP
+           AUTO FLOATING / DRAGGABLE MINI PLAYER
            ========================================= */
         const playerSection       = document.getElementById('playerSection');
         const nativePipButton     = document.getElementById('nativePipButton');
@@ -676,22 +620,69 @@
 
         let floatingPlayerClosed = false;
         let floatThreshold       = 0;
+        let savedFloatPosition   = null;   // { left, top } in viewport coords; null = use default
+        let dragState            = null;
 
-        /* Measure where the player bottom sits in page coordinates.
-           Measured while un-floated, so the value stays stable. */
-        function recalcFloatThreshold() {
-            if (!playerSection) return;
+        /* ---------- helpers ---------- */
 
-            const wasFloating = playerSection.classList.contains('is-floating');
-            if (wasFloating) playerSection.classList.remove('is-floating');
-
-            const rect = playerSection.getBoundingClientRect();
-            floatThreshold = rect.bottom + window.scrollY;
-
-            if (wasFloating) playerSection.classList.add('is-floating');
+        function clearInlineFloatPosition() {
+            playerSection.style.left   = '';
+            playerSection.style.top    = '';
+            playerSection.style.right  = '';
+            playerSection.style.bottom = '';
         }
 
-        /* Is something actually playing right now? */
+        function getFloatMargin() {
+            return window.innerWidth <= 600 ? 10 : 18;
+        }
+
+        function clampPosition(left, top, w, h) {
+            const pad = 6;
+            return {
+                left: Math.max(pad, Math.min(window.innerWidth  - w - pad, left)),
+                top:  Math.max(pad, Math.min(window.innerHeight - h - pad, top))
+            };
+        }
+
+        /* ---------- activate / deactivate float ---------- */
+
+        function activateFloat() {
+            // add class first so CSS applies floating width/height
+            playerSection.classList.add('is-floating');
+
+            // read the actual floating size (forces sync layout — no paint occurs yet)
+            const w = playerSection.offsetWidth;
+            const h = playerSection.offsetHeight;
+            const margin = getFloatMargin();
+
+            let left, top;
+
+            if (savedFloatPosition) {
+                left = savedFloatPosition.left;
+                top  = savedFloatPosition.top;
+            } else {
+                // default: right middle of the screen
+                left = window.innerWidth - w - margin;
+                top  = (window.innerHeight - h) / 2;
+            }
+
+            const pos = clampPosition(left, top, w, h);
+
+            playerSection.style.left   = pos.left + 'px';
+            playerSection.style.top    = pos.top  + 'px';
+            playerSection.style.right  = 'auto';
+            playerSection.style.bottom = 'auto';
+        }
+
+        function deactivateFloat() {
+            playerSection.classList.remove('is-floating');
+            playerSection.classList.remove('is-dragging');
+            clearInlineFloatPosition();
+            dragState = null;
+        }
+
+        /* ---------- visibility checks ---------- */
+
         function hasActivePlayback() {
             if (video.style.display !== 'none' &&
                 video.src &&
@@ -707,12 +698,34 @@
             return false;
         }
 
+        /* ---------- measure page position of the player ---------- */
+
+        function recalcFloatThreshold() {
+            if (!playerSection) return;
+
+            const wasFloating = playerSection.classList.contains('is-floating');
+
+            if (wasFloating) {
+                playerSection.classList.remove('is-floating');
+                clearInlineFloatPosition();
+            }
+
+            const rect = playerSection.getBoundingClientRect();
+            floatThreshold = rect.bottom + window.scrollY;
+
+            if (wasFloating) {
+                activateFloat();
+            }
+        }
+
+        /* ---------- main state machine ---------- */
+
         function updateFloatingPlayer() {
             if (!playerSection) return;
 
             // Native browser PiP takes over — don't double up
             if (document.pictureInPictureElement) {
-                playerSection.classList.remove('is-floating');
+                deactivateFloat();
                 return;
             }
 
@@ -721,28 +734,136 @@
                 floatingPlayerClosed = false;
             }
 
-            if (floatingPlayerClosed || !hasActivePlayback()) {
-                playerSection.classList.remove('is-floating');
-                return;
-            }
+            const shouldFloat =
+                !floatingPlayerClosed &&
+                hasActivePlayback() &&
+                window.scrollY > floatThreshold;
 
-            playerSection.classList.toggle(
-                'is-floating',
-                window.scrollY > floatThreshold
-            );
+            const isFloating = playerSection.classList.contains('is-floating');
+
+            if (shouldFloat && !isFloating) {
+                activateFloat();
+            } else if (!shouldFloat && isFloating) {
+                deactivateFloat();
+            }
         }
 
         function resetFloatingState() {
             floatingPlayerClosed = false;
-            playerSection.classList.remove('is-floating');
+            savedFloatPosition   = null;   // new channel starts at default right-middle
+            deactivateFloat();
         }
 
-        /* --- listeners --- */
+        /* =========================================
+           DRAG-TO-MOVE  (pointer events — mouse + touch)
+           ========================================= */
+
+        const DRAG_THRESHOLD_PX = 6;   // movement needed before we treat it as a drag
+
+        function onPointerDown(e) {
+            if (!playerSection.classList.contains('is-floating')) return;
+
+            // Never intercept our own buttons
+            if (e.target.closest('.pip-action')) return;
+
+            // Left mouse button only
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+            const rect = playerSection.getBoundingClientRect();
+
+            dragState = {
+                pointerId:  e.pointerId,
+                startX:     e.clientX,
+                startY:     e.clientY,
+                startLeft:  rect.left,
+                startTop:   rect.top,
+                dragging:   false,
+                captured:   false
+            };
+        }
+
+        function onPointerMove(e) {
+            if (!dragState || e.pointerId !== dragState.pointerId) return;
+
+            const dx = e.clientX - dragState.startX;
+            const dy = e.clientY - dragState.startY;
+
+            // Wait for the movement threshold before committing to a drag,
+            // so taps on native video controls / buttons still work.
+            if (!dragState.dragging) {
+                if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+
+                dragState.dragging = true;
+                playerSection.classList.add('is-dragging');
+
+                try {
+                    playerSection.setPointerCapture(e.pointerId);
+                    dragState.captured = true;
+                } catch (_) { /* ignore */ }
+            }
+
+            const w = playerSection.offsetWidth;
+            const h = playerSection.offsetHeight;
+            const pos = clampPosition(
+                dragState.startLeft + dx,
+                dragState.startTop  + dy,
+                w, h
+            );
+
+            playerSection.style.left   = pos.left + 'px';
+            playerSection.style.top    = pos.top  + 'px';
+            playerSection.style.right  = 'auto';
+            playerSection.style.bottom = 'auto';
+
+            if (e.cancelable) e.preventDefault();
+        }
+
+        function onPointerUp(e) {
+            if (!dragState || e.pointerId !== dragState.pointerId) return;
+
+            if (dragState.captured) {
+                try { playerSection.releasePointerCapture(e.pointerId); } catch (_) {}
+            }
+
+            if (dragState.dragging) {
+                playerSection.classList.remove('is-dragging');
+
+                savedFloatPosition = {
+                    left: parseFloat(playerSection.style.left) || 0,
+                    top:  parseFloat(playerSection.style.top)  || 0
+                };
+            }
+
+            dragState = null;
+        }
+
+        playerSection.addEventListener('pointerdown', onPointerDown);
+        playerSection.addEventListener('pointermove', onPointerMove);
+        playerSection.addEventListener('pointerup',   onPointerUp);
+        playerSection.addEventListener('pointercancel', onPointerUp);
+
+        /* =========================================
+           WINDOW / VIDEO LISTENERS
+           ========================================= */
         window.addEventListener('scroll', updateFloatingPlayer, { passive: true });
 
         window.addEventListener('resize', () => {
             recalcFloatThreshold();
             updateFloatingPlayer();
+
+            // re-clamp the floating window if it's open and not being dragged
+            if (playerSection.classList.contains('is-floating') && !dragState) {
+                const w = playerSection.offsetWidth;
+                const h = playerSection.offsetHeight;
+                const left = parseFloat(playerSection.style.left) || 0;
+                const top  = parseFloat(playerSection.style.top)  || 0;
+                const pos  = clampPosition(left, top, w, h);
+
+                playerSection.style.left = pos.left + 'px';
+                playerSection.style.top  = pos.top  + 'px';
+
+                if (savedFloatPosition) savedFloatPosition = pos;
+            }
         });
 
         window.addEventListener('load', () => {
@@ -758,16 +879,16 @@
         video.addEventListener('play',    updateFloatingPlayer);
         video.addEventListener('playing', updateFloatingPlayer);
         video.addEventListener('pause',   updateFloatingPlayer);
-        video.addEventListener('ended', () => {
-            playerSection.classList.remove('is-floating');
-        });
+        video.addEventListener('ended',   deactivateFloat);
+
+        /* ---------- PIP buttons ---------- */
 
         if (closeFloatingButton) {
             closeFloatingButton.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 floatingPlayerClosed = true;
-                playerSection.classList.remove('is-floating');
+                deactivateFloat();
             });
         }
 
@@ -797,7 +918,7 @@
         }
 
         video.addEventListener('enterpictureinpicture', () => {
-            playerSection.classList.remove('is-floating');
+            deactivateFloat();
         });
 
         video.addEventListener('leavepictureinpicture', () => {
