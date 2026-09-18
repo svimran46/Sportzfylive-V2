@@ -91,15 +91,41 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/api/matches/all-today") {
-      const matches = await expandMatches(await getMatches());
-      const now = new Date();
-      return json(matches.filter(match => {
-        if (!match.startTime) return true;
-        const d = new Date(match.startTime);
-        return Number.isNaN(d.getTime()) ||
-          (d.getFullYear() === now.getFullYear() &&
-           d.getMonth() === now.getMonth() &&
-           d.getDate() === now.getDate());
+      const manualMatches = await expandMatches(await getMatches());
+      let streamedMatches = [];
+
+      try {
+        const upstream = await fetch("https://streamed.pk/api/matches/all-today");
+        if (upstream.ok) {
+          const data = await upstream.json();
+          if (Array.isArray(data)) {
+            streamedMatches = data.map(match => ({
+              id: "streamed-" + String(match.id),
+              externalId: String(match.id || ""),
+              title: String(match.title || ""),
+              category: String(match.category || "other").toUpperCase(),
+              startTime: match.date ? new Date(Number(match.date)).toISOString() : "",
+              status: "scheduled",
+              poster: match.poster
+                ? (String(match.poster).startsWith("http") ? String(match.poster) : "https://streamed.pk" + String(match.poster))
+                : "",
+              description: "",
+              channelIds: [],
+              teams: match.teams || null,
+              popular: Boolean(match.popular),
+              source: "streamed"
+            }));
+          }
+        }
+      } catch (_) {}
+
+      const merged = [...manualMatches, ...streamedMatches];
+      const seen = new Set();
+      return json(merged.filter(match => {
+        const key = String(match.externalId || match.id || "").toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
       }));
     }
 
