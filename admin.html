@@ -190,10 +190,27 @@ display:none;
 
 </style>
 
+<style>
+.admin-login{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.admin-login-card{width:min(420px,100%);background:#151922;padding:25px;border-radius:16px}
+.admin-login-card h2{margin-top:0}
+.admin-login-card p{color:#9ca7b5;font-size:14px;line-height:1.5}
+.admin-login-card input{margin-bottom:10px}
+.admin-error{color:#ff7777;font-size:13px;margin-bottom:10px}
+</style>
 </head>
 
 
 <body>
+<div id="adminLogin" class="admin-login">
+  <div class="admin-login-card">
+    <h2>Admin Authentication</h2>
+    <p>Enter the Admin API token configured as the Cloudflare Worker secret.</p>
+    <div id="loginError" class="admin-error"></div>
+    <input id="adminToken" type="password" placeholder="Admin token">
+    <button onclick="loginAdmin()">Continue</button>
+  </div>
+</div>
 
 
 <div class="sidebar">
