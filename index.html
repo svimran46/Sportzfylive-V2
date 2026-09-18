@@ -1081,6 +1081,39 @@ body{
   .sfy-sidebar,.category-track,.sfy-hero-btn{transition:none!important}
 }
 </style>
+<style>
+.sfy-card{position:relative!important;min-width:0!important;overflow:hidden!important;padding:14px!important;border:1px solid #26262a!important;border-radius:15px!important;background:#111113!important;box-shadow:0 8px 24px rgba(0,0,0,.18)!important}
+.sfy-card::after{content:"";position:absolute;inset:auto 0 0;height:1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.55),transparent);opacity:0;transition:opacity .2s ease}
+.sfy-card:hover{transform:translateY(-2px)!important;border-color:#34343b!important;background:#151518!important;box-shadow:0 14px 32px rgba(0,0,0,.28)!important}
+.sfy-card:hover::after{opacity:1}
+.sfy-card-top{min-height:25px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.sfy-sport-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;background:#1b1b1f;color:#9fa4b2;font-size:9px;font-weight:850;letter-spacing:.45px}
+.sfy-sport-badge i{font-size:9px;color:#747b8c}
+.sfy-popular{padding:4px 7px;border-radius:6px;background:rgba(245,158,11,.1);color:#f5b94b;font-size:8px;font-weight:900;letter-spacing:.5px}
+.sfy-match-status{display:inline-flex;align-items:center;gap:5px;color:#8e939f;font-size:9px;font-weight:800;text-transform:uppercase;white-space:nowrap}
+.sfy-match-status.is-live{color:#ff5a72}
+.sfy-live-dot{width:6px;height:6px;border-radius:50%;background:#ff4664;box-shadow:0 0 0 3px rgba(255,70,100,.1);animation:sfyPulse 1.5s infinite}
+@keyframes sfyPulse{50%{opacity:.45;transform:scale(.8)}}
+.sfy-match-date{color:#666b77;font-size:9px;font-weight:700;text-align:center;margin:1px 0 8px}
+.sfy-teams-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:7px;min-height:104px}
+.sfy-team{min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.sfy-team span{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e5e7ed;font-size:10px;font-weight:750}
+.sfy-team-logo{width:52px!important;height:52px!important;object-fit:contain;padding:9px!important;border-radius:50%!important;background:#18181b!important;border:1px solid #29292e!important;box-sizing:border-box}
+.sfy-team-logo.placeholder{display:grid;place-items:center;color:#666b77;font-size:15px}
+.sfy-vs{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;border:1px solid #29292e;background:#0d0d0f;color:#707582;font-size:8px;font-weight:950}
+.sfy-match-title{margin-top:8px;padding-top:9px;border-top:1px solid #222226;color:#8c919d;font-size:9px;font-weight:650;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sfy-watch-btn{width:100%!important;height:38px!important;margin-top:11px!important;border:1px solid #2e3038!important;border-radius:9px!important;background:#191a20!important;color:#f4f5f8!important;font-size:10px!important;font-weight:850!important;transition:.18s ease!important}
+.sfy-watch-btn:hover{background:#5865f2!important;border-color:#5865f2!important;box-shadow:0 7px 18px rgba(88,101,242,.22)!important}
+.sfy-watch-btn i{margin-right:5px;font-size:9px}
+.sfy-channel-logo{width:64px;height:64px;margin:8px auto 10px;display:grid;place-items:center;border-radius:50%;background:#18181b;border:1px solid #29292e;overflow:hidden}
+.sfy-channel-logo img{width:100%;height:100%;object-fit:contain;padding:10px}
+.sfy-channel-logo.placeholder{color:#6c7280;font-size:18px}
+.sfy-card-title{color:#f4f5f8;text-align:center;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sfy-card-subtitle{margin-top:4px;color:#696e7a;text-align:center;font-size:9px}
+.channel-card .sfy-watch-btn{margin-top:12px!important}
+@media(max-width:900px){.sfy-card{padding:13px!important}.sfy-teams-row{min-height:100px}}
+@media(max-width:380px){.sfy-teams-row{gap:4px}.sfy-team-logo{width:48px!important;height:48px!important}}
+</style>
 </head>
 <body>
 <div class="sfy-shell">
@@ -1418,18 +1451,21 @@ body{
 
     function buildMatchCard(match) {
         const id = String(match.id || "");
+        const category = normalizeCategory(match.category || "OTHER");
+        const sportLabel = category === "TODAYS MATCHES" ? "SPORTS" : category;
 
         if (isChannel(match)) {
             const poster = resolveAssetUrl(match.poster);
-
             return `
-                <article class="match-card channel-card">
-                    ${poster
-                        ? `<img class="channel-poster" src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy">`
-                        : `<div class="channel-poster placeholder">TV</div>`}
-                    <div class="match-title">${esc(match.title || "Channel")}</div>
-                    ${match.popular ? `<span class="popular-badge">POPULAR</span>` : ""}
-                    <button type="button" class="watch-btn" data-match-id="${esc(id)}">Watch Stream</button>
+                <article class="match-card sfy-card channel-card">
+                    <div class="sfy-card-top">
+                        <span class="sfy-sport-badge"><i class="fas fa-tv"></i> ${esc(sportLabel)}</span>
+                        ${match.popular ? `<span class="sfy-popular">POPULAR</span>` : ""}
+                    </div>
+                    ${poster ? `<div class="sfy-channel-logo"><img src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy"></div>` : `<div class="sfy-channel-logo placeholder"><i class="fas fa-tv"></i></div>`}
+                    <div class="sfy-card-title">${esc(match.title || "Channel")}</div>
+                    <div class="sfy-card-subtitle">Live sports channel</div>
+                    <button type="button" class="sfy-watch-btn watch-btn" data-match-id="${esc(id)}"><i class="fas fa-play"></i> Watch Stream</button>
                 </article>`;
         }
 
@@ -1437,32 +1473,33 @@ body{
         const away = match.teams?.away || {};
         const homeBadge = getLogoUrl(home.badge);
         const awayBadge = getLogoUrl(away.badge);
-        const homeLogo = homeBadge
-            ? `<img class="team-logo" src="${esc(homeBadge)}" data-logo-token="${esc(home.badge || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(home.name || "Home")}" loading="lazy">`
-            : `<div class="team-logo placeholder">?</div>`;
-        const awayLogo = awayBadge
-            ? `<img class="team-logo" src="${esc(awayBadge)}" data-logo-token="${esc(away.badge || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(away.name || "Away")}" loading="lazy">`
-            : `<div class="team-logo placeholder">?</div>`;
+        const logo = (url, token, alt) => url
+            ? `<img class="sfy-team-logo" src="${esc(url)}" data-logo-token="${esc(token || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(alt || "Team")}" loading="lazy">`
+            : `<div class="sfy-team-logo placeholder"><i class="fas fa-shield-halved"></i></div>`;
 
         const matchDate = safeDate(match.date ?? match.timestamp);
         const live = isLive(match);
-        const statusText = live ? "Live now" : (matchDate ? matchDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "Scheduled");
+        const statusText = live ? "LIVE" : (matchDate ? matchDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "SCHEDULED");
+        const dateText = matchDate ? matchDate.toLocaleDateString([], {day:"numeric",month:"short"}) : "Today";
 
         return `
-            <article class="match-card">
-                <div class="match-title">${esc(match.title || `${home.name || "TBD"} vs ${away.name || "TBD"}`)}</div>
-                <div class="teams">
-                    <div class="team">${homeLogo}<div class="team-name">${esc(home.name || "TBD")}</div></div>
-                    <div class="vs">VS</div>
-                    <div class="team">${awayLogo}<div class="team-name">${esc(away.name || "TBD")}</div></div>
+            <article class="match-card sfy-card sfy-match-card">
+                <div class="sfy-card-top">
+                    <span class="sfy-sport-badge"><i class="fas fa-futbol"></i> ${esc(sportLabel)}</span>
+                    <span class="sfy-match-status ${live ? "is-live" : ""}">
+                        ${live ? '<span class="sfy-live-dot"></span>' : '<i class="far fa-clock"></i>'} ${esc(statusText)}
+                    </span>
                 </div>
-                <div class="match-meta">
-                    <span class="match-status ${live ? "live" : ""}">${statusText}</span>
+                <div class="sfy-match-date">${esc(dateText)}</div>
+                <div class="sfy-teams-row">
+                    <div class="sfy-team">${logo(homeBadge, home.badge, home.name)}<span>${esc(home.name || "TBD")}</span></div>
+                    <div class="sfy-vs">VS</div>
+                    <div class="sfy-team">${logo(awayBadge, away.badge, away.name)}<span>${esc(away.name || "TBD")}</span></div>
                 </div>
-                <button type="button" class="watch-btn" data-match-id="${esc(id)}">${live ? "Watch Live" : "Watch Stream"}</button>
+                <div class="sfy-match-title">${esc(match.title || `${home.name || "TBD"} vs ${away.name || "TBD"}`)}</div>
+                <button type="button" class="sfy-watch-btn watch-btn" data-match-id="${esc(id)}"><i class="fas fa-play"></i> ${live ? "Watch Live" : "Watch Stream"}</button>
             </article>`;
     }
-
     /*
      * MANUAL STREAMS ONLY
      *
