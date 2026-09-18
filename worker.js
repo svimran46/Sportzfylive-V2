@@ -4,7 +4,7 @@ export default {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token"
+      "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token, X-Admin-Session"
     };
     if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
     const json = (data, status = 200) => Response.json(data, { status, headers: corsHeaders });
@@ -18,10 +18,26 @@ export default {
       return channels.map(channel => ({ ...channel, id: channel.id || slugify(channel.name) || slugify(channel.url) }));
     };
     const getMatches = async () => readArray("matches");
-    const requireAdmin = async () => {
-      const token = env.ADMIN_TOKEN;
+    const getClientIP = () => request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() || "unknown";
+
+    const createAdminSession = async () => {
       const supplied = request.headers.get("X-Admin-Token");
-      if (!token || !supplied || supplied !== token) return false;
+      if (!env.ADMIN_TOKEN || !supplied || supplied !== env.ADMIN_TOKEN) return null;
+      const session = crypto.randomUUID();
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      await env.SPORTZFY_DB.put(
+        "admin_session:" + session,
+        JSON.stringify({ ip: getClientIP(), expiresAt }),
+        { expirationTtl: 24 * 60 * 60 }
+      );
+      return { session, expiresAt };
+    };
+
+    const requireAdmin = async () => {
+      const session = request.headers.get("X-Admin-Session");
+      if (!session) return false;
+      const raw = await env.SPORTZFY_DB.get("admin_session:" + session, "json");
+      if (!raw || raw.expiresAt <= Date.now() || raw.ip !== getClientIP()) return false;
       return true;
     };
     const expandMatches = async (matches) => {
@@ -34,6 +50,12 @@ export default {
           : []
       }));
     };
+
+    if (request.method === "POST" && url.pathname === "/api/admin/login") {
+      const result = await createAdminSession();
+      if (!result) return json({ error: "Invalid admin token" }, 401);
+      return json(result);
+    }
 
     if (request.method === "GET" && url.pathname === "/api/channels") {
       return json(await getChannels());
