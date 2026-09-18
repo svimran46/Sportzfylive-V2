@@ -32,6 +32,8 @@ textarea{min-height:90px;resize:vertical}
 .admin-login-card{width:min(420px,100%);background:#151922;padding:25px;border-radius:16px}
 .admin-login-card h2{margin-top:0}.admin-login-card p{color:#9ca7b5;font-size:14px;line-height:1.5}
 .mobile-menu{display:none}
+.auto-link{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.auto-link small{color:#8f99a8}
 @media(max-width:760px){
 .sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}
 .main{margin-left:0;padding:18px}.mobile-menu{display:block;background:#242b38}
@@ -75,6 +77,12 @@ textarea{min-height:90px;resize:vertical}
       <div id="matchCount" style="color:#8f99a8;margin-bottom:10px"></div>
       <div id="matches">Loading...</div>
     </div>
+    <div class="card">
+      <h2>Automatic Channel Linking</h2>
+      <p style="color:#9ca7b5;line-height:1.5">The worker checks Streamed match metadata, matches it to your saved matches, and attaches only channels that have an explicit Streamed-source mapping.</p>
+      <div id="autoLinkStatus" class="status"></div>
+      <div class="auto-link"><button onclick="autoLinkMatches()">Run Auto-Link Now</button><small>Automatic background check: every 10 minutes.</small></div>
+    </div>
   </section>
 
   <section id="page-matches" class="page hidden">
@@ -106,11 +114,11 @@ textarea{min-height:90px;resize:vertical}
   </section>
 
   <section id="page-streams" class="page hidden">
-    <div class="card"><h2>Streams</h2><p style="color:#9ca7b5">Streams are attached to matches through the selected channels. Stream management will be added here next.</p></div>
+    <div class="card"><h2>Streams</h2><p style="color:#9ca7b5">Streamed is used here for match metadata only. Your channel catalog remains the source for channel selection.</p></div>
   </section>
 
   <section id="page-settings" class="page hidden">
-    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p></div>
+    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p><p style="color:#9ca7b5">For deterministic auto-linking, a channel can include <code>streamedSource</code>, <code>streamedSources</code>, or <code>streamedAliases</code> in its imported channel object.</p></div>
   </section>
 </main>
 <script src="admin.js"></script>
