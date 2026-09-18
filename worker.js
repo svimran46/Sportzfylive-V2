@@ -530,6 +530,25 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/admin/sync-broadcasts") {
+      if (!await requireAdmin()) return json({ error: "Admin authentication required" }, 401);
+
+      if (request.method === "POST") {
+        try {
+          return json(await syncBroadcastData(env));
+        } catch (error) {
+          return json({ error: "Broadcast sync failed: " + String(error?.message || error) }, 502);
+        }
+      }
+
+      if (request.method === "GET") {
+        return json({
+          configured: Boolean(env.GOALDIR_TOKEN),
+          countries: String(env.BROADCAST_COUNTRIES || "").split(",").map(x => x.trim()).filter(Boolean)
+        });
+      }
+    }
+
     if (request.method === "GET" && url.pathname === "/api/status") {
       return json({ status: "online", worker: "sportzfylive" });
     }
@@ -544,6 +563,7 @@ export default {
       try {
         await syncStreamedMatches(env);
         await autoLinkMatches(env);
+        await syncBroadcastData(env);
       } catch (error) {
         console.error("Scheduled auto-link failed:", error);
       }
@@ -799,4 +819,284 @@ async function autoLinkMatches(env) {
   }
 
   await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
+}
+
+
+async function syncBroadcastData(env) {
+  const readArray = async (key) => {
+    const value = await env.SPORTZFY_DB.get(key, "json");
+    return Array.isArray(value) ? value : [];
+  };
+
+  if (!env.GOALDIR_TOKEN) {
+    return {
+      success: false,
+      configured: false,
+      message: "GOALDIR_TOKEN is not configured",
+      linkedMatches: 0,
+      countries: []
+    };
+  }
+
+  const normalizeText = (value) => String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/\b(vs\.?|versus|v)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const slugify = (value) => normalizeText(value).replace(/\s+/g, "-");
+
+  const teamNamesFromMatch = (match) => {
+    const teams = match?.teams || {};
+    const home = teams.home?.name || teams.home?.longName || teams.home?.shortName || "";
+    const away = teams.away?.name || teams.away?.longName || teams.away?.shortName || "";
+    if (home && away) return [String(home), String(away)];
+
+    const parts = String(match.title || "").split(/\s+(?:vs\.?|versus|v)\s+/i);
+    return parts.length >= 2 ? [parts[0], parts.slice(1).join(" vs ")] : [];
+  };
+
+  const dateKey = (value) => {
+    const time = Date.parse(value || "");
+    if (!Number.isFinite(time)) return "";
+    return new Date(time).toISOString().slice(0, 10);
+  };
+
+  const eventTeams = (event) => {
+    const home = event?.home?.name || event?.home?.longName ||
+      event?.home_team?.name || event?.homeTeam?.name || event?.home_team_name || "";
+    const away = event?.away?.name || event?.away?.longName ||
+      event?.away_team?.name || event?.awayTeam?.name || event?.away_team_name || "";
+    return [String(home), String(away)].filter(Boolean);
+  };
+
+  const eventTime = (event) =>
+    event?.date || event?.start_at || event?.starting_at || event?.kickoff ||
+    event?.startTime || event?.datetime || event?.utcTime || "";
+
+  const responseItems = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.results)) return payload.results;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.broadcasts)) return payload.broadcasts;
+    if (Array.isArray(payload?.events)) return payload.events;
+    return [];
+  };
+
+  const goalDirFetch = async (path) => {
+    const response = await fetch("https://sports.bzzoiro.com/api/v2/" + path, {
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Token " + env.GOALDIR_TOKEN
+      }
+    });
+    if (!response.ok) throw new Error("GoalDir returned " + response.status);
+    return response.json();
+  };
+
+  const matches = await readArray("matches");
+  const channels = (await readArray("channels")).map(channel => ({
+    ...channel,
+    id: channel.id || slugify(channel.name) || slugify(channel.url)
+  }));
+
+  const today = new Date();
+  const from = today.toISOString().slice(0, 10);
+  const toDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const to = toDate.toISOString().slice(0, 10);
+
+  const configuredCountries = String(env.BROADCAST_COUNTRIES || "")
+    .split(",").map(x => x.trim().toUpperCase()).filter(Boolean);
+
+  const channelCountries = channels.flatMap(channel => [
+    channel.countryCode, channel.country_code, channel.regionCode
+  ]).map(x => String(x || "").trim().toUpperCase()).filter(Boolean);
+
+  const defaultCountries = [
+    "MY","SG","ID","TH","PH","IN","AU","NZ","JP","KR",
+    "GB","IE","FR","DE","ES","IT","NL","PT","BE","CH",
+    "AT","TR","GR","SA","AE","QA","US","CA","MX","BR","AR","CL","CO"
+  ];
+
+  const countries = [...new Set([
+    ...(configuredCountries.length ? configuredCountries : defaultCountries),
+    ...channelCountries
+  ])].slice(0, 40);
+
+  const eventPayload = await goalDirFetch(
+    "events/?date_from=" + encodeURIComponent(from) +
+    "&date_to=" + encodeURIComponent(to) +
+    "&limit=200"
+  );
+  const events = responseItems(eventPayload);
+
+  const eventById = new Map();
+  for (const event of events) {
+    const id = String(event?.id ?? event?.event_id ?? "");
+    if (id) eventById.set(id, event);
+  }
+
+  const broadcastRows = [];
+  for (const country of countries) {
+    try {
+      const payload = await goalDirFetch(
+        "broadcasts/?country_code=" + encodeURIComponent(country) +
+        "&date_from=" + encodeURIComponent(from) +
+        "&date_to=" + encodeURIComponent(to) +
+        "&limit=200"
+      );
+      for (const row of responseItems(payload)) {
+        broadcastRows.push({ row, country });
+      }
+    } catch (error) {
+      console.warn("Broadcast country sync failed:", country, error);
+    }
+  }
+
+  const channelAliases = (channel) => [
+    channel.name,
+    channel.broadcastName,
+    ...(Array.isArray(channel.broadcastNames) ? channel.broadcastNames : []),
+    ...(Array.isArray(channel.broadcastAliases) ? channel.broadcastAliases : [])
+  ].map(normalizeText).filter(Boolean);
+
+  const channelMatches = (broadcastName, country) => {
+    const wanted = normalizeText(broadcastName);
+    if (!wanted) return [];
+    return channels.filter(channel => {
+      const countryFields = [
+        channel.countryCode, channel.country_code, channel.regionCode
+      ].map(x => String(x || "").trim().toUpperCase()).filter(Boolean);
+
+      if (countryFields.length && country && !countryFields.includes(country)) return false;
+
+      const aliases = channelAliases(channel);
+      return aliases.some(alias =>
+        alias === wanted ||
+        alias.includes(wanted) ||
+        wanted.includes(alias)
+      );
+    }).map(channel => String(channel.id));
+  };
+
+  const matchEvent = (match) => {
+    const [home, away] = teamNamesFromMatch(match).map(normalizeText);
+    if (!home || !away) return null;
+    const matchDate = dateKey(match.startTime);
+
+    let best = null;
+    let bestScore = 0;
+
+    for (const event of events) {
+      const [eventHome, eventAway] = eventTeams(event).map(normalizeText);
+      if (!eventHome || !eventAway) continue;
+
+      let score = 0;
+      if (eventHome === home) score += 45;
+      else if (eventHome.includes(home) || home.includes(eventHome)) score += 30;
+
+      if (eventAway === away) score += 45;
+      else if (eventAway.includes(away) || away.includes(eventAway)) score += 30;
+
+      const eDate = dateKey(eventTime(event));
+      if (matchDate && eDate === matchDate) score += 20;
+
+      const mt = Date.parse(match.startTime || "");
+      const et = Date.parse(eventTime(event));
+      if (Number.isFinite(mt) && Number.isFinite(et)) {
+        const diff = Math.abs(mt - et);
+        if (diff <= 15 * 60 * 1000) score += 30;
+        else if (diff <= 60 * 60 * 1000) score += 15;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = event;
+      }
+    }
+
+    return best && bestScore >= 90 ? { event: best, score: bestScore } : null;
+  };
+
+  const broadcastMap = new Map();
+  for (const { row, country } of broadcastRows) {
+    const eventId = String(
+      row?.event_id ?? row?.eventId ?? row?.event?.id ?? row?.fixture_id ?? row?.fixtureId ?? ""
+    );
+    if (!eventId) continue;
+
+    const channel = row?.channel || row?.tv_channel || row?.tvChannel ||
+      row?.station || row?.broadcaster || row?.tv || {};
+    const name = String(
+      channel?.name || row?.channel_name || row?.channelName ||
+      row?.station_name || row?.stationName || row?.broadcaster_name || ""
+    ).trim();
+
+    if (!name) continue;
+
+    const key = eventId + "::" + country + "::" + normalizeText(name);
+    broadcastMap.set(key, {
+      name,
+      country,
+      eventId,
+      url: String(channel?.url || row?.channel_url || row?.url || "")
+    });
+  }
+
+  let linkedMatches = 0;
+  let matchedMatches = 0;
+  let unmatchedMatches = 0;
+  const now = new Date().toISOString();
+
+  for (const match of matches) {
+    const found = matchEvent(match);
+    if (!found) {
+      unmatchedMatches++;
+      continue;
+    }
+
+    const eventId = String(found.event?.id ?? found.event?.event_id ?? "");
+    const broadcasts = [...broadcastMap.values()].filter(item => item.eventId === eventId);
+
+    const matchedBroadcasts = broadcasts.map(item => ({
+      name: item.name,
+      country: item.country,
+      source: "goaldir"
+    }));
+
+    const addedIds = broadcasts.flatMap(item => channelMatches(item.name, item.country));
+    const currentIds = Array.isArray(match.channelIds) ? match.channelIds.map(String) : [];
+    const mergedIds = [...new Set([...currentIds, ...addedIds])];
+
+    if (matchedBroadcasts.length) matchedMatches++;
+    if (addedIds.length) linkedMatches++;
+
+    match.channelIds = mergedIds;
+    match.broadcasts = matchedBroadcasts;
+    match.broadcastMatchId = eventId;
+    match.broadcastMatchScore = Math.round(found.score);
+    match.broadcastStatus = addedIds.length
+      ? "linked"
+      : (matchedBroadcasts.length ? "broadcast-found-no-local-channel" : "no-broadcast-listing");
+    match.broadcastSyncedAt = now;
+    match.updatedAt = now;
+  }
+
+  await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
+
+  return {
+    success: true,
+    configured: true,
+    source: "goaldir",
+    countries,
+    eventCount: events.length,
+    broadcastCount: broadcastRows.length,
+    matchedMatches,
+    linkedMatches,
+    unmatchedMatches
+  };
 }
