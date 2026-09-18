@@ -1,12 +1,26 @@
 export default {
   async fetch(request, env) {
 
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    };
+
+
+    // Handle CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: corsHeaders
+      });
+    }
+
+
     const url = new URL(request.url);
 
 
-    // ==============================
+
     // GET CHANNELS
-    // ==============================
     if (
       request.method === "GET" &&
       url.pathname === "/api/channels"
@@ -18,15 +32,16 @@ export default {
       );
 
       return Response.json(
-        channels || []
+        channels || [],
+        {
+          headers: corsHeaders
+        }
       );
     }
 
 
 
-    // ==============================
     // SAVE CHANNELS
-    // ==============================
     if (
       request.method === "POST" &&
       url.pathname === "/api/channels"
@@ -41,17 +56,21 @@ export default {
       );
 
 
-      return Response.json({
-        success: true,
-        count: data.length
-      });
+      return Response.json(
+        {
+          success:true,
+          count:data.length
+        },
+        {
+          headers:corsHeaders
+        }
+      );
     }
 
 
 
-    // ==============================
-    // INITIAL CHANNEL IMPORT
-    // ==============================
+
+    // IMPORT CHANNELS
     if (
       request.method === "POST" &&
       url.pathname === "/api/import"
@@ -66,26 +85,35 @@ export default {
       );
 
 
-      return Response.json({
-        success: true,
-        imported: channels.length
-      });
+      return Response.json(
+        {
+          success:true,
+          imported:channels.length
+        },
+        {
+          headers:corsHeaders
+        }
+      );
     }
 
 
 
-    // ==============================
-    // HEALTH CHECK
-    // ==============================
+
+    // STATUS
     if (
       request.method === "GET" &&
       url.pathname === "/api/status"
     ) {
 
-      return Response.json({
-        status: "online",
-        worker: "sportzfylive"
-      });
+      return Response.json(
+        {
+          status:"online",
+          worker:"sportzfylive"
+        },
+        {
+          headers:corsHeaders
+        }
+      );
     }
 
 
@@ -93,7 +121,7 @@ export default {
     return new Response(
       "SportzfyLive API Online",
       {
-        status: 200
+        headers:corsHeaders
       }
     );
 
