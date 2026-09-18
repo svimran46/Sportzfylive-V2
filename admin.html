@@ -132,7 +132,7 @@ textarea{min-height:90px;resize:vertical}
   </section>
 
   <section id="page-settings" class="page hidden">
-    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p><p style="color:#9ca7b5">For deterministic auto-linking, a channel can include <code>streamedSource</code>, <code>streamedSources</code>, or <code>streamedAliases</code> in its imported channel object. Streamed documents these values as provider/source identifiers, so the system does not guess that they are TV-channel names.</p></div>
+    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p><p style="color:#9ca7b5">Broadcast syncing uses structured football TV listings rather than Streamed provider/source IDs. Add the Cloudflare Worker secret <code>GOALDIR_TOKEN</code> and optionally set <code>BROADCAST_COUNTRIES</code> to a comma-separated ISO country-code list such as <code>MY,GB,US,ES,DE,IN,ID,AU,CA,BR</code>. Channel records can also include <code>broadcastName</code>, <code>broadcastNames</code>, <code>broadcastAliases</code>, and country-code fields for precise matching.</p></div>
   </section>
 </main>
 <script src="admin.js"></script>
