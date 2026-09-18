@@ -1377,6 +1377,9 @@ body{
         window.__SPORTZFY_MATCHES = new Map(
             matches.filter(Boolean).map(match => [String(match.id || ""), match])
         );
+        if (typeof window.renderSportzfyHero === "function") {
+            window.renderSportzfyHero(matches);
+        }
 
 
         const container = document.getElementById("matches-container") ||
