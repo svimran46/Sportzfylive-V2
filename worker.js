@@ -928,34 +928,12 @@ async function syncBroadcastData(env) {
     return response.json();
   };
 
-  const fetchPaged = async (path, maxPages = 10) => {
-    const items = [];
-    for (let page = 0; page < maxPages; page++) {
-      const offset = page * 200;
-      const separator = path.includes("?") ? "&" : "?";
-      const payload = await goalDirFetch(
-        path + separator + "limit=200&offset=" + offset
-      );
-      const pageItems = responseItems(payload);
-      items.push(...pageItems);
-
-      const count = Number(payload?.count);
-      if (pageItems.length < 200) break;
-      if (Number.isFinite(count) && items.length >= count) break;
-    }
-    return items;
-  };
-
   const matches = await readArray("matches");
   const channels = (await readArray("channels")).map(channel => ({
     ...channel,
     id: channel.id || slugify(channel.name) || slugify(channel.url)
   }));
 
-  /*
-    Use a UTC window that overlaps the user's "today" on both sides.
-    This avoids dropping matches whose local date differs from UTC.
-  */
   const now = Date.now();
   const from = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const to = new Date(now + 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -986,21 +964,109 @@ async function syncBroadcastData(env) {
   ])];
 
   /*
-    IMPORTANT:
-    We no longer make one giant request per country. BSD's v2 broadcasts
-    endpoint accepts country_code as an optional filter, so we fetch the
-    complete date window once and retain the country attached to each row.
-    This gives global coverage and avoids silently missing countries.
-  */
-  const events = await fetchPaged(
-    "events/?date_from=" + encodeURIComponent(from) +
-    "&date_to=" + encodeURIComponent(to)
-  );
+    Cloudflare Workers Free allows only 10 ms of CPU per invocation.
+    The previous implementation downloaded a large global broadcast list
+    and compared every broadcast against every local match. That is far
+    too much work for the Free plan.
 
-  const broadcastRows = await fetchPaged(
-    "broadcasts/?date_from=" + encodeURIComponent(from) +
-    "&date_to=" + encodeURIComponent(to)
+    We now process a small batch and request broadcasts only for the
+    matched BSD events. The cursor is kept in KV, so the scheduled job
+    gradually processes the whole catalogue without one huge invocation.
+  */
+  const eligible = matches.filter(match => {
+    const time = Date.parse(match.startTime || "");
+    return !Number.isFinite(time) ||
+      (time >= now - 24 * 60 * 60 * 1000 &&
+       time <= now + 48 * 60 * 60 * 1000);
+  });
+
+  const batchSize = 8;
+  let cursor = Number(await env.SPORTZFY_DB.get("broadcast_sync_cursor"));
+  if (!Number.isFinite(cursor) || cursor < 0 || cursor >= eligible.length) cursor = 0;
+
+  const batch = eligible.slice(cursor, cursor + batchSize);
+
+  if (!batch.length) {
+    await env.SPORTZFY_DB.put("broadcast_sync_cursor", "0");
+    return {
+      success: true,
+      configured: true,
+      source: "bsd",
+      countries,
+      processed: 0,
+      totalEligible: eligible.length,
+      remaining: eligible.length,
+      cycleComplete: true,
+      matchedMatches: 0,
+      linkedMatches: 0,
+      message: "Broadcast sync cycle complete; cursor reset."
+    };
+  }
+
+  /*
+    One event request gives us a much smaller payload than downloading
+    every broadcast in every country. Country filtering is deliberately
+    not applied here; the returned rows retain their country_code, so
+    global broadcast coverage is preserved.
+  */
+  const eventPayload = await goalDirFetch(
+    "events/?date_from=" + encodeURIComponent(from) +
+    "&date_to=" + encodeURIComponent(to) +
+    "&limit=200"
   );
+  const events = responseItems(eventPayload);
+
+  const normalizedEvents = events.map(event => {
+    const [home, away] = eventTeams(event).map(normalizeText);
+    return {
+      event,
+      id: String(event?.id ?? event?.event_id ?? ""),
+      home,
+      away,
+      date: dateKey(eventTime(event)),
+      time: Date.parse(eventTime(event))
+    };
+  }).filter(item => item.id && item.home && item.away);
+
+  const findEvent = (match) => {
+    const [homeRaw, awayRaw] = teamNamesFromMatch(match);
+    const home = normalizeText(homeRaw);
+    const away = normalizeText(awayRaw);
+    if (!home || !away) return null;
+
+    const matchDate = dateKey(match.startTime);
+    const matchTime = Date.parse(match.startTime || "");
+    let best = null;
+    let bestScore = 0;
+
+    for (const candidate of normalizedEvents) {
+      let score = 0;
+
+      if (candidate.home === home) score += 50;
+      else if (candidate.home.includes(home) || home.includes(candidate.home)) score += 35;
+
+      if (candidate.away === away) score += 50;
+      else if (candidate.away.includes(away) || away.includes(candidate.away)) score += 35;
+
+      if (matchDate && candidate.date === matchDate) score += 20;
+
+      if (Number.isFinite(matchTime) && Number.isFinite(candidate.time)) {
+        const diff = Math.abs(matchTime - candidate.time);
+        if (diff <= 10 * 60 * 1000) score += 35;
+        else if (diff <= 30 * 60 * 1000) score += 25;
+        else if (diff <= 90 * 60 * 1000) score += 10;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+
+    return best && bestScore >= 100
+      ? { event: best.event, score: bestScore }
+      : null;
+  };
 
   const channelAliases = (channel) => [
     channel.name,
@@ -1032,9 +1098,7 @@ async function syncBroadcastData(env) {
         return false;
       }
 
-      const aliases = channelAliases(channel);
-
-      return aliases.some(alias =>
+      return channelAliases(channel).some(alias =>
         alias === wanted ||
         alias.includes(wanted) ||
         wanted.includes(alias)
@@ -1042,129 +1106,22 @@ async function syncBroadcastData(env) {
     }).map(channel => String(channel.id));
   };
 
-  const matchEvent = (match) => {
-    const [homeRaw, awayRaw] = teamNamesFromMatch(match);
-    const home = normalizeText(homeRaw);
-    const away = normalizeText(awayRaw);
-
-    if (!home || !away) return null;
-
-    const matchDate = dateKey(match.startTime);
-    const matchTime = Date.parse(match.startTime || "");
-
-    let best = null;
-    let bestScore = 0;
-
-    for (const event of events) {
-      const [eventHomeRaw, eventAwayRaw] = eventTeams(event);
-      const eventHome = normalizeText(eventHomeRaw);
-      const eventAway = normalizeText(eventAwayRaw);
-
-      if (!eventHome || !eventAway) continue;
-
-      let score = 0;
-
-      if (eventHome === home) score += 50;
-      else if (eventHome.includes(home) || home.includes(eventHome)) score += 35;
-
-      if (eventAway === away) score += 50;
-      else if (eventAway.includes(away) || away.includes(eventAway)) score += 35;
-
-      const eDate = dateKey(eventTime(event));
-      if (matchDate && eDate === matchDate) score += 20;
-
-      const eventTimestamp = Date.parse(eventTime(event));
-      if (Number.isFinite(matchTime) && Number.isFinite(eventTimestamp)) {
-        const diff = Math.abs(matchTime - eventTimestamp);
-        if (diff <= 10 * 60 * 1000) score += 35;
-        else if (diff <= 30 * 60 * 1000) score += 25;
-        else if (diff <= 90 * 60 * 1000) score += 10;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        best = event;
-      }
-    }
-
-    return best && bestScore >= 100
-      ? { event: best, score: bestScore }
-      : null;
-  };
-
-  /*
-    BSD v2 broadcast rows are documented as:
-      event_id
-      country_code
-      channel_id
-      channel_name
-      channel_link
-      scheduled_start_time
-
-    Keep the documented flat fields first, with a few tolerant fallbacks.
-  */
-  const broadcastMap = new Map();
-
-  for (const row of broadcastRows) {
-    const eventId = String(
-      row?.event_id ??
-      row?.eventId ??
-      row?.event?.id ??
-      ""
-    );
-
-    if (!eventId) continue;
-
-    const name = String(
-      row?.channel_name ??
-      row?.channelName ??
-      row?.channel?.name ??
-      row?.tv_channel?.name ??
-      row?.broadcaster_name ??
-      ""
-    ).trim();
-
-    if (!name) continue;
-
-    const country = String(
-      row?.country_code ??
-      row?.countryCode ??
-      row?.country ??
-      ""
-    ).trim().toUpperCase();
-
-    const key = [
-      eventId,
-      country,
-      normalizeText(name)
-    ].join("::");
-
-    broadcastMap.set(key, {
-      name,
-      country,
-      eventId,
-      channelId: row?.channel_id ?? row?.channelId ?? null,
-      url: String(
-        row?.channel_link ??
-        row?.channel_url ??
-        row?.url ??
-        ""
-      )
-    });
-  }
+  const allMatches = new Map(
+    matches.map(match => [String(match.id), match])
+  );
 
   let matchedMatches = 0;
   let linkedMatches = 0;
-  let unmatchedMatches = 0;
   let broadcastCount = 0;
   const diagnostics = [];
-  const nowIso = new Date().toISOString();
+  const syncedAt = new Date().toISOString();
 
-  for (const match of matches) {
-    const found = matchEvent(match);
+  for (const match of batch) {
+    const found = findEvent(match);
 
     if (!found) {
-      unmatchedMatches++;
+      match.broadcastStatus = "no-event-match";
+      match.broadcastSyncedAt = syncedAt;
       diagnostics.push({
         id: match.id,
         title: match.title,
@@ -1173,21 +1130,55 @@ async function syncBroadcastData(env) {
       continue;
     }
 
-    const eventId = String(
-      found.event?.id ??
-      found.event?.event_id ??
-      ""
-    );
+    let payload;
+    try {
+      payload = await goalDirFetch(
+        "events/" + encodeURIComponent(
+          String(found.event?.id ?? found.event?.event_id)
+        ) + "/broadcasts/"
+      );
+    } catch (error) {
+      match.broadcastStatus = "broadcast-request-failed";
+      match.broadcastError = String(error?.message || error);
+      diagnostics.push({
+        id: match.id,
+        title: match.title,
+        status: "broadcast-request-failed"
+      });
+      continue;
+    }
 
-    const broadcasts = [...broadcastMap.values()]
-      .filter(item => item.eventId === eventId);
+    const rows = responseItems(payload);
 
-    const matchedBroadcasts = broadcasts.map(item => ({
-      name: item.name,
-      country: item.country,
-      channelId: item.channelId,
-      source: "bsd"
-    }));
+    const broadcasts = rows.map(row => {
+      const name = String(
+        row?.channel_name ??
+        row?.channelName ??
+        row?.channel?.name ??
+        row?.tv_channel?.name ??
+        row?.broadcaster_name ??
+        ""
+      ).trim();
+
+      const country = String(
+        row?.country_code ??
+        row?.countryCode ??
+        row?.country ??
+        ""
+      ).trim().toUpperCase();
+
+      return {
+        name,
+        country,
+        channelId: row?.channel_id ?? row?.channelId ?? null,
+        url: String(
+          row?.channel_link ??
+          row?.channel_url ??
+          row?.url ??
+          ""
+        )
+      };
+    }).filter(row => row.name);
 
     const addedIds = broadcasts.flatMap(item =>
       channelMatches(item.name, item.country)
@@ -1202,31 +1193,33 @@ async function syncBroadcastData(env) {
       ...addedIds
     ])];
 
-    if (matchedBroadcasts.length) matchedMatches++;
+    if (broadcasts.length) matchedMatches++;
     if (addedIds.length) linkedMatches++;
-    broadcastCount += matchedBroadcasts.length;
+    broadcastCount += broadcasts.length;
 
     match.channelIds = mergedIds;
-    match.broadcasts = matchedBroadcasts;
-    match.broadcastMatchId = eventId;
+    match.broadcasts = broadcasts.map(item => ({
+      name: item.name,
+      country: item.country,
+      channelId: item.channelId,
+      source: "bsd"
+    }));
+    match.broadcastMatchId = String(found.event?.id ?? found.event?.event_id ?? "");
     match.broadcastMatchScore = Math.round(found.score);
     match.broadcastStatus = addedIds.length
       ? "linked"
-      : (
-        matchedBroadcasts.length
-          ? "broadcast-found-no-local-channel"
-          : "no-broadcast-listing"
-      );
-    match.broadcastSyncedAt = nowIso;
-    match.updatedAt = nowIso;
+      : (broadcasts.length ? "broadcast-found-no-local-channel" : "no-broadcast-listing");
+    match.broadcastSyncedAt = syncedAt;
+    delete match.broadcastError;
+    match.updatedAt = syncedAt;
 
     diagnostics.push({
       id: match.id,
       title: match.title,
       status: match.broadcastStatus,
-      eventId,
+      eventId: match.broadcastMatchId,
       score: Math.round(found.score),
-      broadcasts: matchedBroadcasts.map(item => ({
+      broadcasts: broadcasts.map(item => ({
         name: item.name,
         country: item.country
       })),
@@ -1234,18 +1227,33 @@ async function syncBroadcastData(env) {
     });
   }
 
-  await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
+  const nextCursor = cursor + batch.length;
+  const cycleComplete = nextCursor >= eligible.length;
+
+  await env.SPORTZFY_DB.put(
+    "matches",
+    JSON.stringify([...allMatches.values()])
+  );
+
+  await env.SPORTZFY_DB.put(
+    "broadcast_sync_cursor",
+    String(cycleComplete ? 0 : nextCursor)
+  );
 
   return {
     success: true,
     configured: true,
     source: "bsd",
     countries,
-    eventCount: events.length,
+    processed: batch.length,
+    totalEligible: eligible.length,
+    cursor: cycleComplete ? 0 : nextCursor,
+    remaining: cycleComplete ? 0 : eligible.length - nextCursor,
+    cycleComplete,
+    eventCount: normalizedEvents.length,
     broadcastCount,
     matchedMatches,
     linkedMatches,
-    unmatchedMatches,
-    diagnostics: diagnostics.slice(0, 100)
+    diagnostics
   };
 }
