@@ -92,10 +92,10 @@ textarea{min-height:90px;resize:vertical}
     </div>
 
     <div class="card">
-      <h2>Automatic Channel Linking</h2>
-      <p style="color:#9ca7b5;line-height:1.5">After matches are synced, the worker attaches local channels only when their channel record explicitly maps to a Streamed source identifier. The Streamed API documents these as provider/source IDs, not TV-channel names.</p>
+      <h2>Legacy Streamed Source Mapping</h2>
+      <p style="color:#9ca7b5;line-height:1.5">Optional legacy mapping for channel records that explicitly define a Streamed provider/source alias. This is separate from broadcast-TV identification and never treats a provider ID as a broadcaster name.</p>
       <div id="autoLinkStatus" class="status"></div>
-      <div class="auto-link"><button onclick="autoLinkMatches()">Run Auto-Link Now</button><small>Sync + auto-link also runs automatically every 10 minutes.</small></div>
+      <div class="auto-link"><button onclick="autoLinkMatches()">Run Source Mapping</button><small>Broadcast Channel Sync is the primary TV-channel mapper.</small></div>
     </div>
   </section>
 
