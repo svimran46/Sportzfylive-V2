@@ -1,5 +1,6 @@
 const API="https://sportzfylive.svimranmy.workers.dev";
-let adminToken=sessionStorage.getItem("sportzfy_admin_token")||"";
+let adminToken=localStorage.getItem("sportzfy_admin_token")||"";
+let adminSession=localStorage.getItem("sportzfy_admin_session")||"";
 let channels=[];
 let allMatches=[];
 
@@ -9,7 +10,7 @@ async function api(path,options={}){
   const response=await fetch(API+path,{...options,headers:{
     "Accept":"application/json",
     "Content-Type":"application/json",
-    "X-Admin-Token":adminToken,
+    ...(adminSession ? {"X-Admin-Session":adminSession} : {"X-Admin-Token":adminToken}),
     ...(options.headers||{})
   }});
   let data=null;try{data=await response.json()}catch(_){}
@@ -21,13 +22,24 @@ async function loginAdmin(){
   const input=document.getElementById("adminToken");
   adminToken=input.value.trim();
   if(!adminToken)return;
-  sessionStorage.setItem("sportzfy_admin_token",adminToken);
   try{
-    await api("/api/admin/matches");
+    const response=await fetch(API+"/api/admin/login",{method:"POST",headers:{
+      "Content-Type":"application/json",
+      "X-Admin-Token":adminToken
+    }});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data?.error||"Authentication failed");
+    adminSession=data.session;
+    localStorage.setItem("sportzfy_admin_session",adminSession);
+    localStorage.removeItem("sportzfy_admin_token");
+    adminToken="";
     document.getElementById("adminLogin").style.display="none";
     await Promise.all([loadChannels(),loadMatches()]);
   }catch(e){
-    adminToken="";sessionStorage.removeItem("sportzfy_admin_token");
+    adminToken="";
+    adminSession="";
+    localStorage.removeItem("sportzfy_admin_token");
+    localStorage.removeItem("sportzfy_admin_session");
     document.getElementById("loginError").textContent="Authentication failed.";
   }
 }
@@ -118,5 +130,15 @@ function toggleSidebar(){document.getElementById("sidebar").classList.toggle("op
 document.querySelectorAll(".menu div").forEach(item=>item.addEventListener("click",()=>showPage(item.dataset.page)));
 document.getElementById("channelSearch").addEventListener("input",renderChannels);
 
-if(adminToken)loginAdmin();
-else document.getElementById("adminLogin").style.display="flex";
+if(adminSession){
+  api("/api/admin/matches").then(()=>{
+    document.getElementById("adminLogin").style.display="none";
+    loadChannels();loadMatches();
+  }).catch(()=>{
+    localStorage.removeItem("sportzfy_admin_session");
+    adminSession="";
+    document.getElementById("adminLogin").style.display="flex";
+  });
+}else{
+  document.getElementById("adminLogin").style.display="flex";
+}
