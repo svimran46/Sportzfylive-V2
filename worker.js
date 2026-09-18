@@ -19,9 +19,10 @@ export default {
     };
     const getMatches = async () => readArray("matches");
     const requireAdmin = async () => {
-      if (!ctx.access) return null;
-      const identity = await ctx.access.getIdentity();
-      return identity?.email ? identity : null;
+      const token = env.ADMIN_TOKEN;
+      const supplied = request.headers.get("X-Admin-Token");
+      if (!token || !supplied || supplied !== token) return false;
+      return true;
     };
     const expandMatches = async (matches) => {
       const channels = await getChannels();
