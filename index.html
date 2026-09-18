@@ -853,45 +853,315 @@ body{
 @media(max-width:600px){.category-controls{gap:4px}.category-arrow{width:44px;height:44px}.category-track{grid-auto-columns:calc((100% - 10px)/2);gap:10px}}
 @media(max-width:380px){.category-track{grid-auto-columns:100%}.category-progress span{width:100%}}
 </style>
+
+<style>
+/* =========================================================
+   SPORTZFYLIVE — MODERN STREAMING SHELL
+   ========================================================= */
+:root{
+  --ui-bg:#050912;
+  --ui-panel:#09111f;
+  --ui-panel-2:#0d1728;
+  --ui-border:rgba(91,119,163,.25);
+  --ui-text:#f7f9ff;
+  --ui-muted:#8e9bb0;
+  --ui-blue:#5865f2;
+  --ui-blue-2:#7c83ff;
+  --ui-cyan:#35c8ff;
+  --ui-green:#25e77a;
+  --ui-red:#ff4664;
+  --ui-radius:16px;
+  --ui-shadow:0 18px 55px rgba(0,0,0,.34);
+}
+html,body{background:var(--ui-bg)!important}
+body{
+  padding:0!important;
+  overflow-x:hidden;
+  background:
+    radial-gradient(900px 500px at 65% -180px,rgba(79,92,255,.16),transparent 62%),
+    linear-gradient(180deg,#050912 0%,#060b14 100%)!important;
+}
+.sfy-shell{min-height:100vh}
+.sfy-sidebar{
+  position:fixed;inset:0 auto 0 0;width:228px;z-index:120;
+  display:flex;flex-direction:column;
+  padding:22px 14px 18px;
+  background:linear-gradient(180deg,#07101d 0%,#050b15 100%);
+  border-right:1px solid var(--ui-border);
+}
+.sfy-brand{
+  display:flex;align-items:center;gap:10px;padding:0 10px 25px;
+  color:#fff;text-decoration:none;
+}
+.sfy-brand-mark{
+  width:38px;height:38px;display:grid;place-items:center;
+  border-radius:12px;
+  background:linear-gradient(145deg,#7d86ff,#4c55e8);
+  color:#fff;font-size:25px;font-weight:950;font-style:italic;
+  box-shadow:0 10px 28px rgba(88,101,242,.28);
+}
+.sfy-brand-text{font-size:18px;font-weight:900;letter-spacing:.7px}
+.sfy-brand-text span{color:#7080ff}
+.sfy-nav{display:flex;flex-direction:column;gap:5px}
+.sfy-nav button{
+  width:100%;min-height:46px;display:flex;align-items:center;gap:14px;
+  padding:0 14px;border:1px solid transparent;border-radius:12px;
+  background:transparent;color:#b9c4d5;text-align:left;
+  font-size:13px;font-weight:650;cursor:pointer;transition:.18s ease;
+}
+.sfy-nav button i{width:20px;text-align:center;font-size:16px;color:#8390a6}
+.sfy-nav button:hover{background:rgba(91,110,255,.09);color:#fff}
+.sfy-nav button.active{
+  color:#fff;background:linear-gradient(90deg,rgba(88,101,242,.98),rgba(88,101,242,.62));
+  border-color:rgba(141,148,255,.22);box-shadow:0 8px 24px rgba(45,55,170,.22);
+}
+.sfy-nav button.active i{color:#fff}
+.sfy-sidebar-promo{
+  margin-top:auto;padding:17px 15px;border:1px solid var(--ui-border);
+  border-radius:15px;background:linear-gradient(145deg,#0c1830,#08101d);
+}
+.sfy-sidebar-promo i{font-size:18px;color:#a9afff}
+.sfy-sidebar-promo strong{display:block;margin:10px 0 4px;font-size:14px}
+.sfy-sidebar-promo span{display:block;color:var(--ui-muted);font-size:11px;line-height:1.55}
+.sfy-sidebar-promo button{
+  width:100%;margin-top:12px;min-height:36px;border:0;border-radius:9px;
+  background:linear-gradient(90deg,#5865f2,#737cff);color:#fff;font-weight:800;cursor:pointer;
+}
+.sfy-main{margin-left:228px;min-height:100vh}
+.sfy-topbar{
+  position:sticky;top:0;z-index:90;height:70px;
+  display:flex;align-items:center;gap:18px;padding:0 28px;
+  background:rgba(5,9,18,.78);border-bottom:1px solid rgba(91,119,163,.18);
+  backdrop-filter:blur(18px);
+}
+.sfy-mobile-menu{display:none}
+.sfy-search{
+  flex:1;max-width:560px;position:relative;
+}
+.sfy-search i{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#8795ad;font-size:14px}
+#sfy-search-input{
+  width:100%;height:42px;padding:0 68px 0 44px;
+  border:1px solid rgba(90,113,153,.28);border-radius:13px;
+  outline:0;background:rgba(14,25,43,.92);color:#fff;font-size:13px;
+  transition:.18s ease;
+}
+#sfy-search-input::placeholder{color:#77859d}
+#sfy-search-input:focus{border-color:rgba(104,116,255,.75);box-shadow:0 0 0 3px rgba(88,101,242,.10)}
+.sfy-shortcut{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  padding:3px 7px;border:1px solid rgba(120,140,180,.18);border-radius:6px;
+  color:#7f8da4;font-size:10px;background:#111c2e;
+}
+.sfy-top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sfy-icon-btn{
+  width:40px;height:40px;display:grid;place-items:center;border:1px solid transparent;
+  border-radius:11px;background:transparent;color:#a8b4c8;cursor:pointer;
+}
+.sfy-icon-btn:hover{background:#101b2d;color:#fff}
+.sfy-avatar{background:linear-gradient(145deg,#273858,#17243a);color:#fff}
+.sfy-content{padding:22px 28px 60px;max-width:1500px;margin:auto}
+#matches-container{width:100%!important;margin:0!important;padding:0!important}
+
+/* Featured hero */
+.sfy-hero{
+  position:relative;min-height:290px;overflow:hidden;margin-bottom:22px;
+  border:1px solid rgba(101,124,176,.26);border-radius:20px;
+  background:
+    radial-gradient(circle at 20% 50%,rgba(52,95,255,.26),transparent 34%),
+    radial-gradient(circle at 82% 40%,rgba(37,200,255,.13),transparent 30%),
+    linear-gradient(105deg,#0a1630,#07101f 52%,#0a1425);
+  box-shadow:var(--ui-shadow);
+}
+.sfy-hero::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(4,9,18,.15),rgba(4,9,18,.05) 50%,rgba(4,9,18,.52));
+}
+.sfy-hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.22;filter:saturate(1.2)}
+.sfy-hero-content{position:relative;z-index:2;min-height:290px;padding:30px 34px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.sfy-hero-kicker{font-size:11px;font-weight:900;letter-spacing:2px;color:#7f8cff;margin-bottom:5px}
+.sfy-hero-title{font-size:clamp(28px,4vw,52px);font-weight:950;letter-spacing:-1.5px;margin-bottom:16px}
+.sfy-hero-teams{display:flex;align-items:center;justify-content:center;gap:24px}
+.sfy-hero-team{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800}
+.sfy-hero-team img{width:54px;height:54px;object-fit:contain;border-radius:50%;background:rgba(255,255,255,.05);padding:6px}
+.sfy-hero-vs{font-size:13px;font-weight:900;color:#8491a9}
+.sfy-hero-meta{margin-top:12px;color:#aab5c7;font-size:12px}
+.sfy-hero-btn{
+  margin-top:18px;min-height:44px;padding:0 22px;border:0;border-radius:11px;
+  background:linear-gradient(90deg,#5865f2,#737cff);color:#fff;font-weight:850;cursor:pointer;
+  box-shadow:0 10px 28px rgba(88,101,242,.25);
+}
+.sfy-hero-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+
+/* Category chips */
+.sfy-chips{display:flex;gap:9px;overflow-x:auto;padding:0 0 22px;scrollbar-width:none}
+.sfy-chips::-webkit-scrollbar{display:none}
+.sfy-chip{
+  flex:0 0 auto;min-height:42px;padding:0 15px;border:1px solid rgba(91,119,163,.25);
+  border-radius:12px;background:#0b1525;color:#aeb9ca;display:flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap;
+}
+.sfy-chip i{font-size:13px;color:#8d9bb2}
+.sfy-chip:hover{border-color:#5865f2;color:#fff}
+.sfy-chip.active{background:linear-gradient(90deg,#5865f2,#6f78ff);border-color:transparent;color:#fff}
+.sfy-chip.active i{color:#fff}
+
+/* Existing category/carousel polish */
+.category-section{
+  margin:0 0 30px!important;padding-bottom:25px;
+  border-bottom:1px solid rgba(91,119,163,.12);
+}
+.category-heading-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+.category-section h2{margin:0!important;font-size:18px!important;letter-spacing:-.25px}
+.category-section h2::before{width:5px!important;height:21px!important;border-radius:4px!important}
+.category-controls{display:flex;gap:7px}
+.category-arrow{
+  width:38px;height:38px;border:1px solid rgba(91,119,163,.25);border-radius:11px;
+  background:#0b1525;color:#dce5f5;font-size:21px;line-height:1;cursor:pointer;
+}
+.category-arrow:hover:not(:disabled){background:#182744;border-color:#5865f2}
+.category-arrow:disabled{opacity:.32;cursor:default}
+.category-viewport{overflow:hidden!important;border-radius:14px}
+.category-track{
+  display:grid!important;grid-auto-flow:column!important;
+  grid-auto-columns:calc((100% - 32px)/3)!important;
+  grid-template-columns:none!important;
+  gap:16px!important;
+  transition:transform 300ms cubic-bezier(.16,1,.3,1);
+}
+.match-card{
+  min-width:0!important;border:1px solid rgba(91,119,163,.25)!important;
+  border-radius:15px!important;background:linear-gradient(145deg,#0c1627,#08111e)!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.22)!important;padding:15px!important;
+}
+.match-card:hover{border-color:rgba(106,124,255,.65)!important;background:#0d192c!important}
+.match-title{font-size:13px!important;font-weight:750!important}
+.team-logo{width:52px!important;height:52px!important;background:#07101d!important;border-color:rgba(91,119,163,.22)!important}
+.team-name{font-size:11px!important;color:#d7dfec!important}
+.vs{width:30px!important;height:30px!important;background:#07101d!important;border-color:rgba(91,119,163,.2)!important}
+.match-status.live{color:#ff5270!important;border-color:rgba(255,82,112,.28)!important;background:rgba(255,82,112,.07)!important}
+.watch-btn{background:linear-gradient(90deg,#5865f2,#737cff)!important;border:0!important;border-radius:10px!important}
+.category-progress{height:3px!important;margin-top:12px!important;background:rgba(91,119,163,.12)!important;border-radius:99px!important;overflow:hidden}
+.category-progress span{display:block;height:100%;border-radius:99px;background:#5865f2!important;transition:.3s ease}
+
+/* Mobile */
+@media(max-width:900px){
+  .sfy-sidebar{transform:translateX(-105%);transition:transform .25s ease;box-shadow:20px 0 50px rgba(0,0,0,.45)}
+  .sfy-sidebar.open{transform:translateX(0)}
+  .sfy-main{margin-left:0}
+  .sfy-mobile-menu{display:grid;width:40px;height:40px;place-items:center;border:1px solid rgba(91,119,163,.25);border-radius:11px;background:#0b1525;color:#fff;cursor:pointer}
+  .sfy-overlay{display:none;position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.58);backdrop-filter:blur(2px)}
+  .sfy-overlay.show{display:block}
+  .sfy-topbar{height:64px;padding:0 14px;gap:10px}
+  .sfy-search{max-width:none}
+  .sfy-content{padding:16px 14px 45px}
+  .sfy-hero{min-height:245px}
+  .sfy-hero-content{min-height:245px;padding:24px 16px}
+  .sfy-hero-team{font-size:12px;flex-direction:column;gap:5px}
+  .sfy-hero-team img{width:46px;height:46px}
+  .sfy-hero-teams{gap:15px}
+  .category-track{grid-auto-columns:calc((100% - 10px)/2)!important;gap:10px!important}
+}
+@media(max-width:560px){
+  .sfy-top-actions .sfy-icon-btn:not(.sfy-avatar){display:none}
+  .sfy-shortcut{display:none}
+  .sfy-brand-text{font-size:17px}
+  .sfy-hero{border-radius:15px}
+  .sfy-hero-title{font-size:29px}
+  .sfy-hero-teams{gap:10px}
+  .sfy-hero-vs{font-size:11px}
+  .category-section{margin-bottom:24px!important;padding-bottom:20px}
+  .category-section h2{font-size:16px!important}
+}
+@media(max-width:380px){
+  .category-track{grid-auto-columns:100%!important}
+  .sfy-search{min-width:0}
+  #sfy-search-input{padding-left:38px}
+}
+@media(prefers-reduced-motion:reduce){
+  .sfy-sidebar,.category-track,.sfy-hero-btn{transition:none!important}
+}
+</style>
 </head>
 <body>
-
-  <!-- Header -->
-  <header class="main-header">
-    <h1>⚡ Sportzfylive</h1>
-    <button id="refresh-btn" onclick="loadMatches()">
-      <i class="fas fa-sync-alt"></i> Refresh
-    </button>
-  </header>
-
-  <!-- Main Container for Matches -->
-  <main id="matches-container">
-    <div class="loading-spinner">Loading matches...</div>
-  </main>
-
-  <!-- Stream Picker / Player -->
-  <div id="stream-modal" class="modal">
-    <div class="stream-page">
-      <div class="stream-topbar">
-        <button class="back-btn" type="button" onclick="closeModal()">← <span>Back</span></button>
-        <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
-      </div>
-
-      <div class="stream-heading">
-        <div>
-          <h2>Available Streams</h2>
-          <p id="stream-subtitle">Select a stream to watch</p>
-        </div>
-        <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Enter theater mode</span></button>
-      </div>
-
-      <div id="stream-picker"></div>
-
-      <div id="player-container" class="player-container" hidden></div>
+<div class="sfy-shell">
+  <aside class="sfy-sidebar" id="sfy-sidebar">
+    <a class="sfy-brand" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">
+      <span class="sfy-brand-mark">S</span>
+      <span class="sfy-brand-text">SPORTZFY <span>LIVE</span></span>
+    </a>
+    <nav class="sfy-nav" aria-label="Sports navigation">
+      <button class="active" data-nav="ALL"><i class="fas fa-house"></i><span>Home</span></button>
+      <button data-nav="LIVE"><i class="fas fa-tower-broadcast"></i><span>Live</span></button>
+      <button data-nav="FOOTBALL"><i class="fas fa-futbol"></i><span>Football</span></button>
+      <button data-nav="BASKETBALL"><i class="fas fa-basketball"></i><span>Basketball</span></button>
+      <button data-nav="CRICKET"><i class="fas fa-baseball"></i><span>Cricket</span></button>
+      <button data-nav="TENNIS"><i class="fas fa-table-tennis-paddle-ball"></i><span>Tennis</span></button>
+      <button data-nav="RUGBY"><i class="fas fa-football"></i><span>Rugby</span></button>
+      <button data-nav="BASEBALL"><i class="fas fa-baseball-ball"></i><span>Baseball</span></button>
+      <button data-nav="AMERICAN FOOTBALL"><i class="fas fa-football"></i><span>American Football</span></button>
+      <button data-nav="MOTOR-SPORTS"><i class="fas fa-car"></i><span>Motorsport</span></button>
+      <button data-nav="GOLF"><i class="fas fa-golf-ball-tee"></i><span>Golf</span></button>
+      <button data-nav="FIGHT"><i class="fas fa-hand-fist"></i><span>Fight</span></button>
+      <button data-nav="OTHER"><i class="fas fa-ellipsis"></i><span>Other</span></button>
+    </nav>
+    <div class="sfy-sidebar-promo">
+      <i class="fas fa-crown"></i>
+      <strong>Watch Live Anytime</strong>
+      <span>Your favorite sports, all in one place.</span>
+      <button type="button" data-nav="LIVE">Explore Live</button>
     </div>
+  </aside>
+  <div class="sfy-overlay" id="sfy-overlay"></div>
+  <div class="sfy-main">
+    <header class="sfy-topbar">
+      <button class="sfy-mobile-menu" id="sfy-mobile-menu" aria-label="Open menu"><i class="fas fa-bars"></i></button>
+      <div class="sfy-search">
+        <i class="fas fa-magnifying-glass"></i>
+        <input id="sfy-search-input" type="search" autocomplete="off" placeholder="Search matches, teams, leagues..." aria-label="Search matches, teams, leagues">
+        <span class="sfy-shortcut">⌘ K</span>
+      </div>
+      <div class="sfy-top-actions">
+        <button class="sfy-icon-btn" type="button" aria-label="Notifications"><i class="far fa-bell"></i></button>
+        <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh"><i class="fas fa-arrows-rotate"></i></button>
+        <button class="sfy-icon-btn sfy-avatar" type="button" aria-label="Profile"><i class="fas fa-user"></i></button>
+      </div>
+    </header>
+    <main class="sfy-content">
+      <section class="sfy-hero" id="sfy-hero" hidden></section>
+      <div class="sfy-chips" id="sfy-chips" aria-label="Sport filters">
+        <button class="sfy-chip active" data-nav="ALL"><i class="fas fa-border-all"></i>All</button>
+        <button class="sfy-chip" data-nav="LIVE"><i class="fas fa-tower-broadcast"></i>Live</button>
+        <button class="sfy-chip" data-nav="FOOTBALL"><i class="fas fa-futbol"></i>Football</button>
+        <button class="sfy-chip" data-nav="BASKETBALL"><i class="fas fa-basketball"></i>Basketball</button>
+        <button class="sfy-chip" data-nav="CRICKET"><i class="fas fa-baseball"></i>Cricket</button>
+        <button class="sfy-chip" data-nav="TENNIS"><i class="fas fa-table-tennis-paddle-ball"></i>Tennis</button>
+        <button class="sfy-chip" data-nav="RUGBY"><i class="fas fa-football"></i>Rugby</button>
+        <button class="sfy-chip" data-nav="BASEBALL"><i class="fas fa-baseball-ball"></i>Baseball</button>
+        <button class="sfy-chip" data-nav="OTHER"><i class="fas fa-ellipsis"></i>More</button>
+      </div>
+      <main id="matches-container"><div class="loading-state"><div class="loading-spinner"></div><p>Loading matches...</p></div></main>
+    </main>
   </div>
+</div>
 
-  <!-- ================= JAVASCRIPT ================= -->
+<!-- Stream Picker / Player -->
+<div id="stream-modal" class="modal">
+  <div class="stream-page">
+    <div class="stream-topbar">
+      <button class="back-btn" type="button" onclick="closeModal()">← <span>Back</span></button>
+      <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
+    </div>
+    <div class="stream-heading">
+      <div><h2>Available Streams</h2><p id="stream-subtitle">Select a stream to watch</p></div>
+      <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Enter theater mode</span></button>
+    </div>
+    <div id="stream-picker"></div>
+    <div id="player-container" class="player-container" hidden></div>
+  </div>
+</div>
+
+<!-- ================= JAVASCRIPT ================= -->
+
   <script>
     const PROXY_URL = "https://sportzfylive.svimranmy.workers.dev";
 
@@ -1429,6 +1699,80 @@ function initCategoryCarousels(){
         update();
     });
 }
+</script>
+<script>
+(function(){
+  const sidebar=document.getElementById("sfy-sidebar");
+  const overlay=document.getElementById("sfy-overlay");
+  const menu=document.getElementById("sfy-mobile-menu");
+  const search=document.getElementById("sfy-search-input");
+  function closeMenu(){sidebar?.classList.remove("open");overlay?.classList.remove("show")}
+  menu?.addEventListener("click",()=>{sidebar?.classList.toggle("open");overlay?.classList.toggle("show")});
+  overlay?.addEventListener("click",closeMenu);
+
+  function normalizeNav(v){
+    return String(v||"").trim().toUpperCase();
+  }
+  function filterSections(category){
+    const wanted=normalizeNav(category);
+    document.querySelectorAll(".category-section").forEach(section=>{
+      const title=normalizeNav(section.querySelector("h2")?.textContent);
+      section.style.display=(wanted==="ALL"||title===wanted)?"":"none";
+    });
+    document.querySelectorAll("[data-nav]").forEach(btn=>btn.classList.toggle("active",normalizeNav(btn.dataset.nav)===wanted));
+    if(wanted!=="ALL"){
+      const section=[...document.querySelectorAll(".category-section")].find(s=>normalizeNav(s.querySelector("h2")?.textContent)===wanted);
+      section?.scrollIntoView({behavior:"smooth",block:"start"});
+    }else window.scrollTo({top:0,behavior:"smooth"});
+    closeMenu();
+  }
+  document.addEventListener("click",e=>{
+    const nav=e.target.closest("[data-nav]");
+    if(nav){e.preventDefault();filterSections(nav.dataset.nav)}
+  });
+
+  search?.addEventListener("input",()=>{
+    const q=search.value.trim().toLowerCase();
+    document.querySelectorAll(".category-section").forEach(section=>{
+      let visible=0;
+      section.querySelectorAll(".match-card").forEach(card=>{
+        const ok=!q||card.textContent.toLowerCase().includes(q);
+        card.style.display=ok?"":"none";
+        if(ok)visible++;
+      });
+      section.style.display=visible?"":"none";
+    });
+    if(q) document.querySelectorAll("[data-nav]").forEach(btn=>btn.classList.remove("active"));
+  });
+  document.addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();search?.focus()}
+    if(e.key==="Escape"&&document.activeElement===search){search.value="";search.dispatchEvent(new Event("input"))}
+  });
+
+  window.renderSportzfyHero=function(matches){
+    const hero=document.getElementById("sfy-hero");
+    if(!hero||!Array.isArray(matches)||!matches.length)return;
+    const match=matches.find(m=>m?.live)||matches.find(m=>m?.teams?.home&&m?.teams?.away)||matches[0];
+    if(!match)return;
+    const home=match.teams?.home||{},away=match.teams?.away||{};
+    const escHero=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    const logo=t=>t?.badge?getLogoUrl(t.badge):"";
+    const date=match.date?new Date(match.date):null;
+    hero.hidden=false;
+    hero.innerHTML=
+      '<div class="sfy-hero-content">'+
+      '<div class="sfy-hero-kicker">'+(match.live?"LIVE NOW":"FEATURED MATCH")+'</div>'+
+      '<div class="sfy-hero-title">'+escHero(match.title||"Featured Match")+'</div>'+
+      '<div class="sfy-hero-teams">'+
+      '<div class="sfy-hero-team">'+(logo(home)?'<img src="'+escHero(logo(home))+'" alt="">':"")+escHero(home.name||"TBD")+'</div>'+
+      '<div class="sfy-hero-vs">VS</div>'+
+      '<div class="sfy-hero-team">'+(logo(away)?'<img src="'+escHero(logo(away))+'" alt="">':"")+escHero(away.name||"TBD")+'</div>'+
+      '</div>'+
+      '<div class="sfy-hero-meta">'+(date?date.toLocaleString([], {weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"Schedule available")+'</div>'+
+      '<button class="sfy-hero-btn" type="button" data-match-id="'+escHero(match.id)+'"><i class="fas fa-play"></i> '+(match.live?"Watch Live":"View Match")+'</button>'+
+      '</div>';
+  };
+})();
 </script>
 </body>
 </html>
