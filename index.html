@@ -836,6 +836,23 @@ body{
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
 </style>
+<style id="sportzfy-category-carousel">
+.category-section{position:relative}
+.category-heading-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.category-heading-row h2{margin:0!important}
+.category-controls{display:flex;gap:6px}
+.category-arrow{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border-default);border-radius:9px;background:var(--bg-surface);color:var(--text-muted);font-size:24px;line-height:1;cursor:pointer;transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
+.category-arrow:hover:not(:disabled){background:var(--bg-hover);color:var(--text-primary);border-color:#3f3f46}
+.category-arrow:disabled{opacity:.28;cursor:not-allowed}
+.category-viewport{overflow:hidden;position:relative}
+.category-track{display:grid!important;grid-auto-flow:column;grid-auto-columns:calc((100% - 32px)/3);grid-template-columns:none!important;gap:16px;transform:translateX(0);transition:transform 300ms var(--ease-out)}
+.category-track .match-card{width:100%;min-width:0}
+.category-progress{height:3px;margin-top:12px;border-radius:99px;background:var(--border-subtle);overflow:hidden}
+.category-progress span{display:block;height:100%;width:33.333%;border-radius:inherit;background:var(--brand-primary);transition:transform 300ms var(--ease-out)}
+@media(max-width:900px){.category-track{grid-auto-columns:calc((100% - 16px)/2)}.category-progress span{width:50%}}
+@media(max-width:600px){.category-controls{gap:4px}.category-arrow{width:44px;height:44px}.category-track{grid-auto-columns:calc((100% - 10px)/2);gap:10px}}
+@media(max-width:380px){.category-track{grid-auto-columns:100%}.category-progress span{width:100%}}
+</style>
 </head>
 <body>
 
@@ -1099,17 +1116,28 @@ body{
 
         for (const category of CATEGORY_ORDER) {
             const list = groups[category];
-
             if (!list.length) continue;
 
+            const sectionId = "category-" + category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
             output += `
-                <section class="category-section">
-                    <h2>${esc(category)}</h2>
-                    <div class="matches-grid">
-                        ${list.map(buildMatchCard).join("")}
+                <section class="category-section" data-carousel-category="${esc(category)}">
+                    <div class="category-heading-row">
+                        <h2>${esc(category)}</h2>
+                        <div class="category-controls" aria-label="${esc(category)} navigation">
+                            <button type="button" class="category-arrow" data-carousel-prev="${sectionId}" aria-label="Previous ${esc(category)} matches">‹</button>
+                            <button type="button" class="category-arrow" data-carousel-next="${sectionId}" aria-label="Next ${esc(category)} matches">›</button>
+                        </div>
                     </div>
+                    <div class="category-viewport" id="${sectionId}">
+                        <div class="matches-grid category-track">
+                            ${list.map(buildMatchCard).join("")}
+                        </div>
+                    </div>
+                    <div class="category-progress" aria-hidden="true"><span></span></div>
                 </section>`;
         }
+
+        requestAnimationFrame(initCategoryCarousels);
 
         container.innerHTML = output ||
             `<div class="empty-state">No matches available.</div>`;
@@ -1354,6 +1382,53 @@ body{
     });
 
     document.addEventListener("DOMContentLoaded", loadMatches);
+</script>
+<script>
+function initCategoryCarousels(){
+    document.querySelectorAll("[data-carousel-category]").forEach(section=>{
+        const viewport=section.querySelector(".category-viewport");
+        const track=section.querySelector(".category-track");
+        const prev=section.querySelector("[data-carousel-prev]");
+        const next=section.querySelector("[data-carousel-next]");
+        const progress=section.querySelector(".category-progress span");
+        if(!viewport||!track||!prev||!next)return;
+
+        let page=0;
+        const getVisible=()=>window.innerWidth<=380?1:(window.innerWidth<=900?2:3);
+        const maxPage=()=>Math.max(0,Math.ceil(track.children.length/getVisible())-1);
+        const update=()=>{
+            const visible=getVisible();
+            const gap=parseFloat(getComputedStyle(track).columnGap)||16;
+            const cardWidth=track.children[0]?.getBoundingClientRect().width||viewport.clientWidth;
+            page=Math.min(page,maxPage());
+            track.style.transform=`translateX(-${page*(cardWidth+gap)*visible}px)`;
+            prev.disabled=page===0;
+            next.disabled=page>=maxPage();
+            if(progress){
+                const pages=maxPage()+1;
+                progress.style.width=`${100/pages}%`;
+                progress.style.transform=`translateX(${page*100}%)`;
+            }
+        };
+        prev.addEventListener("click",()=>{page=Math.max(0,page-1);update()});
+        next.addEventListener("click",()=>{page=Math.min(maxPage(),page+1);update()});
+
+        let startX=0,startY=0;
+        viewport.addEventListener("touchstart",e=>{
+            const t=e.changedTouches[0]; startX=t.clientX; startY=t.clientY;
+        },{passive:true});
+        viewport.addEventListener("touchend",e=>{
+            const t=e.changedTouches[0],dx=t.clientX-startX,dy=t.clientY-startY;
+            if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.2){
+                if(dx<0&&page<maxPage())page++;
+                if(dx>0&&page>0)page--;
+                update();
+            }
+        },{passive:true});
+        window.addEventListener("resize",update);
+        update();
+    });
+}
 </script>
 </body>
 </html>
