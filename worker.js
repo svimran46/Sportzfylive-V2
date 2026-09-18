@@ -556,18 +556,41 @@ export default {
     return new Response("SportzfyLive API Online", { headers: corsHeaders });
   },
 
-  async scheduled(controller, env, ctx) {
+  async scheduled(controller, env) {
     if (controller.cron !== "*/10 * * * *") return;
 
-    ctx.waitUntil((async () => {
+    try {
+      await env.SPORTZFY_SYNC_QUEUE.send({
+        type: "scheduled-sync",
+        scheduledAt: controller.scheduledTime
+      });
+    } catch (error) {
+      console.error("Failed to queue scheduled sync:", error);
+    }
+  },
+
+  async queue(batch, env) {
+    for (const message of batch.messages) {
       try {
+        if (message.body?.type !== "scheduled-sync") {
+          message.ack();
+          continue;
+        }
+
+        console.log("Starting scheduled sync");
+
         await syncStreamedMatches(env);
         await autoLinkMatches(env);
         await syncBroadcastData(env);
+
+        console.log("Scheduled sync completed");
+
+        message.ack();
       } catch (error) {
-        console.error("Scheduled auto-link failed:", error);
+        console.error("Scheduled sync failed:", error);
+        message.retry();
       }
-    })());
+    }
   }
 };
 
