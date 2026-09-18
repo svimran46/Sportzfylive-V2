@@ -135,16 +135,29 @@ async function syncBroadcasts(){
       status.textContent="Broadcast source is not configured. Add the GOALDIR_TOKEN Worker secret first.";
       return;
     }
-    status.textContent="Broadcast sync complete. Regions: "+result.countries.length+
-      "; matched broadcasts: "+result.matchedMatches+
-      "; local channels linked: "+result.linkedMatches+".";
+
+    if(typeof result.processed==="number"){
+      const progress=result.cycleComplete
+        ? "Cycle complete."
+        : "More matches remain; the next automatic/manual sync will continue from the saved cursor.";
+      status.textContent=
+        "Batch complete. Processed: "+result.processed+
+        "; remaining: "+(result.remaining ?? 0)+
+        "; matched broadcasts: "+(result.matchedMatches ?? 0)+
+        "; local channels linked: "+(result.linkedMatches ?? 0)+
+        ". "+progress;
+    }else{
+      status.textContent="Broadcast sync complete. Regions: "+(result.countries?.length||0)+
+        "; matched broadcasts: "+(result.matchedMatches||0)+
+        "; local channels linked: "+(result.linkedMatches||0)+".";
+    }
+
     await loadMatches();
   }catch(e){
     status.className="error";
     status.textContent=e.message;
   }
 }
-
 async function autoLinkMatches(){
   const status=document.getElementById("autoLinkStatus");
   if(!status)return;
