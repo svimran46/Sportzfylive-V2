@@ -61,6 +61,31 @@ export default {
       return json(await getChannels());
     }
 
+    if (request.method === "GET" && url.pathname === "/api/streamed/matches") {
+      try {
+        const upstream = await fetch("https://streamed.pk/api/matches/all-today");
+        if (!upstream.ok) return json({ error: "Streamed API returned " + upstream.status }, 502);
+        const streamed = await upstream.json();
+        const matches = Array.isArray(streamed) ? streamed : [];
+        return json(matches.map(match => ({
+          id: "streamed-" + String(match.id || crypto.randomUUID()),
+          externalId: match.id || null,
+          title: String(match.title || ""),
+          category: String(match.category || "other").toUpperCase(),
+          startTime: match.date ? new Date(Number(match.date)).toISOString() : "",
+          status: "scheduled",
+          poster: match.poster ? (String(match.poster).startsWith("http") ? String(match.poster) : "https://streamed.pk" + String(match.poster)) : "",
+          description: "",
+          channelIds: [],
+          teams: match.teams || null,
+          popular: Boolean(match.popular),
+          source: "streamed"
+        })));
+      } catch (error) {
+        return json({ error: "Unable to fetch Streamed matches" }, 502);
+      }
+    }
+
     if (request.method === "GET" && url.pathname === "/api/matches") {
       return json(await expandMatches(await getMatches()));
     }
