@@ -194,6 +194,102 @@ export default {
       return best && bestScore >= 80 ? { match: best, score: Math.round(bestScore) } : null;
     };
 
+    const syncStreamedMatches = async () => {
+      const [existingMatches, channels, streamedRaw] = await Promise.all([
+        getMatches(),
+        getChannels(),
+        fetchStreamedMatches()
+      ]);
+
+      const now = new Date().toISOString();
+      const channelIdsForSources = (sources) => {
+        const ids = [];
+        for (const source of sources) {
+          for (const channel of channels) {
+            if (sourceMatchesChannel(source, channel)) ids.push(String(channel.id));
+          }
+        }
+        return [...new Set(ids)];
+      };
+
+      const imported = [];
+      const updated = [];
+      const created = [];
+
+      for (const raw of streamedRaw) {
+        const streamed = toStreamedMatch(raw);
+        const externalId = String(raw.id || "");
+        const title = String(raw.title || "");
+        const rawDate = raw.date ? Number(raw.date) : NaN;
+
+        let index = existingMatches.findIndex(item =>
+          externalId && String(item.externalId || "") === externalId
+        );
+
+        if (index === -1) {
+          const normalizedTitle = normalizeText(title);
+          index = existingMatches.findIndex(item => {
+            if (item.source !== "streamed") return false;
+            if (normalizeText(item.title) !== normalizedTitle) return false;
+            if (!rawDate || !item.startTime) return true;
+            const existingDate = Date.parse(item.startTime);
+            return existingDate === existingDate &&
+              Math.abs(existingDate - rawDate) <= 60 * 60 * 1000;
+          });
+        }
+
+        const sourceNames = streamed.sources.map(source => source.source);
+        const autoIds = channelIdsForSources(sourceNames);
+
+        if (index === -1) {
+          const match = {
+            ...streamed,
+            channelIds: autoIds,
+            createdAt: now,
+            updatedAt: now,
+            autoLinkStatus: autoIds.length ? "linked" : "matched-no-channel-map",
+            autoLinkedAt: now
+          };
+          existingMatches.push(match);
+          imported.push(match);
+          created.push(match.id);
+          continue;
+        }
+
+        const current = existingMatches[index];
+        const currentIds = Array.isArray(current.channelIds) ? current.channelIds.map(String) : [];
+        const mergedIds = [...new Set([...currentIds, ...autoIds])];
+
+        existingMatches[index] = {
+          ...current,
+          externalId: streamed.externalId || current.externalId || "",
+          title: streamed.title || current.title,
+          category: streamed.category || current.category,
+          startTime: streamed.startTime || current.startTime,
+          poster: streamed.poster || current.poster || "",
+          teams: streamed.teams || current.teams || null,
+          popular: streamed.popular ?? current.popular ?? false,
+          sources: streamed.sources,
+          source: "streamed",
+          channelIds: mergedIds,
+          autoLinkStatus: autoIds.length ? "linked" : (current.autoLinkStatus || "matched-no-channel-map"),
+          autoLinkedAt: now,
+          updatedAt: now
+        };
+        updated.push(existingMatches[index].id);
+      }
+
+      await env.SPORTZFY_DB.put("matches", JSON.stringify(existingMatches));
+      return {
+        success: true,
+        streamedCount: streamedRaw.length,
+        created: created.length,
+        updated: updated.length,
+        totalMatches: existingMatches.length,
+        linkedMatches: existingMatches.filter(match => match.autoLinkStatus === "linked").length
+      };
+    };
+
     const autoLinkMatches = async () => {
       const [matches, channels, streamedRaw] = await Promise.all([
         getMatches(),
@@ -310,6 +406,34 @@ export default {
       return json({ success: true, count: data.length });
     }
 
+    if (url.pathname === "/api/admin/sync-streamed") {
+      if (!await requireAdmin()) return json({ error: "Admin authentication required" }, 401);
+
+      if (request.method === "POST") {
+        try {
+          return json(await syncStreamedMatches());
+        } catch (error) {
+          return json({ error: "Streamed sync failed: " + String(error?.message || error) }, 502);
+        }
+      }
+
+      if (request.method === "GET") {
+        try {
+          const streamedRaw = await fetchStreamedMatches();
+          const matches = await getMatches();
+          return json({
+            streamedCount: streamedRaw.length,
+            storedCount: matches.length,
+            lastSync: matches.reduce((latest, match) =>
+              match.source === "streamed" && match.updatedAt > latest ? match.updatedAt : latest, ""
+            )
+          });
+        } catch (error) {
+          return json({ error: "Unable to check Streamed sync: " + String(error?.message || error) }, 502);
+        }
+      }
+    }
+
     if (url.pathname === "/api/admin/auto-link") {
       if (!await requireAdmin()) return json({ error: "Admin authentication required" }, 401);
 
@@ -418,6 +542,7 @@ export default {
 
     ctx.waitUntil((async () => {
       try {
+        await syncStreamedMatches(env);
         await autoLinkMatches(env);
       } catch (error) {
         console.error("Scheduled auto-link failed:", error);
@@ -425,6 +550,138 @@ export default {
     })());
   }
 };
+
+async function syncStreamedMatches(env) {
+  const readArray = async (key) => {
+    const value = await env.SPORTZFY_DB.get(key, "json");
+    return Array.isArray(value) ? value : [];
+  };
+
+  const slugify = (value) => String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  const normalizeText = (value) => String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(vs\.?|versus|v)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const channels = (await readArray("channels")).map(channel => ({
+    ...channel,
+    id: channel.id || slugify(channel.name) || slugify(channel.url)
+  }));
+  const matches = await readArray("matches");
+
+  const upstream = await fetch("https://streamed.pk/api/matches/all-today", {
+    headers: { "Accept": "application/json" }
+  });
+  if (!upstream.ok) throw new Error("Streamed API returned " + upstream.status);
+
+  const streamedRaw = await upstream.json();
+  const streamedMatches = Array.isArray(streamedRaw) ? streamedRaw : [];
+
+  const aliases = channel => [
+    channel.streamedSource,
+    ...(Array.isArray(channel.streamedSources) ? channel.streamedSources : []),
+    ...(Array.isArray(channel.streamedAliases) ? channel.streamedAliases : [])
+  ].map(value => slugify(value)).filter(Boolean);
+
+  const sourceMatchesChannel = (source, channel) => {
+    const wanted = slugify(source);
+    if (aliases(channel).includes(wanted)) return true;
+    return [channel.id, channel.name, channel.slug]
+      .map(value => slugify(value)).filter(Boolean).includes(wanted);
+  };
+
+  const now = new Date().toISOString();
+
+  for (const raw of streamedMatches) {
+    const externalId = String(raw.id || "");
+    const title = String(raw.title || "");
+    const normalizedTitle = normalizeText(title);
+    const rawDate = raw.date ? Number(raw.date) : NaN;
+
+    let index = matches.findIndex(item =>
+      externalId && String(item.externalId || "") === externalId
+    );
+
+    if (index === -1) {
+      index = matches.findIndex(item => {
+        if (item.source !== "streamed") return false;
+        if (normalizeText(item.title) !== normalizedTitle) return false;
+        if (!rawDate || !item.startTime) return true;
+        const existingDate = Date.parse(item.startTime);
+        return existingDate === existingDate &&
+          Math.abs(existingDate - rawDate) <= 60 * 60 * 1000;
+      });
+    }
+
+    const sourceNames = Array.isArray(raw.sources)
+      ? raw.sources.map(source => String(source?.source || "")).filter(Boolean)
+      : [];
+
+    const autoIds = [];
+    for (const source of sourceNames) {
+      for (const channel of channels) {
+        if (sourceMatchesChannel(source, channel)) autoIds.push(String(channel.id));
+      }
+    }
+
+    const streamed = {
+      id: "streamed-" + (externalId || crypto.randomUUID()),
+      externalId,
+      title,
+      category: String(raw.category || "other").toUpperCase(),
+      startTime: raw.date ? new Date(Number(raw.date)).toISOString() : "",
+      status: "scheduled",
+      poster: raw.poster
+        ? (String(raw.poster).startsWith("http") ? String(raw.poster) : "https://streamed.pk" + String(raw.poster))
+        : "",
+      description: "",
+      channelIds: [],
+      teams: raw.teams || null,
+      popular: Boolean(raw.popular),
+      sources: sourceNames.map(source => {
+        const original = (Array.isArray(raw.sources) ? raw.sources : []).find(item => String(item?.source || "") === source);
+        return { source, id: String(original?.id || "") };
+      }),
+      source: "streamed"
+    };
+
+    if (index === -1) {
+      matches.push({
+        ...streamed,
+        channelIds: autoIds,
+        createdAt: now,
+        updatedAt: now,
+        autoLinkStatus: autoIds.length ? "linked" : "matched-no-channel-map",
+        autoLinkedAt: now
+      });
+    } else {
+      const current = matches[index];
+      const currentIds = Array.isArray(current.channelIds) ? current.channelIds.map(String) : [];
+      matches[index] = {
+        ...current,
+        ...streamed,
+        id: current.id,
+        channelIds: [...new Set([...currentIds, ...autoIds])],
+        createdAt: current.createdAt || now,
+        updatedAt: now,
+        autoLinkStatus: autoIds.length ? "linked" : (current.autoLinkStatus || "matched-no-channel-map"),
+        autoLinkedAt: now
+      };
+    }
+  }
+
+  await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
+  return { success: true, streamedCount: streamedMatches.length, totalMatches: matches.length };
+}
 
 async function autoLinkMatches(env) {
   const readArray = async (key) => {
