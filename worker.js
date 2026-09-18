@@ -850,33 +850,59 @@ async function syncBroadcastData(env) {
 
   const slugify = (value) => normalizeText(value).replace(/\s+/g, "-");
 
+  const pickName = (value) => {
+    if (typeof value === "string") return value;
+    if (!value || typeof value !== "object") return "";
+    return value.name || value.long_name || value.longName ||
+      value.short_name || value.shortName || "";
+  };
+
   const teamNamesFromMatch = (match) => {
     const teams = match?.teams || {};
-    const home = teams.home?.name || teams.home?.longName || teams.home?.shortName || "";
-    const away = teams.away?.name || teams.away?.longName || teams.away?.shortName || "";
-    if (home && away) return [String(home), String(away)];
+    const home = pickName(teams.home || teams.home_team);
+    const away = pickName(teams.away || teams.away_team);
+    if (home && away) return [home, away];
 
-    const parts = String(match.title || "").split(/\s+(?:vs\.?|versus|v)\s+/i);
+    const parts = String(match.title || "")
+      .split(/\s+(?:vs\.?|versus|v)\s+/i)
+      .map(part => part.trim())
+      .filter(Boolean);
+
     return parts.length >= 2 ? [parts[0], parts.slice(1).join(" vs ")] : [];
   };
+
+  const eventTeams = (event) => {
+    const home = pickName(
+      event?.home_team ??
+      event?.home ??
+      event?.homeTeam ??
+      event?.home_team_name
+    );
+    const away = pickName(
+      event?.away_team ??
+      event?.away ??
+      event?.awayTeam ??
+      event?.away_team_name
+    );
+    return [home, away].filter(Boolean);
+  };
+
+  const eventTime = (event) =>
+    event?.event_date ||
+    event?.date ||
+    event?.start_at ||
+    event?.starting_at ||
+    event?.kickoff ||
+    event?.startTime ||
+    event?.datetime ||
+    event?.utcTime ||
+    "";
 
   const dateKey = (value) => {
     const time = Date.parse(value || "");
     if (!Number.isFinite(time)) return "";
     return new Date(time).toISOString().slice(0, 10);
   };
-
-  const eventTeams = (event) => {
-    const home = event?.home?.name || event?.home?.longName ||
-      event?.home_team?.name || event?.homeTeam?.name || event?.home_team_name || "";
-    const away = event?.away?.name || event?.away?.longName ||
-      event?.away_team?.name || event?.awayTeam?.name || event?.away_team_name || "";
-    return [String(home), String(away)].filter(Boolean);
-  };
-
-  const eventTime = (event) =>
-    event?.date || event?.start_at || event?.starting_at || event?.kickoff ||
-    event?.startTime || event?.datetime || event?.utcTime || "";
 
   const responseItems = (payload) => {
     if (Array.isArray(payload)) return payload;
@@ -894,8 +920,30 @@ async function syncBroadcastData(env) {
         "Authorization": "Token " + env.GOALDIR_TOKEN
       }
     });
-    if (!response.ok) throw new Error("GoalDir returned " + response.status);
+
+    if (!response.ok) {
+      throw new Error("GoalDir returned " + response.status + " for " + path);
+    }
+
     return response.json();
+  };
+
+  const fetchPaged = async (path, maxPages = 10) => {
+    const items = [];
+    for (let page = 0; page < maxPages; page++) {
+      const offset = page * 200;
+      const separator = path.includes("?") ? "&" : "?";
+      const payload = await goalDirFetch(
+        path + separator + "limit=200&offset=" + offset
+      );
+      const pageItems = responseItems(payload);
+      items.push(...pageItems);
+
+      const count = Number(payload?.count);
+      if (pageItems.length < 200) break;
+      if (Number.isFinite(count) && items.length >= count) break;
+    }
+    return items;
   };
 
   const matches = await readArray("matches");
@@ -904,77 +952,88 @@ async function syncBroadcastData(env) {
     id: channel.id || slugify(channel.name) || slugify(channel.url)
   }));
 
-  const today = new Date();
-  const from = today.toISOString().slice(0, 10);
-  const toDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-  const to = toDate.toISOString().slice(0, 10);
+  /*
+    Use a UTC window that overlaps the user's "today" on both sides.
+    This avoids dropping matches whose local date differs from UTC.
+  */
+  const now = Date.now();
+  const from = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const to = new Date(now + 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const configuredCountries = String(env.BROADCAST_COUNTRIES || "")
-    .split(",").map(x => x.trim().toUpperCase()).filter(Boolean);
+    .split(",")
+    .map(x => x.trim().toUpperCase())
+    .filter(Boolean);
 
   const channelCountries = channels.flatMap(channel => [
-    channel.countryCode, channel.country_code, channel.regionCode
-  ]).map(x => String(x || "").trim().toUpperCase()).filter(Boolean);
+    channel.countryCode,
+    channel.country_code,
+    channel.regionCode
+  ])
+    .map(x => String(x || "").trim().toUpperCase())
+    .filter(Boolean);
 
   const defaultCountries = [
     "MY","SG","ID","TH","PH","IN","AU","NZ","JP","KR",
     "GB","IE","FR","DE","ES","IT","NL","PT","BE","CH",
-    "AT","TR","GR","SA","AE","QA","US","CA","MX","BR","AR","CL","CO"
+    "AT","TR","GR","SA","AE","QA","US","CA","MX","BR",
+    "AR","CL","CO"
   ];
 
   const countries = [...new Set([
     ...(configuredCountries.length ? configuredCountries : defaultCountries),
     ...channelCountries
-  ])].slice(0, 40);
+  ])];
 
-  const eventPayload = await goalDirFetch(
+  /*
+    IMPORTANT:
+    We no longer make one giant request per country. BSD's v2 broadcasts
+    endpoint accepts country_code as an optional filter, so we fetch the
+    complete date window once and retain the country attached to each row.
+    This gives global coverage and avoids silently missing countries.
+  */
+  const events = await fetchPaged(
     "events/?date_from=" + encodeURIComponent(from) +
-    "&date_to=" + encodeURIComponent(to) +
-    "&limit=200"
+    "&date_to=" + encodeURIComponent(to)
   );
-  const events = responseItems(eventPayload);
 
-  const eventById = new Map();
-  for (const event of events) {
-    const id = String(event?.id ?? event?.event_id ?? "");
-    if (id) eventById.set(id, event);
-  }
-
-  const broadcastRows = [];
-  for (const country of countries) {
-    try {
-      const payload = await goalDirFetch(
-        "broadcasts/?country_code=" + encodeURIComponent(country) +
-        "&date_from=" + encodeURIComponent(from) +
-        "&date_to=" + encodeURIComponent(to) +
-        "&limit=200"
-      );
-      for (const row of responseItems(payload)) {
-        broadcastRows.push({ row, country });
-      }
-    } catch (error) {
-      console.warn("Broadcast country sync failed:", country, error);
-    }
-  }
+  const broadcastRows = await fetchPaged(
+    "broadcasts/?date_from=" + encodeURIComponent(from) +
+    "&date_to=" + encodeURIComponent(to)
+  );
 
   const channelAliases = (channel) => [
     channel.name,
     channel.broadcastName,
     ...(Array.isArray(channel.broadcastNames) ? channel.broadcastNames : []),
     ...(Array.isArray(channel.broadcastAliases) ? channel.broadcastAliases : [])
-  ].map(normalizeText).filter(Boolean);
+  ]
+    .map(normalizeText)
+    .filter(Boolean);
 
   const channelMatches = (broadcastName, country) => {
     const wanted = normalizeText(broadcastName);
     if (!wanted) return [];
+
     return channels.filter(channel => {
       const countryFields = [
-        channel.countryCode, channel.country_code, channel.regionCode
-      ].map(x => String(x || "").trim().toUpperCase()).filter(Boolean);
+        channel.countryCode,
+        channel.country_code,
+        channel.regionCode
+      ]
+        .map(x => String(x || "").trim().toUpperCase())
+        .filter(Boolean);
 
-      if (countryFields.length && country && !countryFields.includes(country)) return false;
+      if (
+        countryFields.length &&
+        country &&
+        !countryFields.includes(country)
+      ) {
+        return false;
+      }
 
       const aliases = channelAliases(channel);
+
       return aliases.some(alias =>
         alias === wanted ||
         alias.includes(wanted) ||
@@ -984,33 +1043,42 @@ async function syncBroadcastData(env) {
   };
 
   const matchEvent = (match) => {
-    const [home, away] = teamNamesFromMatch(match).map(normalizeText);
+    const [homeRaw, awayRaw] = teamNamesFromMatch(match);
+    const home = normalizeText(homeRaw);
+    const away = normalizeText(awayRaw);
+
     if (!home || !away) return null;
+
     const matchDate = dateKey(match.startTime);
+    const matchTime = Date.parse(match.startTime || "");
 
     let best = null;
     let bestScore = 0;
 
     for (const event of events) {
-      const [eventHome, eventAway] = eventTeams(event).map(normalizeText);
+      const [eventHomeRaw, eventAwayRaw] = eventTeams(event);
+      const eventHome = normalizeText(eventHomeRaw);
+      const eventAway = normalizeText(eventAwayRaw);
+
       if (!eventHome || !eventAway) continue;
 
       let score = 0;
-      if (eventHome === home) score += 45;
-      else if (eventHome.includes(home) || home.includes(eventHome)) score += 30;
 
-      if (eventAway === away) score += 45;
-      else if (eventAway.includes(away) || away.includes(eventAway)) score += 30;
+      if (eventHome === home) score += 50;
+      else if (eventHome.includes(home) || home.includes(eventHome)) score += 35;
+
+      if (eventAway === away) score += 50;
+      else if (eventAway.includes(away) || away.includes(eventAway)) score += 35;
 
       const eDate = dateKey(eventTime(event));
       if (matchDate && eDate === matchDate) score += 20;
 
-      const mt = Date.parse(match.startTime || "");
-      const et = Date.parse(eventTime(event));
-      if (Number.isFinite(mt) && Number.isFinite(et)) {
-        const diff = Math.abs(mt - et);
-        if (diff <= 15 * 60 * 1000) score += 30;
-        else if (diff <= 60 * 60 * 1000) score += 15;
+      const eventTimestamp = Date.parse(eventTime(event));
+      if (Number.isFinite(matchTime) && Number.isFinite(eventTimestamp)) {
+        const diff = Math.abs(matchTime - eventTimestamp);
+        if (diff <= 10 * 60 * 1000) score += 35;
+        else if (diff <= 30 * 60 * 1000) score += 25;
+        else if (diff <= 90 * 60 * 1000) score += 10;
       }
 
       if (score > bestScore) {
@@ -1019,61 +1087,124 @@ async function syncBroadcastData(env) {
       }
     }
 
-    return best && bestScore >= 90 ? { event: best, score: bestScore } : null;
+    return best && bestScore >= 100
+      ? { event: best, score: bestScore }
+      : null;
   };
 
+  /*
+    BSD v2 broadcast rows are documented as:
+      event_id
+      country_code
+      channel_id
+      channel_name
+      channel_link
+      scheduled_start_time
+
+    Keep the documented flat fields first, with a few tolerant fallbacks.
+  */
   const broadcastMap = new Map();
-  for (const { row, country } of broadcastRows) {
+
+  for (const row of broadcastRows) {
     const eventId = String(
-      row?.event_id ?? row?.eventId ?? row?.event?.id ?? row?.fixture_id ?? row?.fixtureId ?? ""
+      row?.event_id ??
+      row?.eventId ??
+      row?.event?.id ??
+      ""
     );
+
     if (!eventId) continue;
 
-    const channel = row?.channel || row?.tv_channel || row?.tvChannel ||
-      row?.station || row?.broadcaster || row?.tv || {};
     const name = String(
-      channel?.name || row?.channel_name || row?.channelName ||
-      row?.station_name || row?.stationName || row?.broadcaster_name || ""
+      row?.channel_name ??
+      row?.channelName ??
+      row?.channel?.name ??
+      row?.tv_channel?.name ??
+      row?.broadcaster_name ??
+      ""
     ).trim();
 
     if (!name) continue;
 
-    const key = eventId + "::" + country + "::" + normalizeText(name);
+    const country = String(
+      row?.country_code ??
+      row?.countryCode ??
+      row?.country ??
+      ""
+    ).trim().toUpperCase();
+
+    const key = [
+      eventId,
+      country,
+      normalizeText(name)
+    ].join("::");
+
     broadcastMap.set(key, {
       name,
       country,
       eventId,
-      url: String(channel?.url || row?.channel_url || row?.url || "")
+      channelId: row?.channel_id ?? row?.channelId ?? null,
+      url: String(
+        row?.channel_link ??
+        row?.channel_url ??
+        row?.url ??
+        ""
+      )
     });
   }
 
-  let linkedMatches = 0;
   let matchedMatches = 0;
+  let linkedMatches = 0;
   let unmatchedMatches = 0;
-  const now = new Date().toISOString();
+  let broadcastCount = 0;
+  const diagnostics = [];
+  const nowIso = new Date().toISOString();
 
   for (const match of matches) {
     const found = matchEvent(match);
+
     if (!found) {
       unmatchedMatches++;
+      diagnostics.push({
+        id: match.id,
+        title: match.title,
+        status: "no-event-match"
+      });
       continue;
     }
 
-    const eventId = String(found.event?.id ?? found.event?.event_id ?? "");
-    const broadcasts = [...broadcastMap.values()].filter(item => item.eventId === eventId);
+    const eventId = String(
+      found.event?.id ??
+      found.event?.event_id ??
+      ""
+    );
+
+    const broadcasts = [...broadcastMap.values()]
+      .filter(item => item.eventId === eventId);
 
     const matchedBroadcasts = broadcasts.map(item => ({
       name: item.name,
       country: item.country,
-      source: "goaldir"
+      channelId: item.channelId,
+      source: "bsd"
     }));
 
-    const addedIds = broadcasts.flatMap(item => channelMatches(item.name, item.country));
-    const currentIds = Array.isArray(match.channelIds) ? match.channelIds.map(String) : [];
-    const mergedIds = [...new Set([...currentIds, ...addedIds])];
+    const addedIds = broadcasts.flatMap(item =>
+      channelMatches(item.name, item.country)
+    );
+
+    const currentIds = Array.isArray(match.channelIds)
+      ? match.channelIds.map(String)
+      : [];
+
+    const mergedIds = [...new Set([
+      ...currentIds,
+      ...addedIds
+    ])];
 
     if (matchedBroadcasts.length) matchedMatches++;
     if (addedIds.length) linkedMatches++;
+    broadcastCount += matchedBroadcasts.length;
 
     match.channelIds = mergedIds;
     match.broadcasts = matchedBroadcasts;
@@ -1081,9 +1212,26 @@ async function syncBroadcastData(env) {
     match.broadcastMatchScore = Math.round(found.score);
     match.broadcastStatus = addedIds.length
       ? "linked"
-      : (matchedBroadcasts.length ? "broadcast-found-no-local-channel" : "no-broadcast-listing");
-    match.broadcastSyncedAt = now;
-    match.updatedAt = now;
+      : (
+        matchedBroadcasts.length
+          ? "broadcast-found-no-local-channel"
+          : "no-broadcast-listing"
+      );
+    match.broadcastSyncedAt = nowIso;
+    match.updatedAt = nowIso;
+
+    diagnostics.push({
+      id: match.id,
+      title: match.title,
+      status: match.broadcastStatus,
+      eventId,
+      score: Math.round(found.score),
+      broadcasts: matchedBroadcasts.map(item => ({
+        name: item.name,
+        country: item.country
+      })),
+      addedChannelIds: [...new Set(addedIds)]
+    });
   }
 
   await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
@@ -1091,12 +1239,13 @@ async function syncBroadcastData(env) {
   return {
     success: true,
     configured: true,
-    source: "goaldir",
+    source: "bsd",
     countries,
     eventCount: events.length,
-    broadcastCount: broadcastRows.length,
+    broadcastCount,
     matchedMatches,
     linkedMatches,
-    unmatchedMatches
+    unmatchedMatches,
+    diagnostics: diagnostics.slice(0, 100)
   };
 }
