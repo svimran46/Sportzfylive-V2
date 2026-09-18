@@ -856,8 +856,10 @@ async function syncBroadcastData(env) {
       success: false,
       configured: false,
       message: "GOALDIR_TOKEN is not configured",
-      linkedMatches: 0,
-      countries: []
+      processed: 0,
+      remaining: 0,
+      matchedMatches: 0,
+      linkedMatches: 0
     };
   }
 
@@ -882,8 +884,9 @@ async function syncBroadcastData(env) {
 
   const teamNamesFromMatch = (match) => {
     const teams = match?.teams || {};
-    const home = pickName(teams.home || teams.home_team);
-    const away = pickName(teams.away || teams.away_team);
+    const home = pickName(teams.home || teams.home_team || teams.homeTeam);
+    const away = pickName(teams.away || teams.away_team || teams.awayTeam);
+
     if (home && away) return [home, away];
 
     const parts = String(match.title || "")
@@ -891,7 +894,9 @@ async function syncBroadcastData(env) {
       .map(part => part.trim())
       .filter(Boolean);
 
-    return parts.length >= 2 ? [parts[0], parts.slice(1).join(" vs ")] : [];
+    return parts.length >= 2
+      ? [parts[0], parts.slice(1).join(" vs ")]
+      : [];
   };
 
   const eventTeams = (event) => {
@@ -907,7 +912,7 @@ async function syncBroadcastData(env) {
       event?.awayTeam ??
       event?.away_team_name
     );
-    return [home, away].filter(Boolean);
+    return [home, away];
   };
 
   const eventTime = (event) =>
@@ -958,8 +963,8 @@ async function syncBroadcastData(env) {
   }));
 
   const now = Date.now();
-  const from = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const to = new Date(now + 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const fromDate = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const toDate = new Date(now + 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const configuredCountries = String(env.BROADCAST_COUNTRIES || "")
     .split(",")
@@ -986,17 +991,13 @@ async function syncBroadcastData(env) {
     ...channelCountries
   ])];
 
-  /*
-    Cloudflare Workers Free allows only 10 ms of CPU per invocation.
-    The previous implementation downloaded a large global broadcast list
-    and compared every broadcast against every local match. That is far
-    too much work for the Free plan.
-
-    We now process a small batch and request broadcasts only for the
-    matched BSD events. The cursor is kept in KV, so the scheduled job
-    gradually processes the whole catalogue without one huge invocation.
-  */
+  // BSD's events endpoint supports team_name filtering. Querying by the
+  // actual teams avoids the previous global 200-event ceiling and lets us
+  // identify the exact fixture before requesting its broadcasts.
   const eligible = matches.filter(match => {
+    const category = String(match.category || "").toUpperCase();
+    if (category && !["FOOTBALL", "SOCCER"].includes(category)) return false;
+
     const time = Date.parse(match.startTime || "");
     return !Number.isFinite(time) ||
       (time >= now - 24 * 60 * 60 * 1000 &&
@@ -1018,63 +1019,73 @@ async function syncBroadcastData(env) {
       countries,
       processed: 0,
       totalEligible: eligible.length,
-      remaining: eligible.length,
+      remaining: 0,
+      cursor: 0,
       cycleComplete: true,
+      eventCount: 0,
+      broadcastCount: 0,
       matchedMatches: 0,
       linkedMatches: 0,
       message: "Broadcast sync cycle complete; cursor reset."
     };
   }
 
-  /*
-    One event request gives us a much smaller payload than downloading
-    every broadcast in every country. Country filtering is deliberately
-    not applied here; the returned rows retain their country_code, so
-    global broadcast coverage is preserved.
-  */
-  const eventPayload = await goalDirFetch(
-    "events/?date_from=" + encodeURIComponent(from) +
-    "&date_to=" + encodeURIComponent(to) +
-    "&limit=200"
-  );
-  const events = responseItems(eventPayload);
-
-  const normalizedEvents = events.map(event => {
-    const [home, away] = eventTeams(event).map(normalizeText);
-    return {
-      event,
-      id: String(event?.id ?? event?.event_id ?? ""),
-      home,
-      away,
-      date: dateKey(eventTime(event)),
-      time: Date.parse(eventTime(event))
-    };
-  }).filter(item => item.id && item.home && item.away);
-
-  const findEvent = (match) => {
+  const findEvent = async (match) => {
     const [homeRaw, awayRaw] = teamNamesFromMatch(match);
     const home = normalizeText(homeRaw);
     const away = normalizeText(awayRaw);
     if (!home || !away) return null;
 
-    const matchDate = dateKey(match.startTime);
     const matchTime = Date.parse(match.startTime || "");
+    const matchDate = dateKey(match.startTime);
+
+    // Search each side independently. This is intentionally small: two
+    // team-filtered requests per match instead of one huge global request.
+    const queryTeam = async (team) => {
+      const path =
+        "events/?team_name=" + encodeURIComponent(team) +
+        "&date_from=" + encodeURIComponent(fromDate) +
+        "&date_to=" + encodeURIComponent(toDate) +
+        "&limit=50";
+      try {
+        return responseItems(await goalDirFetch(path));
+      } catch (_) {
+        return [];
+      }
+    };
+
+    const [homeEvents, awayEvents] = await Promise.all([
+      queryTeam(homeRaw),
+      queryTeam(awayRaw)
+    ]);
+
+    const candidates = new Map();
+    for (const event of [...homeEvents, ...awayEvents]) {
+      const id = String(event?.id ?? event?.event_id ?? "");
+      if (id) candidates.set(id, event);
+    }
+
     let best = null;
     let bestScore = 0;
 
-    for (const candidate of normalizedEvents) {
+    for (const event of candidates.values()) {
+      const [candidateHome, candidateAway] = eventTeams(event).map(normalizeText);
+      if (!candidateHome || !candidateAway) continue;
+
       let score = 0;
 
-      if (candidate.home === home) score += 50;
-      else if (candidate.home.includes(home) || home.includes(candidate.home)) score += 35;
+      if (candidateHome === home) score += 50;
+      else if (candidateHome.includes(home) || home.includes(candidateHome)) score += 35;
 
-      if (candidate.away === away) score += 50;
-      else if (candidate.away.includes(away) || away.includes(candidate.away)) score += 35;
+      if (candidateAway === away) score += 50;
+      else if (candidateAway.includes(away) || away.includes(candidateAway)) score += 35;
 
-      if (matchDate && candidate.date === matchDate) score += 20;
+      const candidateDate = dateKey(eventTime(event));
+      if (matchDate && candidateDate === matchDate) score += 20;
 
-      if (Number.isFinite(matchTime) && Number.isFinite(candidate.time)) {
-        const diff = Math.abs(matchTime - candidate.time);
+      const candidateTime = Date.parse(eventTime(event));
+      if (Number.isFinite(matchTime) && Number.isFinite(candidateTime)) {
+        const diff = Math.abs(matchTime - candidateTime);
         if (diff <= 10 * 60 * 1000) score += 35;
         else if (diff <= 30 * 60 * 1000) score += 25;
         else if (diff <= 90 * 60 * 1000) score += 10;
@@ -1082,12 +1093,14 @@ async function syncBroadcastData(env) {
 
       if (score > bestScore) {
         bestScore = score;
-        best = candidate;
+        best = event;
       }
     }
 
+    // Both teams must match; the date/time can then resolve same-team
+    // duplicates. 100 = exact home + exact away.
     return best && bestScore >= 100
-      ? { event: best.event, score: bestScore }
+      ? { event: best, score: Math.round(bestScore) }
       : null;
   };
 
@@ -1129,18 +1142,67 @@ async function syncBroadcastData(env) {
     }).map(channel => String(channel.id));
   };
 
-  const allMatches = new Map(
-    matches.map(match => [String(match.id), match])
-  );
-
   let matchedMatches = 0;
   let linkedMatches = 0;
   let broadcastCount = 0;
+  let eventCount = 0;
   const diagnostics = [];
   const syncedAt = new Date().toISOString();
 
-  for (const match of batch) {
-    const found = findEvent(match);
+  // Resolve the 8 event IDs first. This keeps the batch small and avoids
+  // the CPU-heavy global event/broadcast comparison that caused timeouts.
+  const resolved = await Promise.all(
+    batch.map(async match => ({
+      match,
+      found: await findEvent(match)
+    }))
+  );
+
+  // Then request broadcasts only for events that actually matched.
+  const broadcastResults = await Promise.all(
+    resolved.map(async ({ match, found }) => {
+      if (!found) return { match, found: null, broadcasts: [], error: null };
+
+      try {
+        const payload = await goalDirFetch(
+          "events/" + encodeURIComponent(
+            String(found.event?.id ?? found.event?.event_id)
+          ) + "/broadcasts/"
+        );
+
+        const rows = responseItems(payload);
+        const broadcasts = rows.map(row => ({
+          name: String(
+            row?.channel_name ??
+            row?.channelName ??
+            row?.channel?.name ??
+            row?.tv_channel?.name ??
+            row?.broadcaster_name ??
+            ""
+          ).trim(),
+          country: String(
+            row?.country_code ??
+            row?.countryCode ??
+            row?.country ??
+            ""
+          ).trim().toUpperCase(),
+          channelId: row?.channel_id ?? row?.channelId ?? null
+        })).filter(row => row.name);
+
+        return { match, found, broadcasts, error: null };
+      } catch (error) {
+        return {
+          match,
+          found,
+          broadcasts: [],
+          error: String(error?.message || error)
+        };
+      }
+    })
+  );
+
+  for (const result of broadcastResults) {
+    const { match, found, broadcasts, error } = result;
 
     if (!found) {
       match.broadcastStatus = "no-event-match";
@@ -1153,55 +1215,24 @@ async function syncBroadcastData(env) {
       continue;
     }
 
-    let payload;
-    try {
-      payload = await goalDirFetch(
-        "events/" + encodeURIComponent(
-          String(found.event?.id ?? found.event?.event_id)
-        ) + "/broadcasts/"
-      );
-    } catch (error) {
+    eventCount++;
+
+    if (error) {
       match.broadcastStatus = "broadcast-request-failed";
-      match.broadcastError = String(error?.message || error);
+      match.broadcastError = error;
+      match.broadcastMatchId = String(found.event?.id ?? found.event?.event_id ?? "");
+      match.broadcastMatchScore = found.score;
+      match.broadcastSyncedAt = syncedAt;
       diagnostics.push({
         id: match.id,
         title: match.title,
-        status: "broadcast-request-failed"
+        status: "broadcast-request-failed",
+        eventId: match.broadcastMatchId,
+        score: found.score,
+        error
       });
       continue;
     }
-
-    const rows = responseItems(payload);
-
-    const broadcasts = rows.map(row => {
-      const name = String(
-        row?.channel_name ??
-        row?.channelName ??
-        row?.channel?.name ??
-        row?.tv_channel?.name ??
-        row?.broadcaster_name ??
-        ""
-      ).trim();
-
-      const country = String(
-        row?.country_code ??
-        row?.countryCode ??
-        row?.country ??
-        ""
-      ).trim().toUpperCase();
-
-      return {
-        name,
-        country,
-        channelId: row?.channel_id ?? row?.channelId ?? null,
-        url: String(
-          row?.channel_link ??
-          row?.channel_url ??
-          row?.url ??
-          ""
-        )
-      };
-    }).filter(row => row.name);
 
     const addedIds = broadcasts.flatMap(item =>
       channelMatches(item.name, item.country)
@@ -1228,10 +1259,12 @@ async function syncBroadcastData(env) {
       source: "bsd"
     }));
     match.broadcastMatchId = String(found.event?.id ?? found.event?.event_id ?? "");
-    match.broadcastMatchScore = Math.round(found.score);
+    match.broadcastMatchScore = found.score;
     match.broadcastStatus = addedIds.length
       ? "linked"
-      : (broadcasts.length ? "broadcast-found-no-local-channel" : "no-broadcast-listing");
+      : (broadcasts.length
+        ? "broadcast-found-no-local-channel"
+        : "no-broadcast-listing");
     match.broadcastSyncedAt = syncedAt;
     delete match.broadcastError;
     match.updatedAt = syncedAt;
@@ -1241,7 +1274,7 @@ async function syncBroadcastData(env) {
       title: match.title,
       status: match.broadcastStatus,
       eventId: match.broadcastMatchId,
-      score: Math.round(found.score),
+      score: found.score,
       broadcasts: broadcasts.map(item => ({
         name: item.name,
         country: item.country
@@ -1253,11 +1286,7 @@ async function syncBroadcastData(env) {
   const nextCursor = cursor + batch.length;
   const cycleComplete = nextCursor >= eligible.length;
 
-  await env.SPORTZFY_DB.put(
-    "matches",
-    JSON.stringify([...allMatches.values()])
-  );
-
+  await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
   await env.SPORTZFY_DB.put(
     "broadcast_sync_cursor",
     String(cycleComplete ? 0 : nextCursor)
@@ -1273,7 +1302,7 @@ async function syncBroadcastData(env) {
     cursor: cycleComplete ? 0 : nextCursor,
     remaining: cycleComplete ? 0 : eligible.length - nextCursor,
     cycleComplete,
-    eventCount: normalizedEvents.length,
+    eventCount,
     broadcastCount,
     matchedMatches,
     linkedMatches,
