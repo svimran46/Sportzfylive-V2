@@ -18,6 +18,24 @@
     "crons": ["*/10 * * * *"]
   },
 
+  "queues": {
+    "producers": [
+      {
+        "binding": "SPORTZFY_SYNC_QUEUE",
+        "queue": "sportzfylive-sync"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "sportzfylive-sync",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_concurrency": 1,
+        "max_retries": 3
+      }
+    ]
+  },
+
   "kv_namespaces": [
     {
       "binding": "SPORTZFY_DB",
