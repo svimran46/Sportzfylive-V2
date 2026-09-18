@@ -3,344 +3,116 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-
 <title>Sportzfy Admin</title>
-
 <style>
-
-*{
-box-sizing:border-box;
-font-family:Arial,Helvetica,sans-serif;
-}
-
-body{
-margin:0;
-background:#0b0e14;
-color:white;
-}
-
-
-/* Sidebar */
-
-.sidebar{
-
-position:fixed;
-left:0;
-top:0;
-
-height:100vh;
-width:240px;
-
-background:#151922;
-
-padding:25px;
-
-}
-
-
-.logo{
-
-font-size:24px;
-font-weight:bold;
-
-margin-bottom:40px;
-
-}
-
-
-.menu div{
-
-padding:14px;
-margin-bottom:8px;
-
-border-radius:10px;
-
-color:#aaa;
-
-cursor:pointer;
-
-}
-
-
-.menu div:hover{
-
-background:#242b38;
-color:white;
-
-}
-
-
-
-/* Main */
-
-.main{
-
-margin-left:240px;
-
-padding:30px;
-
-}
-
-
-
-.top{
-
-display:flex;
-justify-content:space-between;
-align-items:center;
-
-}
-
-
-
-button{
-
-background:#e50914;
-
-border:none;
-
-color:white;
-
-padding:12px 18px;
-
-border-radius:8px;
-
-cursor:pointer;
-
-}
-
-
-
-.card{
-
-background:#151922;
-
-padding:20px;
-
-border-radius:15px;
-
-margin-top:20px;
-
-}
-
-
-
-.match{
-
-background:#0f131c;
-
-padding:15px;
-
-border-radius:10px;
-
-margin-top:10px;
-
-display:flex;
-
-justify-content:space-between;
-
-align-items:center;
-
-}
-
-
-
-.stream{
-
-background:#0f131c;
-
-padding:15px;
-
-border-radius:10px;
-
-margin-top:10px;
-
-}
-
-
-
-input,select{
-
-width:100%;
-
-padding:12px;
-
-margin-top:8px;
-
-margin-bottom:15px;
-
-border-radius:8px;
-
-border:1px solid #303744;
-
-background:#0b0e14;
-
-color:white;
-
-}
-
-
-
-.hidden{
-
-display:none;
-
-}
-
-
-</style>
-
-<style>
+*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+body{margin:0;background:#0b0e14;color:#fff}
+.sidebar{position:fixed;left:0;top:0;height:100vh;width:240px;background:#151922;padding:25px;z-index:20}
+.logo{font-size:24px;font-weight:bold;margin-bottom:40px}
+.menu div{padding:14px;margin-bottom:8px;border-radius:10px;color:#aaa;cursor:pointer}
+.menu div:hover,.menu div.active{background:#242b38;color:#fff}
+.main{margin-left:240px;padding:30px;max-width:1200px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.top h1{margin:0}
+button{background:#e50914;border:none;color:#fff;padding:12px 18px;border-radius:8px;cursor:pointer}
+button.secondary{background:#242b38}
+.card{background:#151922;padding:20px;border-radius:15px;margin-top:20px}
+.hidden{display:none!important}
+input,select,textarea{width:100%;padding:12px;margin-top:8px;margin-bottom:15px;border-radius:8px;border:1px solid #303744;background:#0b0e14;color:#fff}
+textarea{min-height:90px;resize:vertical}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.match{background:#0f131c;padding:15px;border-radius:10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:15px}
+.match button{background:#b91c1c}
+.channel-list{max-height:260px;overflow:auto;border:1px solid #303744;border-radius:8px;padding:8px}
+.channel-item{display:flex;align-items:center;gap:10px;padding:9px;border-radius:6px}
+.channel-item:hover{background:#202633}
+.channel-item input{width:auto;margin:0}
+.status{color:#7dd3fc;margin:5px 0 12px}.error{color:#ff7777;margin:5px 0 12px}
 .admin-login{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .admin-login-card{width:min(420px,100%);background:#151922;padding:25px;border-radius:16px}
-.admin-login-card h2{margin-top:0}
-.admin-login-card p{color:#9ca7b5;font-size:14px;line-height:1.5}
-.admin-login-card input{margin-bottom:10px}
-.admin-error{color:#ff7777;font-size:13px;margin-bottom:10px}
+.admin-login-card h2{margin-top:0}.admin-login-card p{color:#9ca7b5;font-size:14px;line-height:1.5}
+.mobile-menu{display:none}
+@media(max-width:760px){
+.sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}
+.main{margin-left:0;padding:18px}.mobile-menu{display:block;background:#242b38}
+.form-grid{grid-template-columns:1fr}.match{align-items:flex-start;flex-direction:column}
+}
 </style>
 </head>
-
-
 <body>
 <div id="adminLogin" class="admin-login">
   <div class="admin-login-card">
     <h2>Admin Authentication</h2>
     <p>Enter the Admin API token configured as the Cloudflare Worker secret.</p>
-    <div id="loginError" class="admin-error"></div>
+    <div id="loginError" class="error"></div>
     <input id="adminToken" type="password" placeholder="Admin token">
     <button onclick="loginAdmin()">Continue</button>
   </div>
 </div>
 
-
-<div class="sidebar">
-
-<div class="logo">
-Sportzfy Admin
-</div>
-
-
-<div class="menu">
-
-<div>Dashboard</div>
-<div>Matches</div>
-<div>Streams</div>
-<div>Settings</div>
-
-</div>
-
-
-</div>
-
-
-
-
-<div class="main">
-
-
-<div class="top">
-
-<h1>
-Admin Dashboard
-</h1>
-
-
-<button onclick="loadMatches()">
-Refresh
-</button>
-
-
-</div>
-
-
-
-
-<div class="card">
-
-
-<h2>
-Today's Matches
-</h2>
-
-
-<div id="matches">
-Loading...
-</div>
-
-
-</div>
-
-
-
-
-
-<div id="streamBox" class="card hidden">
-
-
-<h2 id="matchTitle">
-Streams
-</h2>
-
-
-
-<button onclick="openForm()">
-+ Add Stream
-</button>
-
-
-
-<div id="streams"></div>
-
-
-
-<div id="form" class="hidden">
-
-
-<h3>
-New Stream
-</h3>
-
-
-<input id="name"
-placeholder="Channel Name">
-
-
-<input id="language"
-placeholder="Language"
-value="English">
-
-
-
-<select id="quality">
-
-<option>HD</option>
-<option>SD</option>
-
-</select>
-
-
-
-<input id="url"
-placeholder="Stream URL">
-
-
-<button onclick="saveStream()">
-Save
-</button>
-
-
-</div>
-
-
-</div>
-
-
-
-</div>
-
-
-
+<aside class="sidebar" id="sidebar">
+  <div class="logo">Sportzfy Admin</div>
+  <div class="menu">
+    <div class="active" data-page="dashboard">Dashboard</div>
+    <div data-page="matches">Matches</div>
+    <div data-page="streams">Streams</div>
+    <div data-page="settings">Settings</div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="top">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="mobile-menu" onclick="toggleSidebar()">☰</button>
+      <h1 id="pageTitle">Admin Dashboard</h1>
+    </div>
+    <button class="secondary" onclick="loadMatches()">Refresh</button>
+  </div>
+
+  <section id="page-dashboard" class="page">
+    <div class="card">
+      <h2>Today's Matches</h2>
+      <div id="matchCount" style="color:#8f99a8;margin-bottom:10px"></div>
+      <div id="matches">Loading...</div>
+    </div>
+  </section>
+
+  <section id="page-matches" class="page hidden">
+    <div class="card">
+      <h2>Create Match</h2>
+      <div id="formStatus"></div>
+      <label>Match Title</label>
+      <input id="title" placeholder="e.g. Barcelona vs Real Madrid">
+      <div class="form-grid">
+        <div><label>Category</label><select id="category"><option>FOOTBALL</option><option>CRICKET</option><option>TENNIS</option><option>BASKETBALL</option><option>OTHER</option></select></div>
+        <div><label>Status</label><select id="status"><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="finished">Finished</option></select></div>
+      </div>
+      <label>Start Time</label>
+      <input id="startTime" type="datetime-local">
+      <label>Poster URL</label>
+      <input id="poster" placeholder="https://...">
+      <label>Description</label>
+      <textarea id="description" placeholder="Match description"></textarea>
+      <label>Channels</label>
+      <input id="channelSearch" placeholder="Search channels...">
+      <div id="channelList" class="channel-list">Loading channels...</div>
+      <br>
+      <button onclick="createMatch()">Create Match</button>
+    </div>
+    <div class="card">
+      <h2>All Matches</h2>
+      <div id="allMatches">Loading...</div>
+    </div>
+  </section>
+
+  <section id="page-streams" class="page hidden">
+    <div class="card"><h2>Streams</h2><p style="color:#9ca7b5">Streams are attached to matches through the selected channels. Stream management will be added here next.</p></div>
+  </section>
+
+  <section id="page-settings" class="page hidden">
+    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p></div>
+  </section>
+</main>
 <script src="admin.js"></script>
-
 </body>
 </html>
