@@ -123,6 +123,28 @@ async function syncStreamedMatches(){
   }
 }
 
+async function syncBroadcasts(){
+  const status=document.getElementById("broadcastSyncStatus");
+  if(!status)return;
+  status.className="status";
+  status.textContent="Finding broadcast channels across configured regions...";
+  try{
+    const result=await api("/api/admin/sync-broadcasts",{method:"POST"});
+    if(!result.configured){
+      status.className="error";
+      status.textContent="Broadcast source is not configured. Add the GOALDIR_TOKEN Worker secret first.";
+      return;
+    }
+    status.textContent="Broadcast sync complete. Regions: "+result.countries.length+
+      "; matched broadcasts: "+result.matchedMatches+
+      "; local channels linked: "+result.linkedMatches+".";
+    await loadMatches();
+  }catch(e){
+    status.className="error";
+    status.textContent=e.message;
+  }
+}
+
 async function autoLinkMatches(){
   const status=document.getElementById("autoLinkStatus");
   if(!status)return;
