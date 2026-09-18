@@ -4,7 +4,7 @@ export default {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
+      "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token"
     };
     if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
     const json = (data, status = 200) => Response.json(data, { status, headers: corsHeaders });
