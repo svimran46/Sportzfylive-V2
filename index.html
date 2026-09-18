@@ -497,8 +497,7 @@ body{
 .main-header h1{
   margin:0;
   color:var(--text-primary);
-  font-size:20px;
-  line-height:1.2;
+  font-size:20px;  line-height:1.2;
   font-weight:800;
   letter-spacing:-.4px;
 }
@@ -997,8 +996,7 @@ body{
 .sfy-chips::-webkit-scrollbar{display:none}
 .sfy-chip{
   flex:0 0 auto;min-height:42px;padding:0 15px;border:1px solid rgba(91,119,163,.25);
-  border-radius:12px;background:#0b1525;color:#aeb9ca;display:flex;align-items:center;gap:8px;
-  font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap;
+  border-radius:12px;background:#0b1525;color:#aeb9ca;display:flex;align-items:center;gap:8px;  font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap;
 }
 .sfy-chip i{font-size:13px;color:#8d9bb2}
 .sfy-chip:hover{border-color:#5865f2;color:#fff}
@@ -1114,6 +1112,38 @@ body{
 @media(max-width:900px){.sfy-card{padding:13px!important}.sfy-teams-row{min-height:100px}}
 @media(max-width:380px){.sfy-teams-row{gap:4px}.sfy-team-logo{width:48px!important;height:48px!important}}
 </style>
+
+<style id="sportzfy-streamed-inspired-cards">
+.category-section{margin-bottom:40px}
+.category-heading-row{margin-bottom:14px}
+.category-heading-row h2{font-size:22px!important;font-weight:750!important;letter-spacing:-.4px!important}
+.category-viewport{overflow:hidden}
+.category-track{display:grid!important;grid-auto-flow:column;grid-template-columns:none!important;grid-auto-columns:calc((100% - 32px)/3);gap:16px!important;transition:transform 260ms cubic-bezier(.16,1,.3,1);will-change:transform}
+.category-progress{display:none!important}
+.sfy-match-item{display:block!important;min-width:0;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;text-align:left!important;cursor:pointer;transform:none!important}
+.sfy-match-item::after{display:none!important}
+.sfy-event-visual{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border:1px solid #29292f;border-radius:14px;background:radial-gradient(circle at 30% 20%,rgba(99,102,241,.28),transparent 42%),linear-gradient(135deg,#17171c,#0d0d10);box-shadow:0 8px 26px rgba(0,0,0,.24);transition:transform 180ms ease,border-color 180ms ease,box-shadow 180ms ease}
+.sfy-match-item:hover .sfy-event-visual,.sfy-match-item:focus-visible .sfy-event-visual{transform:translateY(-2px);border-color:#414149;box-shadow:0 12px 32px rgba(0,0,0,.34)}
+.sfy-event-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sfy-event-visual.has-poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28));pointer-events:none}
+.sfy-event-badge,.sfy-event-live,.sfy-event-favorite{position:absolute;z-index:3;top:10px}
+.sfy-event-badge{left:10px;padding:5px 11px;border-radius:999px;background:rgba(10,10,12,.9);color:#f4f4f5;font-size:12px;line-height:1;font-weight:750;backdrop-filter:blur(8px)}
+.sfy-event-live{left:10px;padding:5px 10px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;line-height:1;font-weight:800;letter-spacing:.4px}
+.sfy-event-favorite{right:10px;width:34px;height:34px;top:8px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(12,12,14,.82);color:#fff;font-size:23px;line-height:1;backdrop-filter:blur(8px)}
+.sfy-event-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:clamp(8px,3vw,28px);padding:18px;background:radial-gradient(circle at 50% 50%,rgba(99,102,241,.12),transparent 48%),linear-gradient(135deg,#15151a,#0b0b0e)}
+.sfy-fallback-team{display:flex;align-items:center;justify-content:center}
+.sfy-event-logo{width:clamp(54px,7vw,78px);height:clamp(54px,7vw,78px);object-fit:contain;padding:9px;border-radius:50%;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)}
+.sfy-fallback-vs{color:#a1a1aa;font-size:12px;font-weight:800;letter-spacing:.7px}
+.sfy-event-title{margin-top:12px;color:#f5f5f5;font-size:17px;line-height:1.35;font-weight:750;letter-spacing:-.25px}
+.sfy-event-category{margin-top:3px;color:#77777f;font-size:14px;line-height:1.4;font-weight:600}
+.sfy-event-category span{margin:0 4px;color:#55555d}
+.sfy-channel-item .sfy-event-visual{background:#101014}
+.sfy-channel-item .sfy-event-poster{object-fit:contain;padding:18px}
+.sfy-match-item:focus-visible{outline:2px solid #6366f1;outline-offset:4px}
+@media(max-width:900px){.category-track{grid-auto-columns:calc((100% - 10px)/2);gap:10px!important}.category-heading-row h2{font-size:21px!important}.sfy-event-title{font-size:15px}.sfy-event-category{font-size:13px}}
+@media(max-width:520px){#matches-container{padding-left:16px!important;padding-right:16px!important}.category-section{margin-bottom:36px}.category-heading-row{margin-bottom:12px}.category-heading-row h2{font-size:21px!important}.category-arrow{width:38px;height:38px}.sfy-event-visual{border-radius:12px}.sfy-event-title{margin-top:10px;font-size:14px;line-height:1.35}.sfy-event-category{font-size:12px}.sfy-event-badge,.sfy-event-live{top:8px;left:8px}.sfy-event-favorite{top:6px;right:7px;width:31px;height:31px;font-size:21px}.sfy-event-fallback{gap:8px;padding:10px}.sfy-event-logo{width:48px;height:48px;padding:7px}.sfy-fallback-vs{font-size:10px}}
+</style>
+
 </head>
 <body>
 <div class="sfy-shell">
@@ -1452,52 +1482,58 @@ body{
     function buildMatchCard(match) {
         const id = String(match.id || "");
         const category = normalizeCategory(match.category || "OTHER");
-        const sportLabel = category === "TODAYS MATCHES" ? "SPORTS" : category;
-
-        if (isChannel(match)) {
-            const poster = resolveAssetUrl(match.poster);
-            return `
-                <article class="match-card sfy-card channel-card">
-                    <div class="sfy-card-top">
-                        <span class="sfy-sport-badge"><i class="fas fa-tv"></i> ${esc(sportLabel)}</span>
-                        ${match.popular ? `<span class="sfy-popular">POPULAR</span>` : ""}
-                    </div>
-                    ${poster ? `<div class="sfy-channel-logo"><img src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy"></div>` : `<div class="sfy-channel-logo placeholder"><i class="fas fa-tv"></i></div>`}
-                    <div class="sfy-card-title">${esc(match.title || "Channel")}</div>
-                    <div class="sfy-card-subtitle">Live sports channel</div>
-                    <button type="button" class="sfy-watch-btn watch-btn" data-match-id="${esc(id)}"><i class="fas fa-play"></i> Watch Stream</button>
-                </article>`;
-        }
-
         const home = match.teams?.home || {};
         const away = match.teams?.away || {};
         const homeBadge = getLogoUrl(home.badge);
         const awayBadge = getLogoUrl(away.badge);
-        const logo = (url, token, alt) => url
-            ? `<img class="sfy-team-logo" src="${esc(url)}" data-logo-token="${esc(token || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(alt || "Team")}" loading="lazy">`
-            : `<div class="sfy-team-logo placeholder"><i class="fas fa-shield-halved"></i></div>`;
-
         const matchDate = safeDate(match.date ?? match.timestamp);
         const live = isLive(match);
-        const statusText = live ? "LIVE" : (matchDate ? matchDate.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "SCHEDULED");
-        const dateText = matchDate ? matchDate.toLocaleDateString([], {day:"numeric",month:"short"}) : "Today";
+        const dateText = matchDate
+            ? matchDate.toLocaleDateString([], { day:"numeric", month:"short" })
+            : "Today";
+        const timeText = matchDate
+            ? matchDate.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })
+            : "";
 
+        const logo = (url, token, alt) => url
+            ? `<img class="sfy-event-logo" src="${esc(url)}" data-logo-token="${esc(token || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(alt || "Team")}" loading="lazy">`
+            : `<div class="sfy-event-logo placeholder"><i class="fas fa-shield-halved"></i></div>`;
+
+        if (isChannel(match)) {
+            const poster = resolveAssetUrl(match.poster);
+            return `
+                <article class="match-card sfy-match-item sfy-channel-item" data-match-id="${esc(id)}" tabindex="0" role="button" aria-label="Open ${esc(match.title || "Channel")}">
+                    <div class="sfy-event-visual">
+                        <div class="sfy-event-badge">${esc(dateText)}</div>
+                        ${match.popular ? '<span class="sfy-event-favorite" aria-hidden="true">☆</span>' : ""}
+                        ${poster
+                            ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy">`
+                            : '<div class="sfy-event-fallback"><i class="fas fa-tv"></i></div>'}
+                    </div>
+                    <div class="sfy-event-title">${esc(match.title || "Channel")}</div>
+                    <div class="sfy-event-category">${esc(category === "TODAYS MATCHES" ? "Sports" : category)}</div>
+                </article>`;
+        }
+
+        const poster = resolveAssetUrl(match.poster);
         return `
-            <article class="match-card sfy-card sfy-match-card">
-                <div class="sfy-card-top">
-                    <span class="sfy-sport-badge"><i class="fas fa-futbol"></i> ${esc(sportLabel)}</span>
-                    <span class="sfy-match-status ${live ? "is-live" : ""}">
-                        ${live ? '<span class="sfy-live-dot"></span>' : '<i class="far fa-clock"></i>'} ${esc(statusText)}
-                    </span>
+            <article class="match-card sfy-match-item" data-match-id="${esc(id)}" tabindex="0" role="button" aria-label="Open ${esc(match.title || "Match")}">
+                <div class="sfy-event-visual ${poster ? "has-poster" : ""}">
+                    ${live
+                        ? '<span class="sfy-event-live">LIVE</span>'
+                        : `<span class="sfy-event-badge">${esc(dateText)}</span>`}
+                    <span class="sfy-event-favorite" aria-hidden="true">☆</span>
+                    ${poster
+                        ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="" loading="lazy">`
+                        : `
+                            <div class="sfy-event-fallback">
+                                <div class="sfy-fallback-team">${logo(homeBadge, home.badge, home.name)}</div>
+                                <span class="sfy-fallback-vs">VS</span>
+                                <div class="sfy-fallback-team">${logo(awayBadge, away.badge, away.name)}</div>
+                            </div>`}
                 </div>
-                <div class="sfy-match-date">${esc(dateText)}</div>
-                <div class="sfy-teams-row">
-                    <div class="sfy-team">${logo(homeBadge, home.badge, home.name)}<span>${esc(home.name || "TBD")}</span></div>
-                    <div class="sfy-vs">VS</div>
-                    <div class="sfy-team">${logo(awayBadge, away.badge, away.name)}<span>${esc(away.name || "TBD")}</span></div>
-                </div>
-                <div class="sfy-match-title">${esc(match.title || `${home.name || "TBD"} vs ${away.name || "TBD"}`)}</div>
-                <button type="button" class="sfy-watch-btn watch-btn" data-match-id="${esc(id)}"><i class="fas fa-play"></i> ${live ? "Watch Live" : "Watch Stream"}</button>
+                <div class="sfy-event-title">${esc(match.title || `${home.name || "TBD"} vs ${away.name || "TBD"}`)}</div>
+                <div class="sfy-event-category">${esc(category === "TODAYS MATCHES" ? "Sports" : category)}${timeText ? ` <span>•</span> ${esc(timeText)}` : ""}</div>
             </article>`;
     }
     /*
@@ -1688,7 +1724,15 @@ body{
     });
 
     document.addEventListener("keydown", event => {
-        if (event.key === "Escape") closeModal();
+        if (event.key === "Escape") {
+            closeModal();
+            return;
+        }
+        if ((event.key === "Enter" || event.key === " ") && event.target?.closest?.(".sfy-match-item")) {
+            event.preventDefault();
+            const item = event.target.closest(".sfy-match-item");
+            if (item?.dataset.matchId) openManualStream(item.dataset.matchId);
+        }
     });
 
     document.addEventListener("DOMContentLoaded", loadMatches);
