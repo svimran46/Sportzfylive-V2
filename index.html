@@ -469,7 +469,7 @@
 
   <!-- ================= JAVASCRIPT ================= -->
   <script>
-    const PROXY_URL = "https://streamedproxy.svimranmy.workers.dev";
+    const PROXY_URL = "https://sportzfylive.svimranmy.workers.dev";
 
     const CATEGORY_ORDER = [
         "LIVE",
@@ -611,11 +611,26 @@
                 PROXY_URL + "/api/matches/all-today"
             );
 
-            const matches = Array.isArray(data)
+            const rawMatches = Array.isArray(data)
                 ? data
                 : Array.isArray(data?.matches)
                     ? data.matches
                     : [];
+
+            const matches = rawMatches.map(match => {
+                const title = String(match.title || "Untitled Match");
+                const parts = title.split(/\\s+vs\\.?\\s+/i);
+                return {
+                    ...match,
+                    id: String(match.id || ""),
+                    date: match.startTime ? new Date(match.startTime).getTime() : null,
+                    live: String(match.status || "").toLowerCase() === "live",
+                    teams: match.teams || (parts.length >= 2 ? {
+                        home: { name: parts[0].trim() },
+                        away: { name: parts.slice(1).join(" vs ").trim() }
+                    } : null)
+                };
+            });
 
             if (!matches.length) {
                 if (app) app.innerHTML = `<div class="empty-state">No matches available.</div>`;
@@ -752,9 +767,23 @@
     let activeMatch = null;
 
     function getManualStreams(matchId) {
-        const value = MANUAL_STREAMS[String(matchId)];
-        if (Array.isArray(value)) return value;
-        if (value && typeof value === "object" && value.url) return [value];
+        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
+        const configured = MANUAL_STREAMS[String(matchId)];
+
+        if (Array.isArray(configured)) return configured;
+        if (configured && typeof configured === "object" && configured.url) return [configured];
+
+        if (Array.isArray(match?.channels)) {
+            return match.channels
+                .filter(channel => channel && channel.url)
+                .map(channel => ({
+                    name: channel.name || "Stream",
+                    quality: channel.quality || "HD",
+                    language: channel.language || channel.genre || "Sports",
+                    url: channel.url
+                }));
+        }
+
         return [];
     }
 
@@ -775,7 +804,7 @@
         const count = streams.length;
 
         document.getElementById("stream-subtitle").textContent =
-            `${title} • ${count} manual stream${count === 1 ? "" : "s"} added`;
+            `${title} • ${count} stream${count === 1 ? "" : "s"} available`;
 
         player.hidden = true;
         player.replaceChildren();
