@@ -108,16 +108,31 @@ async function loadMatches(){
   }
 }
 
+async function syncStreamedMatches(){
+  const status=document.getElementById("streamedSyncStatus");
+  if(!status)return;
+  status.className="status";
+  status.textContent="Syncing today's matches from Streamed...";
+  try{
+    const result=await api("/api/admin/sync-streamed",{method:"POST"});
+    status.textContent="Sync complete. Streamed: "+result.streamedCount+"; created: "+result.created+"; updated: "+result.updated+".";
+    await loadMatches();
+  }catch(e){
+    status.className="error";
+    status.textContent=e.message;
+  }
+}
+
 async function autoLinkMatches(){
   const status=document.getElementById("autoLinkStatus");
   if(!status)return;
   status.className="status";
-  status.textContent="Checking Streamed match metadata and linking mapped channels...";
+  status.textContent="Linking local channels to Streamed source mappings...";
   try{
     const result=await api("/api/admin/auto-link",{method:"POST"});
     const linked=result.results.filter(item=>item.addedChannelIds?.length).length;
     const matched=result.results.filter(item=>item.streamedMatchId).length;
-    status.textContent=`Done. Matched ${matched}/${result.processed} matches; added channels to ${linked}.`;
+    status.textContent="Done. Matched "+matched+"/"+result.processed+" matches; added channels to "+linked+".";
     await loadMatches();
   }catch(e){
     status.className="error";
