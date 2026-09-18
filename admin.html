@@ -78,11 +78,18 @@ textarea{min-height:90px;resize:vertical}
       <div id="matches">Loading...</div>
     </div>
     <div class="card">
-      <h2>Automatic Channel Linking</h2>
-      <p style="color:#9ca7b5;line-height:1.5">The worker checks Streamed match metadata, matches it to your saved matches, and attaches only channels that have an explicit Streamed-source mapping.</p>
-      <div id="autoLinkStatus" class="status"></div>
-      <div class="auto-link"><button onclick="autoLinkMatches()">Run Auto-Link Now</button><small>Automatic background check: every 10 minutes.</small></div>
+      <h2>Streamed Match Sync</h2>
+      <p style="color:#9ca7b5;line-height:1.5">Streamed is now the starting point: todays match metadata is imported into your KV database, while your existing manually created matches and channel selections are preserved.</p>
+      <div id="streamedSyncStatus" class="status"></div>
+      <div class="auto-link"><button onclick="syncStreamedMatches()">Sync Streamed Matches</button><small>Automatic sync runs every 10 minutes.</small></div>
     </div>
+
+    <div class="card">
+      <h2>Automatic Channel Linking</h2>
+      <p style="color:#9ca7b5;line-height:1.5">After matches are synced, the worker attaches local channels only when their channel record explicitly maps to a Streamed source identifier. The Streamed API documents these as provider/source IDs, not TV-channel names.</p>
+      <div id="autoLinkStatus" class="status"></div>
+      <div class="auto-link"><button onclick="autoLinkMatches()">Run Auto-Link Now</button><small>Sync + auto-link also runs automatically every 10 minutes.</small></div>
+    </div>>
   </section>
 
   <section id="page-matches" class="page hidden">
@@ -118,7 +125,7 @@ textarea{min-height:90px;resize:vertical}
   </section>
 
   <section id="page-settings" class="page hidden">
-    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p><p style="color:#9ca7b5">For deterministic auto-linking, a channel can include <code>streamedSource</code>, <code>streamedSources</code>, or <code>streamedAliases</code> in its imported channel object.</p></div>
+    <div class="card"><h2>Settings</h2><p style="color:#9ca7b5">Worker API: <code>https://sportzfylive.svimranmy.workers.dev</code></p><p style="color:#9ca7b5">Authentication uses the Cloudflare Worker ADMIN_TOKEN secret.</p><p style="color:#9ca7b5">For deterministic auto-linking, a channel can include <code>streamedSource</code>, <code>streamedSources</code>, or <code>streamedAliases</code> in its imported channel object. Streamed documents these values as provider/source identifiers, so the system does not guess that they are TV-channel names.</p></div>
   </section>
 </main>
 <script src="admin.js"></script>
