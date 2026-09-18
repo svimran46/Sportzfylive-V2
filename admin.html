@@ -85,6 +85,13 @@ textarea{min-height:90px;resize:vertical}
     </div>
 
     <div class="card">
+      <h2>Broadcast Channel Sync</h2>
+      <p style="color:#9ca7b5;line-height:1.5">Uses structured football broadcast listings to identify broadcasters for today's matches across multiple regions, then maps broadcaster names to your local channel catalog.</p>
+      <div id="broadcastSyncStatus" class="status"></div>
+      <div class="auto-link"><button onclick="syncBroadcasts()">Sync Broadcast Channels</button><small>Runs automatically every 10 minutes. Configure regions with BROADCAST_COUNTRIES.</small></div>
+    </div>
+
+    <div class="card">
       <h2>Automatic Channel Linking</h2>
       <p style="color:#9ca7b5;line-height:1.5">After matches are synced, the worker attaches local channels only when their channel record explicitly maps to a Streamed source identifier. The Streamed API documents these as provider/source IDs, not TV-channel names.</p>
       <div id="autoLinkStatus" class="status"></div>
