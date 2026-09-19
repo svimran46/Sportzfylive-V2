@@ -571,23 +571,54 @@ export default {
 
   async queue(batch, env) {
     for (const message of batch.messages) {
+      const type = message.body?.type || "scheduled-sync";
+
       try {
-        if (message.body?.type !== "scheduled-sync") {
+        if (type === "scheduled-sync" || type === "streamed-sync") {
+          console.log("Starting streamed sync");
+
+          const result = await syncStreamedMatches(env);
+
+          console.log("Streamed sync completed:", JSON.stringify({
+            streamedCount: result.streamedCount,
+            totalMatches: result.totalMatches
+          }));
+
+          // Broadcast matching is deliberately a separate Queue invocation.
+          // This keeps the CPU-heavy jobs isolated from each other.
+          await env.SPORTZFY_SYNC_QUEUE.send({
+            type: "broadcast-sync",
+            queuedAt: Date.now()
+          });
+
           message.ack();
           continue;
         }
 
-        console.log("Starting scheduled sync");
+        if (type === "broadcast-sync") {
+          console.log("Starting broadcast sync");
 
-        await syncStreamedMatches(env);
-        await autoLinkMatches(env);
-        await syncBroadcastData(env);
+          const result = await syncBroadcastData(env);
 
-        console.log("Scheduled sync completed");
+          console.log("Broadcast sync completed:", JSON.stringify({
+            processed: result.processed || 0,
+            remaining: result.remaining || 0,
+            eventCount: result.eventCount || 0,
+            broadcastCount: result.broadcastCount || 0,
+            matchedMatches: result.matchedMatches || 0,
+            linkedMatches: result.linkedMatches || 0,
+            cycleComplete: Boolean(result.cycleComplete)
+          }));
 
+          message.ack();
+          continue;
+        }
+
+        // Unknown message types should never be retried forever.
+        console.warn("Ignoring unknown sync queue message:", type);
         message.ack();
       } catch (error) {
-        console.error("Scheduled sync failed:", error);
+        console.error("Sync queue job failed:", type, error);
         message.retry();
       }
     }
@@ -1004,7 +1035,10 @@ async function syncBroadcastData(env) {
        time <= now + 48 * 60 * 60 * 1000);
   });
 
-  const batchSize = 8;
+  // Keep each Queue invocation very small. The current Worker
+  // environment has a tight CPU budget, so two fixtures per invocation
+  // is safer than doing a large parallel batch.
+  const batchSize = 2;
   let cursor = Number(await env.SPORTZFY_DB.get("broadcast_sync_cursor"));
   if (!Number.isFinite(cursor) || cursor < 0 || cursor >= eligible.length) cursor = 0;
 
