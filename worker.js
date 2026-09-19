@@ -1061,30 +1061,6 @@ async function syncBroadcastData(env) {
     return "bsd:" + String(country || "global").toUpperCase() + ":" + idPart;
   };
 
-  const channelMatchesBroadcast = (channel, name, country) => {
-    const wanted = normalizeText(name);
-    if (!wanted) return false;
-
-    const storedBroadcastId = String(channel.broadcastChannelId ?? "");
-    const aliases = [
-      channel.name,
-      channel.broadcastName,
-      ...(Array.isArray(channel.broadcastNames) ? channel.broadcastNames : []),
-      ...(Array.isArray(channel.broadcastAliases) ? channel.broadcastAliases : [])
-    ].map(normalizeText).filter(Boolean);
-
-    const channelCountries = [
-      channel.countryCode,
-      channel.country_code,
-      channel.regionCode
-    ].map(x => String(x || "").trim().toUpperCase()).filter(Boolean);
-
-    if (country && channelCountries.length && !channelCountries.includes(country)) return false;
-
-    return aliases.some(alias => alias === wanted || alias.includes(wanted) || wanted.includes(alias))
-      || (storedBroadcastId && channel.broadcastCountry === country && storedBroadcastId === String(arguments[2] ?? ""));
-  };
-
   const autoCreateBroadcastChannel = (broadcast) => {
     const name = String(broadcast.name || "").trim();
     const country = String(broadcast.country || "").trim().toUpperCase();
