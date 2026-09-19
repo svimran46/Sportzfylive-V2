@@ -1,211 +1,32 @@
 const API="https://sportzfylive.svimranmy.workers.dev";
-let adminToken=localStorage.getItem("sportzfy_admin_token")||"";
-let adminSession=localStorage.getItem("sportzfy_admin_session")||"";
-let channels=[];
-let allMatches=[];
+let adminToken=localStorage.getItem("sportzfy_admin_token")||"",adminSession=localStorage.getItem("sportzfy_admin_session")||"",channels=[],allMatches=[],matchPage=1;
 
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
-
-async function api(path,options={}){
-  const response=await fetch(API+path,{...options,headers:{
-    "Accept":"application/json",
-    "Content-Type":"application/json",
-    ...(adminSession ? {"X-Admin-Session":adminSession} : {"X-Admin-Token":adminToken}),
-    ...(options.headers||{})
-  }});
-  let data=null;try{data=await response.json()}catch(_){}
-  if(!response.ok)throw new Error(data?.error||`HTTP ${response.status}`);
-  return data;
-}
-
-async function loginAdmin(){
-  const input=document.getElementById("adminToken");
-  adminToken=input.value.trim();
-  if(!adminToken)return;
-  try{
-    const response=await fetch(API+"/api/admin/login",{method:"POST",headers:{
-      "Content-Type":"application/json",
-      "X-Admin-Token":adminToken
-    }});
-    const data=await response.json();
-    if(!response.ok)throw new Error(data?.error||"Authentication failed");
-    adminSession=data.session;
-    localStorage.setItem("sportzfy_admin_session",adminSession);
-    localStorage.removeItem("sportzfy_admin_token");
-    adminToken="";
-    document.getElementById("adminLogin").style.display="none";
-    await Promise.all([loadChannels(),loadMatches()]);
-  }catch(e){
-    adminToken="";
-    adminSession="";
-    localStorage.removeItem("sportzfy_admin_token");
-    localStorage.removeItem("sportzfy_admin_session");
-    document.getElementById("loginError").textContent="Authentication failed.";
-  }
-}
-
-async function loadChannels(){
-  const box=document.getElementById("channelList");
-  try{channels=await fetch(API+"/api/channels").then(r=>r.json());renderChannels()}
-  catch(e){box.innerHTML='<div class="error">Unable to load channels.</div>'}
-}
-
-function renderChannels(){
-  const box=document.getElementById("channelList");
-  const q=(document.getElementById("channelSearch")?.value||"").trim().toLowerCase();
-  const selected=new Set([...document.querySelectorAll("#channelList input:checked")].map(x=>x.value));
-  const list=channels.filter(c=>String(c.name||"").toLowerCase().includes(q)||String(c.genre||"").toLowerCase().includes(q));
-  box.innerHTML=list.length?list.map(c=>`<label class="channel-item"><input type="checkbox" value="${esc(c.id)}" ${selected.has(String(c.id))?"checked":""}><span>${esc(c.name)}</span></label>`).join(""):'<div style="padding:15px;color:#8f99a8">No channels found.</div>';
-}
-
+async function api(path,options={}){const r=await fetch(API+path,{...options,headers:{"Accept":"application/json","Content-Type":"application/json",...(adminSession?{"X-Admin-Session":adminSession}:{"X-Admin-Token":adminToken}),...(options.headers||{})}});let d=null;try{d=await r.json()}catch(_){}if(!r.ok)throw new Error(d?.error||`HTTP ${r.status}`);return d}
+async function loginAdmin(){const input=document.getElementById("adminToken");adminToken=input.value.trim();if(!adminToken)return;try{const r=await fetch(API+"/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Token":adminToken}}),d=await r.json();if(!r.ok)throw new Error(d?.error||"Authentication failed");adminSession=d.session;localStorage.setItem("sportzfy_admin_session",adminSession);localStorage.removeItem("sportzfy_admin_token");adminToken="";document.getElementById("adminLogin").style.display="none";await Promise.all([loadChannels(),loadMatches(),loadContent()])}catch(e){document.getElementById("loginError").textContent="Authentication failed."}}
+async function loadChannels(){try{channels=await fetch(API+"/api/channels").then(r=>r.json());renderChannels();renderSources()}catch(e){document.getElementById("channelList").innerHTML='<div class="error">Unable to load TV sources.</div>'}}
+function renderChannels(){const box=document.getElementById("channelList");if(!box)return;const q=(document.getElementById("channelSearch")?.value||"").toLowerCase();const selected=new Set([...document.querySelectorAll("#channelList input:checked")].map(x=>x.value));const list=channels.filter(c=>String(c.name||"").toLowerCase().includes(q)||String(c.genre||"").toLowerCase().includes(q));box.innerHTML=list.length?list.map(c=>`<label class="channel-item"><input type="checkbox" value="${esc(c.id)}" ${selected.has(String(c.id))?"checked":""}><span>${esc(c.name)} <span class="pill">${esc(c.country||"")}</span></span></label>`).join(""):'<div style="padding:15px;color:#748399">No TV sources found.</div>'}
 function selectedChannelIds(){return [...document.querySelectorAll("#channelList input:checked")].map(x=>x.value)}
-
-async function createMatch(){
-  const status=document.getElementById("formStatus"),title=document.getElementById("title").value.trim();
-  if(!title){status.className="error";status.textContent="Match title is required.";return}
-  status.className="status";status.textContent="Saving...";
-  try{
-    await api("/api/admin/matches",{method:"POST",body:JSON.stringify({
-      title,
-      category:document.getElementById("category").value,
-      startTime:document.getElementById("startTime").value?new Date(document.getElementById("startTime").value).toISOString():"",
-      status:document.getElementById("status").value,
-      poster:document.getElementById("poster").value.trim(),
-      description:document.getElementById("description").value.trim(),
-      channelIds:selectedChannelIds()
-    })});
-    status.textContent="Match created successfully.";
-    clearForm();
-    await loadMatches();
-    showPage("matches");
-  }catch(e){status.className="error";status.textContent=e.message}
-}
-
-function clearForm(){
-  ["title","startTime","poster","description"].forEach(id=>document.getElementById(id).value="");
-  document.getElementById("status").value="scheduled";
-  document.querySelectorAll("#channelList input").forEach(x=>x.checked=false);
-}
-
-function renderMatchList(box,matches){
-  box.innerHTML=matches.length?matches.map(m=>`<div class="match"><div><b>${esc(m.title)}</b><br><small>${esc(m.category)} • ${esc(m.status)} • ${esc(m.startTime||"No date")}</small></div><button onclick="deleteMatch('${esc(m.id)}')">Delete</button></div>`).join(""):'<div style="padding:15px;color:#8f99a8">No matches created yet.</div>';
-}
-
-async function loadMatches(){
-  const box=document.getElementById("matches");
-  if(box)box.innerHTML="Loading...";
-  try{
-    allMatches=await api("/api/admin/matches");
-    const count=document.getElementById("matchCount");
-    if(count)count.textContent=`${allMatches.length} match${allMatches.length===1?"":"es"}`;
-    if(box)renderMatchList(box,allMatches);
-    const allBox=document.getElementById("allMatches");
-    if(allBox)renderMatchList(allBox,allMatches);
-  }catch(e){
-    if(box)box.innerHTML='<div class="error">Unable to load matches: '+esc(e.message)+'</div>';
-    const allBox=document.getElementById("allMatches");
-    if(allBox)allBox.innerHTML='<div class="error">Unable to load matches: '+esc(e.message)+'</div>';
-  }
-}
-
-async function syncStreamedMatches(){
-  const status=document.getElementById("streamedSyncStatus");
-  if(!status)return;
-  status.className="status";
-  status.textContent="Syncing today's matches from Streamed...";
-  try{
-    const result=await api("/api/admin/sync-streamed",{method:"POST"});
-    status.textContent="Sync complete. Streamed: "+result.streamedCount+"; created: "+result.created+"; updated: "+result.updated+".";
-    await loadMatches();
-  }catch(e){
-    status.className="error";
-    status.textContent=e.message;
-  }
-}
-
-async function syncBroadcasts(){
-  const status=document.getElementById("broadcastSyncStatus");
-  if(!status)return;
-  status.className="status";
-  status.textContent="Finding broadcast channels across configured regions...";
-  try{
-    const result=await api("/api/admin/sync-broadcasts",{method:"POST"});
-    if(!result.configured){
-      status.className="error";
-      status.textContent="Broadcast source is not configured. Add the GOALDIR_TOKEN Worker secret first.";
-      return;
-    }
-
-    if(typeof result.processed==="number"){
-      const progress=result.cycleComplete
-        ? "Cycle complete."
-        : "More matches remain; the next automatic/manual sync will continue from the saved cursor.";
-      status.textContent=
-        "Batch complete. Processed: "+result.processed+
-        "; remaining: "+(result.remaining ?? 0)+
-        "; matched broadcasts: "+(result.matchedMatches ?? 0)+
-        "; local channels linked: "+(result.linkedMatches ?? 0)+
-        ". "+progress;
-    }else{
-      status.textContent="Broadcast sync complete. Regions: "+(result.countries?.length||0)+
-        "; matched broadcasts: "+(result.matchedMatches||0)+
-        "; local channels linked: "+(result.linkedMatches||0)+".";
-    }
-
-    await loadMatches();
-  }catch(e){
-    status.className="error";
-    status.textContent=e.message;
-  }
-}
-async function autoLinkMatches(){
-  const status=document.getElementById("autoLinkStatus");
-  if(!status)return;
-  status.className="status";
-  status.textContent="Linking local channels to Streamed source mappings...";
-  try{
-    const result=await api("/api/admin/auto-link",{method:"POST"});
-    const linked=result.results.filter(item=>item.addedChannelIds?.length).length;
-    const matched=result.results.filter(item=>item.streamedMatchId).length;
-    status.textContent="Done. Matched "+matched+"/"+result.processed+" matches; added channels to "+linked+".";
-    await loadMatches();
-  }catch(e){
-    status.className="error";
-    status.textContent=e.message;
-  }
-}
-
-async function deleteMatch(id){
-  if(!confirm("Delete this match?"))return;
-  try{await api("/api/admin/matches/"+encodeURIComponent(id),{method:"DELETE"});await loadMatches()}
-  catch(e){alert(e.message)}
-}
-
-function showPage(page){
-  document.querySelectorAll(".page").forEach(x=>x.classList.add("hidden"));
-  const target=document.getElementById("page-"+page);
-  if(target)target.classList.remove("hidden");
-  document.querySelectorAll(".menu div").forEach(x=>x.classList.toggle("active",x.dataset.page===page));
-  const titles={dashboard:"Admin Dashboard",matches:"Matches",streams:"Streams",settings:"Settings"};
-  document.getElementById("pageTitle").textContent=titles[page]||"Admin Dashboard";
-  document.getElementById("sidebar").classList.remove("open");
-  if(page==="matches"){loadChannels();loadMatches()}
-}
-
+function openCreateMatch(){clearForm();showPage("matches");window.scrollTo({top:0,behavior:"smooth"})}
+function clearForm(){["title","startTime","poster","description","editMatchId"].forEach(id=>document.getElementById(id).value="");document.getElementById("status").value="scheduled";document.getElementById("category").value="FOOTBALL";document.getElementById("matchFormTitle").textContent="Add Match Manually";document.querySelectorAll("#channelList input").forEach(x=>x.checked=false);document.getElementById("formStatus").textContent=""}
+function editMatch(id){const m=allMatches.find(x=>String(x.id)===String(id));if(!m)return;showPage("matches");document.getElementById("matchFormTitle").textContent="Edit Match";document.getElementById("editMatchId").value=m.id;document.getElementById("title").value=m.title||"";document.getElementById("category").value=m.category||"OTHER";document.getElementById("status").value=m.status||"scheduled";document.getElementById("startTime").value=m.startTime?new Date(m.startTime).toISOString().slice(0,16):"";document.getElementById("poster").value=m.poster||"";document.getElementById("description").value=m.description||"";setTimeout(()=>{document.querySelectorAll("#channelList input").forEach(x=>x.checked=(m.channelIds||[]).map(String).includes(String(x.value)))},100)}
+async function saveMatch(){const status=document.getElementById("formStatus"),title=document.getElementById("title").value.trim();if(!title){status.className="error";status.textContent="Match title is required.";return}status.className="status";status.textContent="Saving...";const id=document.getElementById("editMatchId").value;const body={title,category:document.getElementById("category").value,startTime:document.getElementById("startTime").value?new Date(document.getElementById("startTime").value).toISOString():"",status:document.getElementById("status").value,poster:document.getElementById("poster").value.trim(),description:document.getElementById("description").value.trim(),channelIds:selectedChannelIds()};try{await api(id?"/api/admin/matches/"+encodeURIComponent(id):"/api/admin/matches",{method:id?"PUT":"POST",body:JSON.stringify(body)});status.textContent=id?"Match updated.":"Match created.";await loadMatches();clearForm()}catch(e){status.className="error";status.textContent=e.message}}
+function renderMatchList(){const box=document.getElementById("allMatches"),dash=document.getElementById("matches"),q=(document.getElementById("matchSearch")?.value||"").trim().toLowerCase(),filtered=allMatches.filter(m=>[m.title,m.category,m.status].some(v=>String(v||"").toLowerCase().includes(q))),size=Number(document.getElementById("matchPageSize")?.value||10),pages=Math.max(1,Math.ceil(filtered.length/size));matchPage=Math.min(matchPage,pages);const pageItems=filtered.slice((matchPage-1)*size,matchPage*size);const html=pageItems.length?pageItems.map(m=>`<div class="match"><div><div class="match-title">${esc(m.title)}</div><div class="match-meta">${esc(m.category)} • ${esc(m.status)} • ${esc(m.startTime?new Date(m.startTime).toLocaleString():"No date")}</div></div><div class="match-actions"><button class="secondary" onclick="editMatch('${esc(m.id)}')">Edit</button><button class="danger" onclick="deleteMatch('${esc(m.id)}')">Delete</button></div></div>`).join(""):'<div style="padding:15px;color:#748399">No matches found.</div>';if(dash)dash.innerHTML=html;if(box)box.innerHTML=html;document.getElementById("matchCount").textContent=`${allMatches.length} total match${allMatches.length===1?"":"es"}`;renderPagination(pages);populateFeatured()}
+function renderPagination(pages){const p=document.getElementById("matchPagination");if(!p)return;p.innerHTML="";const add=(label,page,disabled=false,active=false)=>{const b=document.createElement("button");b.textContent=label;b.disabled=disabled;if(active)b.classList.add("active");b.onclick=()=>{matchPage=page;renderMatchList()};p.appendChild(b)};add("First",1,matchPage===1);add("Previous",Math.max(1,matchPage-1),matchPage===1);const start=Math.max(1,matchPage-2),end=Math.min(pages,start+4);for(let i=start;i<=end;i++)add(String(i),i,false,i===matchPage);add("Next",Math.min(pages,matchPage+1),matchPage===pages);add("Last",pages,matchPage===pages)}
+async function loadMatches(){try{allMatches=await api("/api/admin/matches");renderMatchList()}catch(e){document.getElementById("matches").innerHTML='<div class="error">Unable to load matches: '+esc(e.message)+'</div>';document.getElementById("allMatches").innerHTML=document.getElementById("matches").innerHTML}}
+function renderSources(){const box=document.getElementById("sourceList"),q=(document.getElementById("sourceSearch")?.value||"").toLowerCase();if(!box)return;const list=channels.filter(c=>[c.name,c.genre,c.country,c.broadcastName].some(v=>String(v||"").toLowerCase().includes(q)));box.innerHTML=list.length?list.map(c=>`<div class="match"><div><div class="match-title">${esc(c.name)}</div><div class="match-meta">${esc(c.genre||"")} • ${esc(c.country||"")} ${c.broadcastName?"• "+esc(c.broadcastName):""}</div></div><div class="match-actions"><button class="secondary" onclick="editChannel('${esc(c.id)}')">Edit</button><button class="danger" onclick="deleteChannel('${esc(c.id)}')">Delete</button></div></div>`).join(""):'<div style="padding:15px;color:#748399">No TV sources found.</div>'}
+function editChannel(id){const c=channels.find(x=>String(x.id)===String(id));if(!c)return;document.getElementById("channelEditId").value=c.id;document.getElementById("channelName").value=c.name||"";document.getElementById("channelLogo").value=c.logo||"";document.getElementById("channelGenre").value=c.genre||"";document.getElementById("channelCountry").value=c.country||"";document.getElementById("channelBroadcastName").value=c.broadcastName||"";showPage("channels")}
+function clearChannelForm(){["channelEditId","channelName","channelLogo","channelGenre","channelCountry","channelBroadcastName"].forEach(id=>document.getElementById(id).value="");document.getElementById("channelStatus").textContent=""}
+async function saveChannel(){const name=document.getElementById("channelName").value.trim(),id=document.getElementById("channelEditId").value||crypto.randomUUID();if(!name){document.getElementById("channelStatus").textContent="Name is required.";return}const item={id,name,logo:document.getElementById("channelLogo").value.trim(),genre:document.getElementById("channelGenre").value.trim(),country:document.getElementById("channelCountry").value.trim().toUpperCase(),broadcastName:document.getElementById("channelBroadcastName").value.trim()};const idx=channels.findIndex(c=>String(c.id)===String(id));if(idx>=0)channels[idx]={...channels[idx],...item};else channels.push(item);try{await api("/api/channels",{method:"POST",body:JSON.stringify(channels)});document.getElementById("channelStatus").textContent="TV source saved.";clearChannelForm();renderSources();loadChannels()}catch(e){document.getElementById("channelStatus").className="error";document.getElementById("channelStatus").textContent=e.message}}
+async function deleteChannel(id){if(!confirm("Delete this TV source?"))return;channels=channels.filter(c=>String(c.id)!==String(id));try{await api("/api/channels",{method:"POST",body:JSON.stringify(channels)});renderSources();renderChannels()}catch(e){alert(e.message)}}
+async function loadContent(){try{const d=await api("/api/admin/site-content");document.getElementById("noticeEnabled").checked=!!d.notice?.enabled;document.getElementById("noticeText").value=d.notice?.text||"";document.getElementById("noticeLink").value=d.notice?.link||"";document.getElementById("adEnabled").checked=!!d.ad?.enabled;document.getElementById("adImage").value=d.ad?.image||"";document.getElementById("adLink").value=d.ad?.link||"";document.getElementById("adAlt").value=d.ad?.alt||"";populateFeatured(d.featuredMatchId||"")}catch(e){}}
+function populateFeatured(selected){const s=document.getElementById("featuredMatch");if(!s)return;const old=selected||s.value;s.innerHTML='<option value="">No featured match</option>'+allMatches.map(m=>`<option value="${esc(m.id)}">${esc(m.title)}</option>`).join("");s.value=old||"";const m=allMatches.find(x=>String(x.id)===String(s.value));document.getElementById("featuredPreview").textContent=m?m.title:"No featured match selected."}
+async function saveContent(){try{await api("/api/admin/site-content",{method:"PUT",body:JSON.stringify({notice:{enabled:document.getElementById("noticeEnabled").checked,text:document.getElementById("noticeText").value.trim(),link:document.getElementById("noticeLink").value.trim()},ad:{enabled:document.getElementById("adEnabled").checked,image:document.getElementById("adImage").value.trim(),link:document.getElementById("adLink").value.trim(),alt:document.getElementById("adAlt").value.trim()},featuredMatchId:document.getElementById("featuredMatch").value})});alert("Website content saved.")}catch(e){alert(e.message)}}
+async function syncStreamedMatches(){const s=document.getElementById("streamedSyncStatus");s.textContent="Syncing...";try{const r=await api("/api/admin/sync-streamed",{method:"POST"});s.textContent=`Sync complete. Streamed: ${r.streamedCount}; created: ${r.created}; updated: ${r.updated}.`;await loadMatches()}catch(e){s.className="error";s.textContent=e.message}}
+async function syncBroadcasts(){const s=document.getElementById("broadcastSyncStatus");s.textContent="Syncing...";try{const r=await api("/api/admin/sync-broadcasts",{method:"POST"});s.textContent=typeof r.processed==="number"?`Batch complete. Processed: ${r.processed}; remaining: ${r.remaining??0}; matched broadcasts: ${r.matchedMatches??0}; linked: ${r.linkedMatches??0}.`:"Broadcast sync complete.";await loadMatches()}catch(e){s.className="error";s.textContent=e.message}}
+async function autoLinkMatches(){const s=document.getElementById("autoLinkStatus");s.textContent="Running...";try{const r=await api("/api/admin/auto-link",{method:"POST"});const linked=r.results.filter(x=>x.addedChannelIds?.length).length;s.textContent=`Done. Matched ${r.results.filter(x=>x.streamedMatchId).length}/${r.processed}; linked ${linked}.`;await loadMatches()}catch(e){s.className="error";s.textContent=e.message}}
+async function deleteMatch(id){if(!confirm("Delete this match?"))return;try{await api("/api/admin/matches/"+encodeURIComponent(id),{method:"DELETE"});await loadMatches()}catch(e){alert(e.message)}}
+function showPage(page){document.querySelectorAll(".page").forEach(x=>x.classList.add("hidden"));document.getElementById("page-"+page)?.classList.remove("hidden");document.querySelectorAll(".menu div").forEach(x=>x.classList.toggle("active",x.dataset.page===page));const t={dashboard:"Dashboard",matches:"Matches",channels:"TV Sources",settings:"Website Content",sync:"Sync & Automation"};document.getElementById("pageTitle").textContent=t[page]||"Dashboard";document.getElementById("sidebar").classList.remove("open");if(page==="matches"){loadChannels();loadMatches()}if(page==="channels")loadChannels();if(page==="settings"){loadContent();populateFeatured()}}
 function toggleSidebar(){document.getElementById("sidebar").classList.toggle("open")}
-
-document.querySelectorAll(".menu div").forEach(item=>item.addEventListener("click",()=>showPage(item.dataset.page)));
-document.getElementById("channelSearch").addEventListener("input",renderChannels);
-
-if(adminSession){
-  api("/api/admin/matches").then(()=>{
-    document.getElementById("adminLogin").style.display="none";
-    loadChannels();loadMatches();
-  }).catch(()=>{
-    localStorage.removeItem("sportzfy_admin_session");
-    adminSession="";
-    document.getElementById("adminLogin").style.display="flex";
-  });
-}else{
-  document.getElementById("adminLogin").style.display="flex";
-}
+document.querySelectorAll(".menu div").forEach(x=>x.addEventListener("click",()=>showPage(x.dataset.page)));document.getElementById("channelSearch").addEventListener("input",renderChannels);document.getElementById("matchSearch").addEventListener("input",()=>{matchPage=1;renderMatchList()});document.getElementById("matchPageSize").addEventListener("change",()=>{matchPage=1;renderMatchList()});document.getElementById("sourceSearch").addEventListener("input",renderSources);document.getElementById("featuredMatch").addEventListener("change",()=>{const m=allMatches.find(x=>String(x.id)===String(document.getElementById("featuredMatch").value));document.getElementById("featuredPreview").textContent=m?m.title:"No featured match selected."});
+if(adminSession){api("/api/admin/matches").then(()=>{document.getElementById("adminLogin").style.display="none";loadChannels();loadMatches();loadContent()}).catch(()=>{localStorage.removeItem("sportzfy_admin_session");adminSession="";document.getElementById("adminLogin").style.display="flex"})}else document.getElementById("adminLogin").style.display="flex";
