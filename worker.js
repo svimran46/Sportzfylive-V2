@@ -549,6 +549,64 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/site-content" && request.method === "GET") {
+      const [notice, banner, featuredId] = await Promise.all([
+        env.SPORTZFY_DB.get("site_notice", "json"),
+        env.SPORTZFY_DB.get("site_banner", "json"),
+        env.SPORTZFY_DB.get("site_featured_match", "text")
+      ]);
+      const matches = await getMatches();
+      const featuredMatch = featuredId ? (matches.find(m => String(m.id) === String(featuredId)) || null) : null;
+      return json({
+        notice: notice || { enabled:false, text:"", link:"" },
+        banner: banner || { enabled:false, image:"", link:"", alt:"" },
+        featuredMatchId: featuredId || "",
+        featuredMatch
+      });
+    }
+
+    if (url.pathname === "/api/admin/site-content") {
+      if (!await requireAdmin()) return json({ error: "Admin authentication required" }, 401);
+
+      if (request.method === "GET") {
+        const [notice, banner, featuredId] = await Promise.all([
+          env.SPORTZFY_DB.get("site_notice", "json"),
+          env.SPORTZFY_DB.get("site_banner", "json"),
+          env.SPORTZFY_DB.get("site_featured_match", "text")
+        ]);
+        return json({
+          notice: notice || { enabled:false, text:"", link:"" },
+          banner: banner || { enabled:false, image:"", link:"", alt:"" },
+          featuredMatchId: featuredId || ""
+        });
+      }
+
+      if (request.method === "PUT") {
+        const body = await request.json();
+        const notice = {
+          enabled: Boolean(body.notice?.enabled),
+          text: String(body.notice?.text || "").slice(0, 500),
+          link: String(body.notice?.link || "").slice(0, 1000)
+        };
+        const banner = {
+          enabled: Boolean(body.banner?.enabled),
+          image: String(body.banner?.image || "").slice(0, 2000),
+          link: String(body.banner?.link || "").slice(0, 1000),
+          alt: String(body.banner?.alt || "Banner").slice(0, 200)
+        };
+        const featuredId = String(body.featuredMatchId || "");
+        if (featuredId && !(await getMatches()).some(m => String(m.id) === featuredId)) {
+          return json({ error: "Featured match not found" }, 400);
+        }
+        await Promise.all([
+          env.SPORTZFY_DB.put("site_notice", JSON.stringify(notice)),
+          env.SPORTZFY_DB.put("site_banner", JSON.stringify(banner)),
+          env.SPORTZFY_DB.put("site_featured_match", featuredId)
+        ]);
+        return json({ success:true });
+      }
+    }
+
     if (request.method === "GET" && url.pathname === "/api/status") {
       return json({ status: "online", worker: "sportzfylive" });
     }
