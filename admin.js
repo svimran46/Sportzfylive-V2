@@ -30,7 +30,44 @@ function populateFeatured(selected){const s=document.getElementById("featuredMat
 async function saveContent(){const s=document.getElementById("contentStatus");try{await api("/api/admin/site-content",{method:"PUT",body:JSON.stringify({notice:{enabled:document.getElementById("noticeEnabled").checked,text:document.getElementById("noticeText").value.trim()},banner:{enabled:document.getElementById("adEnabled").checked,image:document.getElementById("adImage").value.trim(),link:document.getElementById("adLink").value.trim()},featuredMatchId:document.getElementById("featuredMatch").value})});s.className="status";s.textContent="Website content saved successfully."}catch(e){s.className="error";s.textContent=e.message}}
 
 async function syncStreamedMatches(){const s=document.getElementById("streamedSyncStatus");s.textContent="Syncing...";try{const r=await api("/api/admin/sync-streamed",{method:"POST"});s.textContent=`Sync complete. Streamed: ${r.streamedCount}; created: ${r.created}; updated: ${r.updated}.`;await loadMatches()}catch(e){s.className="error";s.textContent=e.message}}
-async function syncBroadcasts(){const s=document.getElementById("broadcastSyncStatus");s.textContent="Syncing...";try{const r=await api("/api/admin/sync-broadcasts",{method:"POST"});s.textContent=typeof r.processed==="number"?`Batch complete. Processed: ${r.processed}; remaining: ${r.remaining??0}; matched broadcasts: ${r.matchedMatches??0}; linked: ${r.linkedMatches??0}.`:"Broadcast sync complete.";await loadMatches()}catch(e){s.className="error";s.textContent=e.message}}
+async function syncBroadcasts(){
+  const s=document.getElementById("broadcastSyncStatus");
+  const box=document.getElementById("broadcastSyncResults");
+  s.className="status";
+  s.textContent="Syncing broadcasts and automatically creating matchable TV sources...";
+  if(box) box.innerHTML="";
+  try{
+    const r=await api("/api/admin/sync-broadcasts",{method:"POST"});
+    if(r.configured===false){
+      s.className="error";
+      s.textContent=r.message||"Broadcast API is not configured.";
+      return;
+    }
+
+    s.textContent=`Batch complete. Processed: ${r.processed??0}; broadcasts found: ${r.broadcastCount??0}; matches with broadcasts: ${r.matchedMatches??0}; matches linked: ${r.linkedMatches??0}; new TV sources: ${r.createdChannels??0}; remaining: ${r.remaining??0}.`;
+
+    if(box){
+      const rows=Array.isArray(r.diagnostics)?r.diagnostics:[];
+      const items=rows.map(x=>{
+        const broadcasts=Array.isArray(x.broadcasts)?x.broadcasts:[];
+        const added=Array.isArray(x.addedChannelIds)?x.addedChannelIds:[];
+        return `<div class="preview" style="margin-top:8px">
+          <b>${esc(x.title||"Untitled match")}</b>
+          <div style="margin-top:5px">Status: ${esc(x.status||"unknown")}</div>
+          <div>Broadcasts: ${broadcasts.length?broadcasts.map(b=>esc((b.name||"")+(b.country?" • "+b.country:""))).join(", "):"None found"}</div>
+          <div>TV sources linked/created: ${added.length}</div>
+        </div>`;
+      }).join("");
+      box.innerHTML=rows.length?items:`<div class="preview">No diagnostic rows returned for this batch.</div>`;
+    }
+
+    await loadChannels();
+    await loadMatches();
+  }catch(e){
+    s.className="error";
+    s.textContent=e.message;
+  }
+}
 async function autoLinkMatches(){const s=document.getElementById("autoLinkStatus");s.textContent="Running...";try{const r=await api("/api/admin/auto-link",{method:"POST"});s.textContent=`Done. Matched ${r.results.filter(x=>x.streamedMatchId).length}/${r.processed}.`;await loadMatches()}catch(e){s.className="error";s.textContent=e.message}}
 async function deleteMatch(id){if(!confirm("Delete this match?"))return;try{await api("/api/admin/matches/"+encodeURIComponent(id),{method:"DELETE"});await loadMatches()}catch(e){alert(e.message)}}
 
