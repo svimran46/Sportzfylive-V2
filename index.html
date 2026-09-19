@@ -1565,7 +1565,9 @@ body{
 }
 </style>
 
-</head>
+<style id="sportzfy-site-content-style">
+.sfy-site-notice{display:none;margin:0 0 16px;padding:11px 14px;border:1px solid rgba(88,101,242,.3);background:#0d1626;border-radius:11px;color:#dbe3f2;font-size:13px}.sfy-site-notice.show{display:flex;gap:9px;align-items:center}.sfy-site-notice a{color:#8d98ff;font-weight:800;text-decoration:none}.sfy-site-banner{display:none;margin:0 0 20px;border-radius:14px;overflow:hidden;border:1px solid #1c2a3e}.sfy-site-banner.show{display:block}.sfy-site-banner img{display:block;width:100%;max-height:190px;object-fit:cover}.sfy-featured{display:none;margin:0 0 28px}.sfy-featured.show{display:block}.sfy-featured-label{font-size:11px;font-weight:900;color:#7d89ff;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px}.sfy-featured-card{position:relative;overflow:hidden;border-radius:16px;min-height:220px;background:#0b111b;border:1px solid #1b2a40}.sfy-featured-card img{display:block;width:100%;height:100%;min-height:220px;object-fit:cover}.sfy-featured-overlay{position:absolute;inset:0;display:flex;align-items:flex-end;padding:22px;background:linear-gradient(transparent 20%,rgba(4,8,14,.92))}.sfy-featured-title{font-size:clamp(20px,3vw,34px);font-weight:900}.sfy-featured-meta{margin-top:5px;color:#a6b3c6;font-size:12px}
+</style></head>
 <body>
 <div class="sfy-shell">
   <aside class="sfy-sidebar" id="sfy-sidebar">
@@ -1610,7 +1612,7 @@ body{
         <button class="sfy-icon-btn sfy-avatar" type="button" aria-label="Profile"><i class="fas fa-user"></i></button>
       </div>
     </header>
-    <main class="sfy-content">
+    <main class="sfy-content"><div id="sfy-site-notice" class="sfy-site-notice"></div><div id="sfy-site-banner" class="sfy-site-banner"></div><div id="sfy-featured" class="sfy-featured"></div>
       <section class="sfy-hero" id="sfy-hero" hidden></section>
       <div class="sfy-chips" id="sfy-chips" aria-label="Sport filters">
         <button class="sfy-chip active" data-nav="ALL"><i class="fas fa-border-all"></i>All</button>
@@ -1769,6 +1771,35 @@ body{
         }
     }
 
+    async function loadSiteContent() {
+        try {
+            const data = await fetchJson(PROXY_URL + "/api/site-content");
+            const notice = document.getElementById("sfy-site-notice");
+            if (notice) {
+                notice.classList.toggle("show", Boolean(data.notice?.enabled && data.notice?.text));
+                notice.innerHTML = data.notice?.link
+                    ? '<span>●</span><a href="' + esc(data.notice.link) + '" target="_blank" rel="noopener">' + esc(data.notice.text) + '</a>'
+                    : '<span>●</span><span>' + esc(data.notice?.text || "") + '</span>';
+            }
+            const banner = document.getElementById("sfy-site-banner");
+            if (banner) {
+                banner.classList.toggle("show", Boolean(data.banner?.enabled && data.banner?.image));
+                banner.innerHTML = data.banner?.link
+                    ? '<a href="' + esc(data.banner.link) + '" target="_blank" rel="noopener"><img src="' + esc(data.banner.image) + '" alt="' + esc(data.banner.alt || "Banner") + '"></a>'
+                    : '<img src="' + esc(data.banner?.image || "") + '" alt="' + esc(data.banner?.alt || "Banner") + '">';
+            }
+            const featured = document.getElementById("sfy-featured"), match = data.featuredMatch;
+            if (featured) {
+                featured.classList.toggle("show", Boolean(match));
+                featured.innerHTML = match
+                    ? '<div class="sfy-featured-label">Featured Match</div><div class="sfy-featured-card"><img src="' + esc(match.poster || "") + '" alt=""><div class="sfy-featured-overlay"><div><div class="sfy-featured-title">' + esc(match.title) + '</div><div class="sfy-featured-meta">' + esc(match.category || "") + ' • ' + esc(match.status || "") + '</div></div></div></div>'
+                    : "";
+            }
+        } catch (error) {
+            console.warn("Website content unavailable", error);
+        }
+    }
+
     async function loadMatches() {
         if (loading) return;
 
@@ -1816,6 +1847,7 @@ body{
             }
 
             renderMatches(matches);
+            loadSiteContent();
 
         } catch (error) {
             console.error("Match API error:", error);
