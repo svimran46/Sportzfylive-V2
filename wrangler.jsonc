@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
 
-  "name": "sportzfylive",
+  "name": "sportzfylive-v2",
 
   "main": "worker.js",
 
