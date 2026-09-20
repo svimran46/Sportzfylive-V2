@@ -901,6 +901,26 @@ async function syncStreamedMatches(env) {
   const streamedRaw = await upstream.json();
   const streamedMatches = Array.isArray(streamedRaw) ? streamedRaw : [];
 
+  // Streamed's all-today endpoint contains fixtures but does not expose
+  // a status field. The live endpoint is the authoritative way to determine
+  // which of those fixtures are currently in progress.
+  let liveExternalIds = new Set();
+  try {
+    const liveResponse = await fetch("https://streamed.pk/api/matches/live", {
+      headers: { "Accept": "application/json" }
+    });
+    if (liveResponse.ok) {
+      const liveRaw = await liveResponse.json();
+      const liveMatches = Array.isArray(liveRaw) ? liveRaw : [];
+      liveExternalIds = new Set(
+        liveMatches.map(item => String(item?.id || "")).filter(Boolean)
+      );
+    }
+  } catch (_) {
+    // Keep the normal all-today sync working if the live-status endpoint
+    // is temporarily unavailable.
+  }
+
   const sourceIndex = buildSourceIndex(channels, slugify);
   const now = new Date().toISOString();
 
@@ -961,7 +981,7 @@ async function syncStreamedMatches(env) {
       title,
       category: String(raw.category || "other").toUpperCase(),
       startTime: raw.date ? new Date(Number(raw.date)).toISOString() : "",
-      status: "scheduled",
+      status: liveExternalIds.has(externalId) ? "live" : "scheduled",
       poster: raw.poster
         ? (String(raw.poster).startsWith("http") ? String(raw.poster) : "https://streamed.pk" + String(raw.poster))
         : "",
