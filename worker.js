@@ -212,6 +212,18 @@ async function apiHandler(request, env) {
       : json({ error: "Invalid admin token" }, 401);
   }
 
+  if (request.method === "POST" && url.pathname === "/api/admin/logout") {
+    const session = request.headers.get("X-Admin-Session");
+    if (session) {
+      try {
+        await env.SPORTZFY_DB.delete("admin_session:" + session);
+      } catch (error) {
+        console.error("Admin logout failed:", String(error?.message || error));
+      }
+    }
+    return json({ success: true });
+  }
+
   if (request.method === "GET" && url.pathname === "/api/streamed/matches") {
     try {
       const raw = await fetchStreamedMatches("all-today");
@@ -419,7 +431,8 @@ export default {
       request.method !== "HEAD" &&
       request.method !== "OPTIONS" &&
       response.status < 300 &&
-      !new URL(request.url).pathname.startsWith("/api/admin/login")
+      !new URL(request.url).pathname.startsWith("/api/admin/login") &&
+      !new URL(request.url).pathname.startsWith("/api/admin/logout")
     ) {
       ctx.waitUntil(rebuildSnapshots(env).catch(error => console.error("Snapshot refresh failed:", error)));
     }
