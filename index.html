@@ -1566,7 +1566,8 @@ body{
 </style>
 
 <style id="sportzfy-site-content-style">
-.sfy-site-notice{display:none;margin:0 0 16px;padding:11px 14px;border:1px solid rgba(88,101,242,.3);background:#0d1626;border-radius:11px;color:#dbe3f2;font-size:13px}.sfy-site-notice.show{display:flex;gap:9px;align-items:center}.sfy-site-notice a{color:#8d98ff;font-weight:800;text-decoration:none}.sfy-site-banner{display:none;margin:0 0 20px;border-radius:14px;overflow:hidden;border:1px solid #1c2a3e}.sfy-site-banner.show{display:block}.sfy-site-banner img{display:block;width:100%;max-height:190px;object-fit:cover}.sfy-featured{display:none;margin:0 0 28px}.sfy-featured.show{display:block}.sfy-featured-label{font-size:11px;font-weight:900;color:#7d89ff;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px}.sfy-featured-card{position:relative;overflow:hidden;border-radius:16px;min-height:220px;background:#0b111b;border:1px solid #1b2a40}.sfy-featured-card img{display:block;width:100%;height:100%;min-height:220px;object-fit:cover}.sfy-featured-overlay{position:absolute;inset:0;display:flex;align-items:flex-end;padding:22px;background:linear-gradient(transparent 20%,rgba(4,8,14,.92))}.sfy-featured-title{font-size:clamp(20px,3vw,34px);font-weight:900}.sfy-featured-meta{margin-top:5px;color:#a6b3c6;font-size:12px}
+.sfy-site-notice{display:none;margin:0 0 16px;padding:11px 14px;border:1px solid rgba(88,101,242,.3);background:#0d1626;border-radius:11px;color:#dbe3f2;font-size:13px}.sfy-site-notice.show{display:flex;gap:9px;align-items:center}.sfy-site-notice a{color:#8d98ff;font-weight:800;text-decoration:none}.sfy-site-banner{display:none;margin:0 0 20px;border-radius:14px;overflow:hidden;border:1px solid #1c2a3e}.sfy-site-banner.show{display:block}.sfy-site-banner img{display:block;width:100%;max-height:190px;object-fit:cover}.sfy-featured{display:none;margin:0 0 28px}.sfy-featured.show{display:block}.sfy-featured-label{font-size:11px;font-weight:900;color:#7d89ff;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px}.sfy-featured-card{position:relative;overflow:hidden;border-radius:20px;min-height:300px;background:radial-gradient(circle at 20% 45%,rgba(52,95,255,.22),transparent 34%),radial-gradient(circle at 80% 45%,rgba(37,200,255,.12),transparent 30%),linear-gradient(105deg,#0a1630,#07101f 52%,#0a1425);border:1px solid rgba(101,124,176,.26);box-shadow:var(--ui-shadow)}.sfy-featured-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.14;filter:saturate(1.15)}.sfy-featured-overlay{position:relative;z-index:2;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;background:linear-gradient(90deg,rgba(4,9,18,.12),rgba(4,9,18,.05) 50%,rgba(4,9,18,.32))}.sfy-featured-kicker{font-size:11px;font-weight:900;letter-spacing:2px;color:#7f8cff;margin-bottom:8px}.sfy-featured-title{font-size:clamp(24px,4vw,42px);font-weight:950;letter-spacing:-1px}.sfy-featured-teams{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:18px}.sfy-featured-team{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:110px;color:#f7f9ff;font-size:13px;font-weight:800}.sfy-featured-team img,.sfy-featured-team .sfy-logo-fallback{width:58px;height:58px}.sfy-featured-team img{object-fit:contain;border-radius:50%;background:rgba(255,255,255,.06);padding:7px}.sfy-featured-vs{width:34px;height:34px;display:grid;place-items:center;border:1px solid rgba(120,140,180,.25);border-radius:50%;background:rgba(5,9,18,.6);color:#8491a9;font-size:10px;font-weight:900}.sfy-featured-meta{margin-top:12px;color:#aab5c7;font-size:12px}.sfy-featured-btn{margin-top:18px;min-height:44px;padding:0 22px;border:0;border-radius:11px;background:linear-gradient(90deg,#5865f2,#737cff);color:#fff;font-weight:850;cursor:pointer;box-shadow:0 10px 28px rgba(88,101,242,.25)}.sfy-logo-fallback{display:grid;place-items:center;border:1px solid rgba(120,140,180,.25);border-radius:50%;background:#111c2e;color:#9da9ff;font-size:15px;font-weight:900}
+@media(max-width:600px){.sfy-featured-card,.sfy-featured-overlay{min-height:280px}.sfy-featured-overlay{padding:22px 14px}.sfy-featured-teams{gap:12px}.sfy-featured-team{min-width:90px;font-size:11px}.sfy-featured-team img,.sfy-featured-team .sfy-logo-fallback{width:52px;height:52px}}
 </style></head>
 <body>
 <div class="sfy-shell">
@@ -1613,7 +1614,6 @@ body{
       </div>
     </header>
     <main class="sfy-content"><div id="sfy-site-notice" class="sfy-site-notice"></div><div id="sfy-site-banner" class="sfy-site-banner"></div><div id="sfy-featured" class="sfy-featured"></div>
-      <section class="sfy-hero" id="sfy-hero" hidden></section>
       <div class="sfy-chips" id="sfy-chips" aria-label="Sport filters">
         <button class="sfy-chip active" data-nav="ALL"><i class="fas fa-border-all"></i>All</button>
         <button class="sfy-chip" data-nav="LIVE"><i class="fas fa-tower-broadcast"></i>Live</button>
@@ -1708,18 +1708,36 @@ body{
 
     function getLogoUrl(badge) {
         if (!badge) return "";
-        const value = String(badge);
-        if (/^(https?:)?\/\//i.test(value)) return value;
-        return PROXY_URL + "/api/images/proxy/" + value;
+        const value = String(badge).trim();
+        if (/^(https?:)?\/\//i.test(value) || value.startsWith("data:")) return value;
+
+        // Streamed team badges are identifiers such as "real-madrid".
+        // The documented badge endpoint returns the actual WebP image.
+        return "https://streamed.pk/api/images/badge/" + encodeURIComponent(value) + ".webp";
     }
 
     function logoError(img, token) {
-        if (img.dataset.logoFallback === "1") {
-            img.style.display = "none";
-            return;
-        }
+        if (!img || img.dataset.logoFallback === "1") return;
         img.dataset.logoFallback = "1";
-        img.src = PROXY_URL + "/api/images/proxy/" + token + ".webp";
+
+        const wrapper = img.parentElement;
+        const name = img.getAttribute("alt") || "Team";
+        if (wrapper) {
+            const fallback = document.createElement("div");
+            fallback.className = "sfy-logo-fallback";
+            fallback.setAttribute("aria-label", name);
+            fallback.textContent = name
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map(part => part[0])
+                .join("")
+                .toUpperCase() || "FC";
+            img.replaceWith(fallback);
+        } else {
+            img.removeAttribute("src");
+            img.style.display = "none";
+        }
     }
 
     function safeDate(value) {
@@ -1791,9 +1809,60 @@ body{
             const featured = document.getElementById("sfy-featured"), match = data.featuredMatch;
             if (featured) {
                 featured.classList.toggle("show", Boolean(match));
-                featured.innerHTML = match
-                    ? '<div class="sfy-featured-label">Featured Match</div><div class="sfy-featured-card"><img src="' + esc(match.poster || "") + '" alt=""><div class="sfy-featured-overlay"><div><div class="sfy-featured-title">' + esc(match.title) + '</div><div class="sfy-featured-meta">' + esc(match.category || "") + ' • ' + esc(match.status || "") + '</div></div></div></div>'
-                    : "";
+
+                if (!match) {
+                    featured.innerHTML = "";
+                } else {
+                    const home = match.teams?.home || {};
+                    const away = match.teams?.away || {};
+                    const homeLogo = getLogoUrl(home.badge);
+                    const awayLogo = getLogoUrl(away.badge);
+                    const featuredDate = match.startTime
+                        ? new Date(match.startTime)
+                        : null;
+                    const dateText = featuredDate && !Number.isNaN(featuredDate.getTime())
+                        ? featuredDate.toLocaleString([], {
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                        })
+                        : "";
+
+                    const teamMarkup = (team, logo, side) => {
+                        const name = team.name || (side === "home" ? "Home" : "Away");
+                        return '<div class="sfy-featured-team">' +
+                            (logo
+                                ? '<img src="' + esc(logo) + '" alt="' + esc(name) + '" onerror="logoError(this)">' 
+                                : '<div class="sfy-logo-fallback">' + esc(name.split(/\\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("").toUpperCase() || "FC") + '</div>') +
+                            '<span>' + esc(name) + '</span>' +
+                            '</div>';
+                    };
+
+                    featured.innerHTML =
+                        '<div class="sfy-featured-label">Featured Match</div>' +
+                        '<article class="sfy-featured-card">' +
+                            (match.poster
+                                ? '<img class="sfy-featured-bg" src="' + esc(resolveAssetUrl(match.poster)) + '" alt="" aria-hidden="true">'
+                                : '') +
+                            '<div class="sfy-featured-overlay">' +
+                                '<div class="sfy-featured-kicker">' + (String(match.status || "").toLowerCase() === "live" ? "LIVE NOW" : "FEATURED MATCH") + '</div>' +
+                                '<div class="sfy-featured-title">' + esc(match.title || "Featured Match") + '</div>' +
+                                ((home.name || away.name)
+                                    ? '<div class="sfy-featured-teams">' +
+                                        teamMarkup(home, homeLogo, "home") +
+                                        '<div class="sfy-featured-vs">VS</div>' +
+                                        teamMarkup(away, awayLogo, "away") +
+                                      '</div>'
+                                    : '') +
+                                '<div class="sfy-featured-meta">' + esc(dateText || ((match.category || "") + (match.status ? " • " + match.status : ""))) + '</div>' +
+                                '<button class="sfy-featured-btn" type="button" data-match-id="' + esc(match.id || "") + '">' +
+                                    '<i class="fas fa-play"></i> ' + (String(match.status || "").toLowerCase() === "live" ? "Watch Live" : "View Match") +
+                                '</button>' +
+                            '</div>' +
+                        '</article>';
+                }
             }
         } catch (error) {
             console.warn("Website content unavailable", error);
@@ -1893,10 +1962,6 @@ body{
         window.__SPORTZFY_MATCHES = new Map(
             matches.filter(Boolean).map(match => [String(match.id || ""), match])
         );
-        if (typeof window.renderSportzfyHero === "function") {
-            window.renderSportzfyHero(matches);
-        }
-
 
         const container = document.getElementById("matches-container") ||
                           document.getElementById("app");
@@ -2286,29 +2351,6 @@ function initCategoryCarousels(){
     if(e.key==="Escape"&&document.activeElement===search){search.value="";search.dispatchEvent(new Event("input"))}
   });
 
-  window.renderSportzfyHero=function(matches){
-    const hero=document.getElementById("sfy-hero");
-    if(!hero||!Array.isArray(matches)||!matches.length)return;
-    const match=matches.find(m=>m?.live)||matches.find(m=>m?.teams?.home&&m?.teams?.away)||matches[0];
-    if(!match)return;
-    const home=match.teams?.home||{},away=match.teams?.away||{};
-    const escHero=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-    const logo=t=>t?.badge?getLogoUrl(t.badge):"";
-    const date=match.date?new Date(match.date):null;
-    hero.hidden=false;
-    hero.innerHTML=
-      '<div class="sfy-hero-content">'+
-      '<div class="sfy-hero-kicker">'+(match.live?"LIVE NOW":"FEATURED MATCH")+'</div>'+
-      '<div class="sfy-hero-title">'+escHero(match.title||"Featured Match")+'</div>'+
-      '<div class="sfy-hero-teams">'+
-      '<div class="sfy-hero-team">'+(logo(home)?'<img src="'+escHero(logo(home))+'" alt="">':"")+escHero(home.name||"TBD")+'</div>'+
-      '<div class="sfy-hero-vs">VS</div>'+
-      '<div class="sfy-hero-team">'+(logo(away)?'<img src="'+escHero(logo(away))+'" alt="">':"")+escHero(away.name||"TBD")+'</div>'+
-      '</div>'+
-      '<div class="sfy-hero-meta">'+(date?date.toLocaleString([], {weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"Schedule available")+'</div>'+
-      '<button class="sfy-hero-btn" type="button" data-match-id="'+escHero(match.id)+'"><i class="fas fa-play"></i> '+(match.live?"Watch Live":"View Match")+'</button>'+
-      '</div>';
-  };
 })();
 </script>
 </body>
