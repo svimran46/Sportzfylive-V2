@@ -1,4 +1,4 @@
-const API="https://sportzfylive-v2.svimranmy.workers.dev";
+const API="https://sportzfylive.svimranmy.workers.dev";
 let adminSession=localStorage.getItem("sportzfy_admin_session")||"",channels=[],allMatches=[],matchPage=1,currentMatch=null,editingStreamIndex=-1;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
