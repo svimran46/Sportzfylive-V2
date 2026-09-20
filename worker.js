@@ -84,27 +84,19 @@ async function requireAdmin(request, env) {
   if (!record) return false;
   if (record.expiresAt <= Date.now()) return false;
 
-  const ip = request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
-    "unknown";
-
-  return record.ip === ip;
+  return true;
 }
 
 async function createAdminSession(request, env) {
   const supplied = request.headers.get("X-Admin-Token");
   if (!env.ADMIN_TOKEN || !supplied || supplied !== env.ADMIN_TOKEN) return null;
 
-  const ip = request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
-    "unknown";
-
   const session = crypto.randomUUID();
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
   await env.SPORTZFY_DB.put(
     "admin_session:" + session,
-    JSON.stringify({ ip, expiresAt }),
+    JSON.stringify({ expiresAt }),
     { expirationTtl: 24 * 60 * 60 }
   );
 
