@@ -212,84 +212,123 @@ export default {
         return [...new Set(ids)];
       };
 
-      const imported = [];
-      const updated = [];
+      /*
+        Streamed is the source of truth for Streamed-origin matches.
+
+        Every sync rebuilds the Streamed portion of the stored match list from
+        the current Streamed /api/matches/all-today response:
+          - matches still present are updated
+          - new matches are added
+          - Streamed matches no longer returned are removed
+
+        Manual matches (anything without source === "streamed") are preserved.
+        For an existing Streamed match with the same externalId, we preserve
+        local/admin metadata such as manually attached channelIds and broadcast
+        metadata, then refresh the actual match data from Streamed.
+      */
+      const existingStreamedByExternalId = new Map(
+        existingMatches
+          .filter(item => item.source === "streamed" && item.externalId)
+          .map(item => [String(item.externalId), item])
+      );
+
+      const manualMatches = existingMatches.filter(item => item.source !== "streamed");
+      const freshStreamedMatches = [];
       const created = [];
+      const updated = [];
 
       for (const raw of streamedRaw) {
         const streamed = toStreamedMatch(raw);
         const externalId = String(raw.id || "");
-        const title = String(raw.title || "");
-        const rawDate = raw.date ? Number(raw.date) : NaN;
-
-        let index = existingMatches.findIndex(item =>
-          externalId && String(item.externalId || "") === externalId
-        );
-
-        if (index === -1) {
-          const normalizedTitle = normalizeText(title);
-          index = existingMatches.findIndex(item => {
-            if (item.source !== "streamed") return false;
-            if (normalizeText(item.title) !== normalizedTitle) return false;
-            if (!rawDate || !item.startTime) return true;
-            const existingDate = Date.parse(item.startTime);
-            return existingDate === existingDate &&
-              Math.abs(existingDate - rawDate) <= 60 * 60 * 1000;
-          });
-        }
+        const previous = externalId
+          ? existingStreamedByExternalId.get(externalId)
+          : null;
 
         const sourceNames = streamed.sources.map(source => source.source);
         const autoIds = channelIdsForSources(sourceNames);
 
-        if (index === -1) {
+        if (previous) {
+          const currentIds = Array.isArray(previous.channelIds)
+            ? previous.channelIds.map(String)
+            : [];
+
+          const mergedIds = [...new Set([
+            ...currentIds,
+            ...autoIds
+          ])];
+
+          const refreshed = {
+            ...streamed,
+            id: previous.id || streamed.id,
+            channelIds: mergedIds,
+            createdAt: previous.createdAt || now,
+            updatedAt: now,
+
+            // Preserve locally generated/broadcast metadata until the
+            // broadcast-sync job refreshes it for this fixture.
+            broadcasts: Array.isArray(previous.broadcasts)
+              ? previous.broadcasts
+              : undefined,
+            broadcastMatchId: previous.broadcastMatchId || undefined,
+            broadcastMatchScore: previous.broadcastMatchScore ?? undefined,
+            broadcastStatus: previous.broadcastStatus || undefined,
+            broadcastSyncedAt: previous.broadcastSyncedAt || undefined,
+            autoLinkStatus: autoIds.length
+              ? "linked"
+              : (previous.autoLinkStatus || "matched-no-channel-map"),
+            autoLinkedAt: now
+          };
+
+          if (!refreshed.broadcasts) delete refreshed.broadcasts;
+          if (!refreshed.broadcastMatchId) delete refreshed.broadcastMatchId;
+          if (refreshed.broadcastMatchScore === undefined) delete refreshed.broadcastMatchScore;
+          if (!refreshed.broadcastStatus) delete refreshed.broadcastStatus;
+          if (!refreshed.broadcastSyncedAt) delete refreshed.broadcastSyncedAt;
+
+          freshStreamedMatches.push(refreshed);
+          updated.push(refreshed.id);
+        } else {
           const match = {
             ...streamed,
             channelIds: autoIds,
             createdAt: now,
             updatedAt: now,
-            autoLinkStatus: autoIds.length ? "linked" : "matched-no-channel-map",
+            autoLinkStatus: autoIds.length
+              ? "linked"
+              : "matched-no-channel-map",
             autoLinkedAt: now
           };
-          existingMatches.push(match);
-          imported.push(match);
+
+          freshStreamedMatches.push(match);
           created.push(match.id);
-          continue;
         }
-
-        const current = existingMatches[index];
-        const currentIds = Array.isArray(current.channelIds) ? current.channelIds.map(String) : [];
-        const mergedIds = [...new Set([...currentIds, ...autoIds])];
-
-        existingMatches[index] = {
-          ...current,
-          externalId: streamed.externalId || current.externalId || "",
-          title: streamed.title || current.title,
-          category: streamed.category || current.category,
-          startTime: streamed.startTime || current.startTime,
-          poster: streamed.poster || current.poster || "",
-          teams: streamed.teams || current.teams || null,
-          popular: streamed.popular ?? current.popular ?? false,
-          sources: streamed.sources,
-          source: "streamed",
-          channelIds: mergedIds,
-          autoLinkStatus: autoIds.length ? "linked" : (current.autoLinkStatus || "matched-no-channel-map"),
-          autoLinkedAt: now,
-          updatedAt: now
-        };
-        updated.push(existingMatches[index].id);
       }
 
-      await env.SPORTZFY_DB.put("matches", JSON.stringify(existingMatches));
+      // The stored Streamed section is replaced by the fresh Streamed dataset.
+      // This is what removes fixtures that disappeared from Streamed.
+      const removed = existingMatches.filter(item =>
+        item.source === "streamed" &&
+        !freshStreamedMatches.some(fresh =>
+          String(fresh.externalId || "") === String(item.externalId || "")
+        )
+      );
+
+      const finalMatches = [...manualMatches, ...freshStreamedMatches];
+
+      await env.SPORTZFY_DB.put("matches", JSON.stringify(finalMatches));
+
       return {
         success: true,
         streamedCount: streamedRaw.length,
         created: created.length,
         updated: updated.length,
-        totalMatches: existingMatches.length,
-        linkedMatches: existingMatches.filter(match => match.autoLinkStatus === "linked").length
+        removed: removed.length,
+        removedMatchIds: removed.map(match => String(match.id)),
+        manualMatches: manualMatches.length,
+        totalMatches: finalMatches.length,
+        linkedMatches: finalMatches.filter(match => match.autoLinkStatus === "linked").length
       };
     };
-
     const autoLinkMatches = async () => {
       const [matches, channels, streamedRaw] = await Promise.all([
         getMatches(),
