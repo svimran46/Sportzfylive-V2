@@ -608,6 +608,15 @@ async function apiHandler(request, env, ctx) {
           status: String(body.status || "scheduled"),
           poster: String(body.poster || ""),
           description: String(body.description || ""),
+          competition: String(body.competition || ""),
+          home: String(body.home || ""),
+          away: String(body.away || ""),
+          teams: body.teams && typeof body.teams === "object"
+            ? body.teams
+            : { home: String(body.home || ""), away: String(body.away || "") },
+          liveWindow: Number.isFinite(Number(body.liveWindow)) ? Number(body.liveWindow) : 210,
+          url: String(body.url || ""),
+          streams: Array.isArray(body.streams) ? body.streams : [],
           channelIds: Array.isArray(body.channelIds) ? [...new Set(body.channelIds.map(String))] : [],
           createdAt: now,
           updatedAt: now
@@ -633,6 +642,8 @@ async function apiHandler(request, env, ctx) {
         const body = await request.json();
         const current = matches[index];
 
+        const updatedAt = new Date().toISOString();
+        const incomingStreams = Array.isArray(body.streams) ? body.streams : current.streams;
         matches[index] = {
           ...current,
           title: String(body.title ?? current.title).trim(),
@@ -641,10 +652,21 @@ async function apiHandler(request, env, ctx) {
           status: String(body.status ?? current.status ?? "scheduled"),
           poster: String(body.poster ?? current.poster ?? ""),
           description: String(body.description ?? current.description ?? ""),
+          competition: String(body.competition ?? current.competition ?? ""),
+          home: String(body.home ?? current.home ?? ""),
+          away: String(body.away ?? current.away ?? ""),
+          teams: body.teams && typeof body.teams === "object"
+            ? body.teams
+            : (current.teams || { home: String(body.home ?? current.home ?? ""), away: String(body.away ?? current.away ?? "") }),
+          liveWindow: Number.isFinite(Number(body.liveWindow))
+            ? Number(body.liveWindow)
+            : Number(current.liveWindow ?? 210),
+          url: String(body.url ?? current.url ?? ""),
+          streams: Array.isArray(incomingStreams) ? incomingStreams : [],
           channelIds: Array.isArray(body.channelIds)
             ? [...new Set(body.channelIds.map(String))]
             : (current.channelIds || []),
-          updatedAt: new Date().toISOString()
+          updatedAt
         };
 
         await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
