@@ -251,6 +251,17 @@ async function apiHandler(request, env) {
     return json({ status: "online", worker: "sportzfylive" });
   }
 
+  if (request.method === "POST" && url.pathname === "/api/admin/sync-streamed") {
+    if (!await requireAdmin(request, env)) return json({ error: "Admin authentication required" }, 401);
+    try {
+      const result = await syncStreamedMatches(env);
+      return json(result);
+    } catch (error) {
+      console.error("Admin Streamed sync failed:", error);
+      return json({ error: "Streamed sync failed" }, 502);
+    }
+  }
+
   if (request.method === "GET" && url.pathname === "/api/admin/matches") {
     if (!await requireAdmin(request, env)) return json({ error: "Admin authentication required" }, 401);
     return json(await readArray(env, "matches"));
