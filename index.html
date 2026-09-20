@@ -1563,6 +1563,31 @@ body{
     justify-content:center !important;
   }
 }
+/* Streamed source metadata rows (display only, not playable streams) */
+#stream-modal .source-meta-item{
+  min-height:56px;
+  display:grid;
+  align-content:center;
+  gap:3px;
+  padding:12px 13px;
+  border:1px solid rgba(91,119,163,.18);
+  border-radius:12px;
+  background:#0b1525;
+  color:#f4f7ff;
+}
+#stream-modal .source-meta-name{
+  font-size:12px;
+  font-weight:800;
+  text-transform:capitalize;
+}
+#stream-modal .source-meta-id{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#8e9bb0;
+  font-size:10px;
+}
 </style>
 
 <style id="sportzfy-site-content-style">
@@ -2079,6 +2104,19 @@ body{
         if (Array.isArray(configured)) return configured;
         if (configured && typeof configured === "object" && configured.url) return [configured];
 
+        // Admin-managed manual streams (match.streams[]). Only entries that
+        // already carry their own url are playable; nothing is generated here.
+        if (Array.isArray(match?.streams) && match.streams.length) {
+            return match.streams
+                .filter(stream => stream && typeof stream === "object")
+                .map((stream, index) => ({
+                    name: stream.name || `Stream ${index + 1}`,
+                    quality: stream.quality || "HD",
+                    language: stream.language || "English",
+                    url: stream.url || ""
+                }));
+        }
+
         if (Array.isArray(match?.channels)) {
             return match.channels
                 .filter(channel => channel && channel.url)
@@ -2091,6 +2129,17 @@ body{
         }
 
         return [];
+    }
+
+    // Streamed source metadata (match.sources[]). Display only: these are
+    // source names and IDs supplied by Streamed, not playable stream objects.
+    function getStreamedSources(matchId) {
+        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
+        if (!Array.isArray(match?.sources)) return [];
+
+        return match.sources
+            .filter(item => item && typeof item === "object" && item.source && item.id)
+            .map(item => ({ source: String(item.source), id: String(item.id) }));
     }
 
     function openManualStream(matchId) {
@@ -2106,11 +2155,15 @@ body{
         if (!modal || !picker || !player) return;
 
         const streams = getManualStreams(matchId);
+        const sources = getStreamedSources(matchId);
         const title = match.title || "Channel";
         const count = streams.length;
 
-        document.getElementById("stream-subtitle").textContent =
-            `${title} • ${count} stream${count === 1 ? "" : "s"} available`;
+        document.getElementById("stream-subtitle").textContent = [
+            title,
+            sources.length ? `${sources.length} Streamed source${sources.length === 1 ? "" : "s"}` : "",
+            `${count} manual stream${count === 1 ? "" : "s"}`
+        ].filter(Boolean).join(" • ");
 
         player.hidden = true;
         player.replaceChildren();
@@ -2123,7 +2176,7 @@ body{
                             <div class="source-name">Admin</div>
                             <div class="source-note">✣ Admin added streams</div>
                         </div>
-                        <div class="stream-count">0 streams</div>
+                        <div class="stream-count">0 manual streams</div>
                     </div>
                     <div class="no-manual-streams">
                         <strong>${esc(title)}</strong>
@@ -2138,7 +2191,7 @@ body{
                             <div class="source-name">Admin</div>
                             <div class="source-note">✣ Admin added streams</div>
                         </div>
-                        <div class="stream-count">${count} stream${count === 1 ? "" : "s"}</div>
+                        <div class="stream-count">${count} manual stream${count === 1 ? "" : "s"}</div>
                     </div>
                     <div class="stream-list">
                         ${streams.map((stream, index) => `
@@ -2155,6 +2208,27 @@ body{
                         `).join("")}
                     </div>
                 </div>`;
+        }
+
+        if (sources.length) {
+            picker.insertAdjacentHTML("beforeend", `
+                <div class="stream-source-box" style="margin-top:14px">
+                    <div class="source-head">
+                        <div>
+                            <div class="source-name">Streamed</div>
+                            <div class="source-note">✣ Source metadata</div>
+                        </div>
+                        <div class="stream-count">${sources.length} source${sources.length === 1 ? "" : "s"}</div>
+                    </div>
+                    <div class="stream-list">
+                        ${sources.map(item => `
+                            <div class="source-meta-item">
+                                <span class="source-meta-name">${esc(item.source)}</span>
+                                <span class="source-meta-id" title="${esc(item.id)}">Source ID: ${esc(item.id)}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>`);
         }
 
         modal.style.display = "flex";
