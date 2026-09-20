@@ -365,8 +365,14 @@ async function apiHandler(request, env, ctx) {
             createdAt: previous.createdAt || now,
             updatedAt: now,
 
-            // Preserve locally generated/broadcast metadata until the
-            // broadcast-sync job refreshes it for this fixture.
+            // Preserve locally editable/admin metadata across Streamed refreshes.
+            competition: previous.competition || "",
+            home: previous.home || "",
+            away: previous.away || "",
+            teams: previous.teams || streamed.teams || null,
+            liveWindow: Number(previous.liveWindow ?? 210),
+            url: previous.url || "",
+            streams: Array.isArray(previous.streams) ? previous.streams : [],
             broadcasts: Array.isArray(previous.broadcasts)
               ? previous.broadcasts
               : undefined,
