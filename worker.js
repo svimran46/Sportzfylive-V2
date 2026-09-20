@@ -1473,7 +1473,6 @@ async function syncBroadcastData(env) {
   let linkedMatches = 0;
   let broadcastCount = 0;
   let eventCount = 0;
-  let createdChannels = 0;
   const diagnostics = [];
   const syncedAt = new Date().toISOString();
 
@@ -1629,7 +1628,6 @@ async function syncBroadcastData(env) {
   const cycleComplete = nextCursor >= eligible.length;
 
   await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
-  await env.SPORTZFY_DB.put("channels", JSON.stringify(channels));
   await env.SPORTZFY_DB.put(
     "broadcast_sync_cursor",
     String(cycleComplete ? 0 : nextCursor)
@@ -1650,7 +1648,6 @@ async function syncBroadcastData(env) {
     broadcastCount,
     matchedMatches,
     linkedMatches,
-    createdChannels,
     totalChannels: channels.length,
     diagnostics
   };
