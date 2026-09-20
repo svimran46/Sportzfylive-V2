@@ -1,5 +1,112 @@
-export default {
-  async fetch(request, env, ctx) {
+// ---------------------------------------------------------------------------
+// Shared performance helpers
+// ---------------------------------------------------------------------------
+
+// channel-source lookup: slug -> [channel ids], built once per job instead of
+// re-slugifying every channel alias for every (match x source x channel).
+function buildSourceIndex(channels, slugify) {
+  const index = new Map();
+  for (const channel of channels) {
+    const id = String(channel.id);
+    const keys = new Set([
+      channel.streamedSource,
+      ...(Array.isArray(channel.streamedSources) ? channel.streamedSources : []),
+      ...(Array.isArray(channel.streamedAliases) ? channel.streamedAliases : []),
+      channel.id,
+      channel.name,
+      channel.slug
+    ].map(value => slugify(value)).filter(Boolean));
+
+    for (const key of keys) {
+      let list = index.get(key);
+      if (!list) { list = []; index.set(key, list); }
+      if (!list.includes(id)) list.push(id);
+    }
+  }
+  return index;
+}
+
+function idsForSources(index, sources, slugify) {
+  const ids = [];
+  for (const source of sources) {
+    const list = index.get(slugify(source));
+    if (list) ids.push(...list);
+  }
+  return ids;
+}
+
+function prepareStreamedForLinking(streamedRaw, normalizeText) {
+  return streamedRaw.map(raw => {
+    const title = normalizeText(raw.title);
+    return { raw, title, words: new Set(title.split(" ").filter(word => word.length > 2)) };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Public snapshots
+//
+// The public endpoints used to parse the full "matches" + "channels" JSON (and
+// call the Streamed API) on every request. Sync jobs and admin writes now
+// pre-build the response, and public GETs just return the stored string.
+// ---------------------------------------------------------------------------
+const SNAPSHOT_ALL_TODAY = "snapshot:all-today";
+const SNAPSHOT_FEATURED = "snapshot:featured";
+
+async function rebuildSnapshots(env, matchesIn, channelsIn) {
+  const readArray = async (key) => {
+    const value = await env.SPORTZFY_DB.get(key, "json");
+    return Array.isArray(value) ? value : [];
+  };
+  const slug = (value) => String(value || "").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const matches = matchesIn || await readArray("matches");
+  const channels = channelsIn || (await readArray("channels")).map(channel => ({
+    ...channel,
+    id: channel.id || slug(channel.name) || slug(channel.url)
+  }));
+
+  const byId = new Map(channels.map(channel => [String(channel.id), channel]));
+  const seen = new Set();
+  const allToday = [];
+
+  for (const match of matches) {
+    const key = String(match.externalId || match.id || "").toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    allToday.push({
+      ...match,
+      channels: Array.isArray(match.channelIds)
+        ? match.channelIds.map(id => byId.get(String(id))).filter(Boolean)
+        : []
+    });
+  }
+
+  const featuredId = await env.SPORTZFY_DB.get("site_featured_match", "text");
+  const featured = featuredId
+    ? (matches.find(match => String(match.id) === String(featuredId)) || null)
+    : null;
+
+  const allTodayJson = JSON.stringify(allToday);
+  const featuredJson = JSON.stringify({ id: featuredId || "", match: featured });
+
+  try {
+    await env.SPORTZFY_DB.put(SNAPSHOT_ALL_TODAY, allTodayJson);
+  } catch (error) {
+    // e.g. value larger than KV's 25 MiB limit: drop the stale snapshot so
+    // public GETs fall back to building the response on demand.
+    console.error("Snapshot write failed:", String(error?.message || error));
+    try { await env.SPORTZFY_DB.delete(SNAPSHOT_ALL_TODAY); } catch (_) {}
+  }
+  const previousFeatured = await env.SPORTZFY_DB.get(SNAPSHOT_FEATURED, "text");
+  if (previousFeatured !== featuredJson) {
+    await env.SPORTZFY_DB.put(SNAPSHOT_FEATURED, featuredJson);
+  }
+
+  return { allTodayJson };
+}
+
+async function apiHandler(request, env, ctx) {
     const url = new URL(request.url);
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -165,16 +272,16 @@ export default {
       let best = null;
       let bestScore = 0;
 
-      for (const raw of streamedMatches) {
-        const title = normalizeText(raw.title);
+      const manualWords = new Set(manualTitle.split(" ").filter(word => word.length > 2));
+
+      // streamedMatches here is the pre-normalized list from prepareStreamedForLinking()
+      for (const { raw, title, words: streamedWords } of streamedMatches) {
         if (!title) continue;
 
         let score = 0;
         if (title === manualTitle) score += 100;
         else if (title.includes(manualTitle) || manualTitle.includes(title)) score += 70;
 
-        const manualWords = new Set(manualTitle.split(" ").filter(word => word.length > 2));
-        const streamedWords = new Set(title.split(" ").filter(word => word.length > 2));
         const common = [...manualWords].filter(word => streamedWords.has(word)).length;
         const total = Math.max(manualWords.size, streamedWords.size, 1);
         score += (common / total) * 50;
@@ -202,15 +309,9 @@ export default {
       ]);
 
       const now = new Date().toISOString();
-      const channelIdsForSources = (sources) => {
-        const ids = [];
-        for (const source of sources) {
-          for (const channel of channels) {
-            if (sourceMatchesChannel(source, channel)) ids.push(String(channel.id));
-          }
-        }
-        return [...new Set(ids)];
-      };
+      const sourceIndex = buildSourceIndex(channels, slugify);
+      const channelIdsForSources = (sources) =>
+        [...new Set(idsForSources(sourceIndex, sources, slugify))];
 
       /*
         Streamed is the source of truth for Streamed-origin matches.
@@ -306,11 +407,12 @@ export default {
 
       // The stored Streamed section is replaced by the fresh Streamed dataset.
       // This is what removes fixtures that disappeared from Streamed.
+      const freshExternalIds = new Set(
+        freshStreamedMatches.map(fresh => String(fresh.externalId || ""))
+      );
       const removed = existingMatches.filter(item =>
         item.source === "streamed" &&
-        !freshStreamedMatches.some(fresh =>
-          String(fresh.externalId || "") === String(item.externalId || "")
-        )
+        !freshExternalIds.has(String(item.externalId || ""))
       );
 
       const finalMatches = [...manualMatches, ...freshStreamedMatches];
@@ -338,10 +440,12 @@ export default {
 
       const streamedMatches = streamedRaw.map(toStreamedMatch);
       const channelMap = new Map(channels.map(channel => [String(channel.id), channel]));
+      const sourceIndex = buildSourceIndex(channels, slugify);
+      const preparedStreamed = prepareStreamedForLinking(streamedRaw, normalizeText);
       const results = [];
 
-      for (const match of matches) {
-        const found = findStreamedMatch(match, streamedRaw);
+      for (const [matchIndex, match] of matches.entries()) {
+        const found = findStreamedMatch(match, preparedStreamed);
 
         if (!found) {
           results.push({
@@ -354,18 +458,12 @@ export default {
 
         const streamed = toStreamedMatch(found.match);
         const sourceNames = streamed.sources.map(source => source.source);
-        const autoChannelIds = [];
-
-        for (const source of sourceNames) {
-          for (const channel of channels) {
-            if (sourceMatchesChannel(source, channel)) autoChannelIds.push(String(channel.id));
-          }
-        }
+        const autoChannelIds = idsForSources(sourceIndex, sourceNames, slugify);
 
         const currentIds = Array.isArray(match.channelIds) ? match.channelIds.map(String) : [];
         const mergedIds = [...new Set([...currentIds, ...autoChannelIds])];
 
-        const index = matches.findIndex(item => String(item.id) === String(match.id));
+        const index = matchIndex;
         if (index !== -1) {
           matches[index] = {
             ...matches[index],
@@ -416,22 +514,13 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/api/matches/all-today") {
-      const manualMatches = await expandMatches(await getMatches());
-      let streamedMatches = [];
+      const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+      const snapshot = await env.SPORTZFY_DB.get(SNAPSHOT_ALL_TODAY, "text");
+      if (snapshot) return new Response(snapshot, { headers: jsonHeaders });
 
-      try {
-        streamedMatches = (await fetchStreamedMatches()).map(toStreamedMatch);
-      } catch (_) {}
-
-      const merged = [...manualMatches, ...streamedMatches];
-      const seen = new Set();
-
-      return json(merged.filter(match => {
-        const key = String(match.externalId || match.id || "").toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      }));
+      // First request after deploy (or if the snapshot key was deleted).
+      const built = await rebuildSnapshots(env);
+      return new Response(built.allTodayJson, { headers: jsonHeaders });
     }
 
     if (request.method === "POST" &&
@@ -594,8 +683,16 @@ export default {
         env.SPORTZFY_DB.get("site_banner", "json"),
         env.SPORTZFY_DB.get("site_featured_match", "text")
       ]);
-      const matches = await getMatches();
-      const featuredMatch = featuredId ? (matches.find(m => String(m.id) === String(featuredId)) || null) : null;
+      let featuredMatch = null;
+      if (featuredId) {
+        const snapshot = await env.SPORTZFY_DB.get(SNAPSHOT_FEATURED, "json");
+        if (snapshot && String(snapshot.id) === String(featuredId)) {
+          featuredMatch = snapshot.match || null;
+        } else {
+          const matches = await getMatches();
+          featuredMatch = matches.find(m => String(m.id) === String(featuredId)) || null;
+        }
+      }
       return json({
         notice: notice || { enabled:false, text:"", link:"" },
         banner: banner || { enabled:false, image:"", link:"", alt:"" },
@@ -651,6 +748,25 @@ export default {
     }
 
     return new Response("SportzfyLive API Online", { headers: corsHeaders });
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const response = await apiHandler(request, env, ctx);
+
+    // Any successful admin write can change what the public endpoints return,
+    // so refresh the snapshots in the background.
+    const path = new URL(request.url).pathname;
+    if (
+      request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS" &&
+      response.status < 300 && path !== "/api/admin/login"
+    ) {
+      ctx.waitUntil(
+        rebuildSnapshots(env).catch(error => console.error("Snapshot refresh failed:", error))
+      );
+    }
+
+    return response;
   },
 
   async scheduled(controller, env) {
@@ -757,20 +873,28 @@ async function syncStreamedMatches(env) {
   const streamedRaw = await upstream.json();
   const streamedMatches = Array.isArray(streamedRaw) ? streamedRaw : [];
 
-  const aliases = channel => [
-    channel.streamedSource,
-    ...(Array.isArray(channel.streamedSources) ? channel.streamedSources : []),
-    ...(Array.isArray(channel.streamedAliases) ? channel.streamedAliases : [])
-  ].map(value => slugify(value)).filter(Boolean);
+  const sourceIndex = buildSourceIndex(channels, slugify);
+  const now = new Date().toISOString();
 
-  const sourceMatchesChannel = (source, channel) => {
-    const wanted = slugify(source);
-    if (aliases(channel).includes(wanted)) return true;
-    return [channel.id, channel.name, channel.slug]
-      .map(value => slugify(value)).filter(Boolean).includes(wanted);
+  // Lookup tables so each upstream match is an O(1) lookup instead of a scan
+  // (with regex/unicode normalisation) over every stored match.
+  const byExternalId = new Map();       // externalId -> first index
+  const byTitle = new Map();            // normalised title -> [indexes] (streamed only)
+  const normalizedAt = [];              // index -> normalised title
+  const indexTitle = (i, normalized) => {
+    normalizedAt[i] = normalized;
+    let list = byTitle.get(normalized);
+    if (!list) { list = []; byTitle.set(normalized, list); }
+    list.push(i);
   };
 
-  const now = new Date().toISOString();
+  matches.forEach((item, i) => {
+    const ext = String(item.externalId || "");
+    if (ext && !byExternalId.has(ext)) byExternalId.set(ext, i);
+    if (item.source === "streamed") indexTitle(i, normalizeText(item.title));
+  });
+
+  const touched = new Set();
 
   for (const raw of streamedMatches) {
     const externalId = String(raw.id || "");
@@ -778,31 +902,30 @@ async function syncStreamedMatches(env) {
     const normalizedTitle = normalizeText(title);
     const rawDate = raw.date ? Number(raw.date) : NaN;
 
-    let index = matches.findIndex(item =>
-      externalId && String(item.externalId || "") === externalId
-    );
+    let index = externalId && byExternalId.has(externalId) ? byExternalId.get(externalId) : -1;
 
     if (index === -1) {
-      index = matches.findIndex(item => {
-        if (item.source !== "streamed") return false;
-        if (normalizeText(item.title) !== normalizedTitle) return false;
-        if (!rawDate || !item.startTime) return true;
-        const existingDate = Date.parse(item.startTime);
-        return existingDate === existingDate &&
-          Math.abs(existingDate - rawDate) <= 60 * 60 * 1000;
-      });
+      const candidates = byTitle.get(normalizedTitle);
+      if (candidates) {
+        for (const i of candidates) {
+          if (normalizedAt[i] !== normalizedTitle) continue;
+          const item = matches[i];
+          if (item.source !== "streamed") continue;
+          if (rawDate && item.startTime) {
+            const existingDate = Date.parse(item.startTime);
+            if (!(existingDate === existingDate &&
+                  Math.abs(existingDate - rawDate) <= 60 * 60 * 1000)) continue;
+          }
+          if (index === -1 || i < index) index = i;
+        }
+      }
     }
 
     const sourceNames = Array.isArray(raw.sources)
       ? raw.sources.map(source => String(source?.source || "")).filter(Boolean)
       : [];
 
-    const autoIds = [];
-    for (const source of sourceNames) {
-      for (const channel of channels) {
-        if (sourceMatchesChannel(source, channel)) autoIds.push(String(channel.id));
-      }
-    }
+    const autoIds = [...new Set(idsForSources(sourceIndex, sourceNames, slugify))];
 
     const streamed = {
       id: "streamed-" + (externalId || crypto.randomUUID()),
@@ -826,14 +949,16 @@ async function syncStreamedMatches(env) {
     };
 
     if (index === -1) {
-      matches.push({
+      index = matches.push({
         ...streamed,
         channelIds: autoIds,
         createdAt: now,
         updatedAt: now,
         autoLinkStatus: autoIds.length ? "linked" : "matched-no-channel-map",
         autoLinkedAt: now
-      });
+      }) - 1;
+      if (externalId && !byExternalId.has(externalId)) byExternalId.set(externalId, index);
+      indexTitle(index, normalizedTitle);
     } else {
       const current = matches[index];
       const currentIds = Array.isArray(current.channelIds) ? current.channelIds.map(String) : [];
@@ -847,11 +972,30 @@ async function syncStreamedMatches(env) {
         autoLinkStatus: autoIds.length ? "linked" : (current.autoLinkStatus || "matched-no-channel-map"),
         autoLinkedAt: now
       };
+      if (normalizedAt[index] !== normalizedTitle) indexTitle(index, normalizedTitle);
     }
+
+    touched.add(index);
   }
 
-  await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
-  return { success: true, streamedCount: streamedMatches.length, totalMatches: matches.length };
+  // Streamed is the source of truth for streamed-origin fixtures: anything not
+  // returned by this run has dropped out of the feed, so remove it (same rule
+  // as the admin "sync streamed" endpoint). Manual matches are never touched.
+  // Guard: an empty upstream response is treated as a glitch, not "delete all".
+  let finalMatches = matches;
+  if (streamedMatches.length > 0) {
+    finalMatches = matches.filter((item, i) => item.source !== "streamed" || touched.has(i));
+  }
+
+  await env.SPORTZFY_DB.put("matches", JSON.stringify(finalMatches));
+  await rebuildSnapshots(env, finalMatches, channels);
+
+  return {
+    success: true,
+    streamedCount: streamedMatches.length,
+    totalMatches: finalMatches.length,
+    removed: matches.length - finalMatches.length
+  };
 }
 
 async function autoLinkMatches(env) {
@@ -1100,6 +1244,29 @@ async function syncBroadcastData(env) {
     return "bsd:" + String(country || "global").toUpperCase() + ":" + idPart;
   };
 
+  // Normalised aliases/countries are computed once per channel (and refreshed
+  // only when that channel is modified) instead of on every comparison.
+  const channelMeta = new Map();
+  const buildMeta = (channel) => {
+    const meta = {
+      aliases: [
+        channel.name,
+        channel.broadcastName,
+        ...(Array.isArray(channel.broadcastNames) ? channel.broadcastNames : []),
+        ...(Array.isArray(channel.broadcastAliases) ? channel.broadcastAliases : [])
+      ].map(normalizeText).filter(Boolean),
+      countries: [
+        channel.countryCode,
+        channel.country_code,
+        channel.regionCode,
+        channel.broadcastCountry
+      ].map(x => String(x || "").trim().toUpperCase()).filter(Boolean)
+    };
+    channelMeta.set(channel, meta);
+    return meta;
+  };
+  for (const channel of channels) buildMeta(channel);
+
   const autoCreateBroadcastChannel = (broadcast) => {
     const name = String(broadcast.name || "").trim();
     const country = String(broadcast.country || "").trim().toUpperCase();
@@ -1109,31 +1276,20 @@ async function syncBroadcastData(env) {
 
     if (!name) return null;
 
+    const wantedName = normalizeText(name);
+
     const existing = channels.find(channel => {
       if (rawId && String(channel.broadcastChannelId || "") === rawId &&
           String(channel.broadcastCountry || channel.countryCode || "").toUpperCase() === country) {
         return true;
       }
 
-      const aliases = [
-        channel.name,
-        channel.broadcastName,
-        ...(Array.isArray(channel.broadcastNames) ? channel.broadcastNames : []),
-        ...(Array.isArray(channel.broadcastAliases) ? channel.broadcastAliases : [])
-      ].map(normalizeText).filter(Boolean);
-
-      const channelCountries = [
-        channel.countryCode,
-        channel.country_code,
-        channel.regionCode,
-        channel.broadcastCountry
-      ].map(x => String(x || "").trim().toUpperCase()).filter(Boolean);
-
-      const sameCountry = !country || !channelCountries.length || channelCountries.includes(country);
-      return sameCountry && aliases.some(alias =>
-        alias === normalizeText(name) ||
-        alias.includes(normalizeText(name)) ||
-        normalizeText(name).includes(alias)
+      const meta = channelMeta.get(channel);
+      const sameCountry = !country || !meta.countries.length || meta.countries.includes(country);
+      return sameCountry && meta.aliases.some(alias =>
+        alias === wantedName ||
+        alias.includes(wantedName) ||
+        wantedName.includes(alias)
       );
     });
 
@@ -1143,6 +1299,7 @@ async function syncBroadcastData(env) {
       if (!existing.broadcastSource) existing.broadcastSource = "bsd";
       if (!Array.isArray(existing.broadcastAliases)) existing.broadcastAliases = [];
       if (name && !existing.broadcastAliases.includes(name)) existing.broadcastAliases.push(name);
+      buildMeta(existing);
       return { channel: existing, created: false };
     }
 
@@ -1166,6 +1323,7 @@ async function syncBroadcastData(env) {
     };
 
     channels.push(created);
+    buildMeta(created);
     return { channel: created, created: true };
   };
 
@@ -1505,6 +1663,7 @@ async function syncBroadcastData(env) {
     "broadcast_sync_cursor",
     String(cycleComplete ? 0 : nextCursor)
   );
+  await rebuildSnapshots(env, matches, channels);
 
   return {
     success: true,
