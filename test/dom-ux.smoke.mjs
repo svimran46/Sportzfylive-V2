@@ -1,7 +1,11 @@
 // DOM-level smoke test for index.html: extracts the inline <script> blocks,
 // runs them in a stubbed DOM environment, and simulates user interactions.
-// Primary regression target: the Enter/Space keyboard handler on match cards
-// must open the stream-sources modal (no ReferenceError: openManualStream).
+// Primary regression targets:
+//   1. Enter/Space keyboard handler opens the stream-sources modal
+//      (no ReferenceError: openManualStream).
+//   2. Streamed embed playback: playable streams render as clickable chips
+//      whose embed URL follows https://embed.st/embed/{source}/{id}/{streamNo}
+//      and clicking one loads an iframe into the player container.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -26,13 +30,13 @@ assert.ok(scripts.length >= 2, "expected the main inline script blocks to exist"
 // ---------------------------------------------------------------------------
 
 function makeElement(id = "") {
-  return {
+  const el = {
     id,
     dataset: {},
     textContent: "",
-    innerHTML: "",
     hidden: false,
     disabled: false,
+    title: "",
     style: { display: "", width: "", transform: "" },
     classList: {
       _set: new Set(),
@@ -41,14 +45,59 @@ function makeElement(id = "") {
       toggle(c) { this._set.has(c) ? this._set.delete(c) : this._set.add(c); },
       contains(c) { return this._set.has(c); }
     },
-    replaceChildren() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
-    addEventListener() {},
+    replaceChildren() { el.children.length = 0; },
+    addEventListener(type, handler) {
+      if (type === "click") el._clickHandler = handler;
+    },
+    click() { if (el._clickHandler) el._clickHandler(); },
     closest() { return null; },
     children: [],
+    allow: "",
+    allowFullscreen: false,
+    referrerPolicy: "",
+    scrollIntoView() {},
+    appendChild(child) { el.children.push(child); },
     getBoundingClientRect() { return { width: 800 }; }
   };
+
+  // Minimal innerHTML simulation: materializes .stream-embed-chip buttons as
+  // child elements (with dataset + click wiring) so the stream picker flow is
+  // testable. Not a general HTML parser.
+  const unescapeAttr = (s) => String(s || "")
+    .replace(/&quot;/g, '"').replace(/&#039;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  Object.defineProperty(el, "innerHTML", {
+    get() { return el._html || ""; },
+    set(value) {
+      el._html = String(value);
+      el.children.length = 0;
+      const chipRe = /<button class="stream-embed-chip"([^>]*)>/g;
+      let m;
+      while ((m = chipRe.exec(el._html)) !== null) {
+        const chip = makeElement();
+        chip.tagName = "button";
+        chip.classList.add("stream-embed-chip");
+        const url = m[1].match(/data-embed-url="([^"]*)"/);
+        const label = m[1].match(/data-stream-label="([^"]*)"/);
+        chip.dataset.embedUrl = url ? unescapeAttr(url[1]) : "";
+        chip.dataset.streamLabel = label ? unescapeAttr(label[1]) : "";
+        el.children.push(chip);
+      }
+    }
+  });
+
+  el.querySelectorAll = (selector) => {
+    if (selector === ".stream-embed-chip") {
+      return el.children.filter(c => c.classList && c.classList.contains("stream-embed-chip"));
+    }
+    if (selector === ".stream-embed-chip.active") {
+      return el.children.filter(c =>
+        c.classList && c.classList.contains("stream-embed-chip") && c.classList.contains("active"));
+    }
+    return [];
+  };
+
+  return el;
 }
 
 const documentStub = {
@@ -60,12 +109,24 @@ const documentStub = {
     if (!this._elements.has(id)) this._elements.set(id, makeElement(id));
     return this._elements.get(id);
   },
-  querySelector() { return null; },
+  querySelector(selector) {
+    // Only used by copyEmbedCode for "#player-container iframe"; return the
+    // first iframe we created, if any, so the embed-copy path is testable.
+    if (selector === "#player-container iframe") {
+      const player = this.getElementById("player-container");
+      return player.children.find(c => c.tagName === "iframe") || null;
+    }
+    return null;
+  },
   querySelectorAll() { return []; },
   addEventListener(type, handler) {
     (this._handlers[type] ||= []).push(handler);
   },
-  createElement() { return makeElement(); },
+  createElement(tagName) {
+    const el = makeElement();
+    el.tagName = String(tagName || "").toLowerCase();
+    return el;
+  },
   dispatch(type, event) {
     for (const handler of this._handlers[type] || []) handler(event);
   }
@@ -117,11 +178,33 @@ const ok = (name) => { passed += 1; console.log("  ok " + passed + " - " + name)
 // 1. Keyboard handler opens the stream modal (the openManualStream regression).
 // ---------------------------------------------------------------------------
 
-// Seed one match so openStreamSources has data to render.
+// Seed two matches: one with resolved playable streams, one without.
 windowStub.__SPORTZFY_MATCHES.set("streamed-101", {
   id: "streamed-101",
   title: "Valencia vs Real Sociedad",
   sources: [{ source: "StreamedSoccerHD", id: "src-1" }]
+});
+windowStub.__SPORTZFY_MATCHES.set("streamed-ppv", {
+  id: "streamed-ppv",
+  title: "NY Giants at LA Rams",
+  sources: [{ source: "admin", id: "ppv-new-york-giants-at-los-angeles-rams" }],
+  streamed: {
+    sourceCount: 1,
+    streamCount: 2,
+    sources: [{
+      source: "admin",
+      id: "ppv-new-york-giants-at-los-angeles-rams",
+      streamCount: 2,
+      streams: [
+        { streamNo: 1, language: "English", hd: true, source: "admin" },
+        { streamNo: 2, language: "Spanish", hd: false, source: "admin" }
+      ]
+    }],
+    streams: [
+      { streamNo: 1, language: "English", hd: true, source: "admin" },
+      { streamNo: 2, language: "Spanish", hd: false, source: "admin" }
+    ]
+  }
 });
 
 const card = makeElement("card");
@@ -149,8 +232,8 @@ for (const key of ["Enter", " "]) {
     key + " should populate the modal subtitle"
   );
   assert.ok(
-    subtitle.textContent.includes("1 Streamed source"),
-    key + " should show the Streamed source count"
+    subtitle.textContent.includes("0 playable stream"),
+    key + " should show the playable stream count"
   );
   ok('"' + key + '" on a match card opens the stream sources modal');
 
@@ -172,6 +255,75 @@ assert.equal(
   "mouse click should still open the modal"
 );
 ok("mouse click path unchanged");
+
+// ---------------------------------------------------------------------------
+// 2b. Playable Streamed embeds: chips render, embed URL shape is
+//     https://embed.st/embed/{source}/{id}/{streamNo}, and clicking a chip
+//     mounts an iframe in the player container.
+// ---------------------------------------------------------------------------
+
+const embedCard = makeElement("embed-card");
+embedCard.classList.add("sfy-match-item");
+embedCard.dataset.matchId = "streamed-ppv";
+embedCard.closest = (selector) =>
+  selector === ".sfy-match-item" || selector === "[data-match-id]" ? embedCard : null;
+
+documentStub.dispatch("click", { target: embedCard });
+assert.equal(
+  documentStub.getElementById("stream-modal").style.display,
+  "flex",
+  "embed-capable match should open the modal"
+);
+
+const subtitle2 = documentStub.getElementById("stream-subtitle");
+assert.ok(
+  subtitle2.textContent.includes("2 playable streams"),
+  "subtitle should count both playable streams (got: " + subtitle2.textContent + ")"
+);
+
+const picker2 = documentStub.getElementById("stream-picker");
+const chips = picker2.children.filter(el => el.classList && el.classList.contains("stream-embed-chip"));
+assert.equal(chips.length, 2, "should render one chip per resolved stream");
+ok("playable streams render as one clickable chip per stream");
+
+const wantUrl1 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1";
+const wantUrl2 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/2";
+assert.equal(chips[0].dataset.embedUrl, wantUrl1);
+assert.equal(chips[1].dataset.embedUrl, wantUrl2);
+ok("chip embed URLs follow embed.st/embed/{source}/{id}/{streamNo}");
+
+chips[0].click();
+const player2 = documentStub.getElementById("player-container");
+assert.equal(player2.hidden, false, "clicking a chip should reveal the player");
+assert.equal(player2.children.length, 1, "player should contain exactly one iframe");
+const frame2 = player2.children[0];
+assert.equal(frame2.tagName, "iframe", "mounted element must be an iframe");
+assert.equal(frame2.src, wantUrl1, "iframe must point at the exact embed.st URL");
+assert.equal(frame2.allowFullscreen, true, "iframe must allow fullscreen");
+assert.ok(
+  chips[0].classList.contains("active") && !chips[1].classList.contains("active"),
+  "clicked chip should be marked active"
+);
+ok("clicking a chip mounts the embed.st iframe in the player");
+
+// Switching streams swaps the iframe without stacking players.
+chips[1].click();
+assert.equal(player2.children.length, 1, "only one iframe at a time");
+assert.equal(player2.children[0].src, wantUrl2, "second chip swaps the iframe src");
+assert.ok(chips[1].classList.contains("active"), "active state follows the click");
+ok("switching chips replaces the active stream");
+
+// The no-streams match must still degrade to a friendly note, not a crash.
+documentStub.dispatch("keydown", {
+  key: "Enter",
+  target: card,
+  preventDefault() {}
+});
+assert.ok(
+  documentStub.getElementById("stream-picker").innerHTML.includes("0 playable"),
+  "matches without lineups should show the empty state"
+);
+ok("matches without resolved streams show the empty state");
 
 // ---------------------------------------------------------------------------
 // 3. Static guarantee: no dangling identifier in the shipped page.

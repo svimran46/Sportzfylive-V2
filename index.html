@@ -1587,6 +1587,69 @@ body{
   color:#8e9bb0;
   font-size:10px;
 }
+/* Playable Streamed embed chips */
+#stream-modal .stream-embed-chip{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:56px;
+  padding:12px 14px;
+  border:1px solid rgba(91,119,163,.18);
+  border-radius:12px;
+  background:#0b1525;
+  color:#f4f7ff;
+  font-size:13px;
+  font-weight:700;
+  text-align:left;
+  cursor:pointer;
+  transition:border-color .15s ease, background .15s ease, transform .15s ease;
+}
+#stream-modal .stream-embed-chip:hover{
+  border-color:rgba(115,124,255,.55);
+  background:#0e1a2d;
+  transform:translateY(-1px);
+}
+#stream-modal .stream-embed-chip.active{
+  border-color:#737cff;
+  background:#101d33;
+  box-shadow:0 0 0 1px rgba(115,124,255,.35);
+}
+#stream-modal .stream-chip-main{display:flex;align-items:center;gap:9px;min-width:0}
+#stream-modal .stream-chip-no{
+  display:grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  flex:0 0 auto;
+  border-radius:9px;
+  background:linear-gradient(135deg,#5865f2,#737cff);
+  color:#fff;
+  font-size:12px;
+  font-weight:900;
+}
+#stream-modal .stream-chip-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#stream-modal .stream-chip-tags{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+#stream-modal .stream-chip-tag{
+  padding:3px 8px;
+  border:1px solid rgba(91,119,163,.28);
+  border-radius:999px;
+  color:#aab5c7;
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+}
+#stream-modal .stream-chip-tag.hd{border-color:rgba(52,199,123,.45);color:#5ad694}
+#stream-modal .stream-empty-note{
+  padding:18px 14px;
+  border:1px dashed rgba(91,119,163,.3);
+  border-radius:12px;
+  color:#8e9bb0;
+  font-size:12px;
+  line-height:1.55;
+}
+
 </style>
 
 <style id="sportzfy-site-content-style">
@@ -2097,8 +2160,82 @@ body{
             }));
     }
 
+    // Streamed exposes playback via a deterministic embed pattern:
+    // https://embed.st/embed/{source}/{id}/{streamNo}
+    // Built client-side from the Worker's whitelisted metadata, so no
+    // embedUrl ever needs to cross a public API response.
+    function streamEmbedUrl(group, streamNo) {
+        const source = String(group && group.source || "");
+        const id = String(group && group.id || "");
+        const no = String(Number(streamNo) || 1);
+        return "https://embed.st/embed/" + encodeURIComponent(source) +
+            "/" + encodeURIComponent(id) + "/" + encodeURIComponent(no);
+    }
+
+    function collectPlayableStreams(match) {
+        const playable = [];
+        const groups = (match && match.streamed && Array.isArray(match.streamed.sources))
+            ? match.streamed.sources : [];
+        for (const group of groups) {
+            const streams = Array.isArray(group && group.streams) ? group.streams : [];
+            for (const stream of streams) {
+                if (stream && Number(stream.streamNo) > 0) {
+                    playable.push({ group: group, stream: stream });
+                }
+            }
+        }
+        return playable;
+    }
+
+    function renderStreamChips(playable) {
+        return playable.map(function (item) {
+            const url = streamEmbedUrl(item.group, item.stream.streamNo);
+            const label = "S" + item.stream.streamNo + " • " +
+                (item.stream.language || "Default");
+            const tags = (item.stream.hd ? '<span class="stream-chip-tag hd">HD</span>' : "") +
+                '<span class="stream-chip-tag">Watch</span>';
+            return '<button class="stream-embed-chip" type="button"' +
+                ' data-embed-url="' + esc(url) + '"' +
+                ' data-stream-label="' + esc(label) + '">' +
+                '<span class="stream-chip-main">' +
+                '<span class="stream-chip-no">' + esc(item.stream.streamNo) + '</span>' +
+                '<span class="stream-chip-label">' + esc(item.group.source) +
+                ' • ' + esc(item.stream.language || "Default") + '</span>' +
+                '</span>' +
+                '<span class="stream-chip-tags">' + tags + '</span>' +
+                '</button>';
+        }).join("");
+    }
+
+    function attachStreamPicker() {
+        const picker = document.getElementById("stream-picker");
+        const player = document.getElementById("player-container");
+        if (!picker || !player) return;
+
+        picker.querySelectorAll(".stream-embed-chip").forEach(function (chip) {
+            chip.addEventListener("click", function () {
+                const url = chip.dataset.embedUrl;
+                if (!url) return;
+                picker.querySelectorAll(".stream-embed-chip.active").forEach(function (other) {
+                    other.classList.remove("active");
+                });
+                chip.classList.add("active");
+                player.hidden = false;
+                player.replaceChildren();
+                const frame = document.createElement("iframe");
+                frame.src = url;
+                frame.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
+                frame.allowFullscreen = true;
+                frame.referrerPolicy = "no-referrer";
+                frame.title = chip.dataset.streamLabel || "Match stream";
+                player.appendChild(frame);
+                player.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        });
+    }
+
     function openStreamSources(matchId) {
-        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
+        const match = window.__SPORTZFY_MATCHES && window.__SPORTZFY_MATCHES.get(String(matchId));
         if (!match) return;
 
         activeMatch = match;
@@ -2109,41 +2246,40 @@ body{
         if (!modal || !picker || !player) return;
 
         const sources = getStreamedSources(matchId);
+        const playable = collectPlayableStreams(match);
         const title = match.title || "Match";
 
         document.getElementById("stream-subtitle").textContent =
             title + " • " +
-            sources.length + " Streamed source" + (sources.length === 1 ? "" : "s");
+            playable.length + " playable stream" + (playable.length === 1 ? "" : "s");
 
         player.hidden = true;
         player.replaceChildren();
 
-        const sourceRows = sources.length
-            ? sources.map(item => `
-                <div class="source-meta-item">
-                    <span class="source-meta-name">${esc(item.source)}</span>
-                    <span class="source-meta-id">Streamed source</span>
-                </div>
-            `).join("")
-            : `
-                <div class="no-stream-sources" style="padding:20px">
-                    <strong>${esc(title)}</strong>
-                    <span>No Streamed source metadata is available yet.</span>
-                </div>
-            `;
+        const streamRows = playable.length
+            ? renderStreamChips(playable)
+            : sources.length
+                ? '<div class="stream-empty-note">Lineups for this match are not published yet — streams appear here once the source publishes them.</div>'
+                : '<div class="no-stream-sources" style="padding:20px">' +
+                  '<strong>' + esc(title) + '</strong>' +
+                  '<span>No Streamed source metadata is available yet.</span>' +
+                  '</div>';
 
-        picker.innerHTML = `
-            <div class="stream-source-box">
-                <div class="source-head">
-                    <div>
-                        <div class="source-name">Streamed</div>
-                        <div class="source-note">✣ Streamed source groups</div>
-                    </div>
-                    <div class="stream-count">${sources.length} source${sources.length === 1 ? "" : "s"}</div>
-                </div>
-                <div class="stream-list">${sourceRows}</div>
-            </div>
-        `;
+        picker.innerHTML =
+            '<div class="stream-source-box">' +
+            '<div class="source-head">' +
+            '<div>' +
+            '<div class="source-name">Streamed</div>' +
+            '<div class="source-note">✣ ' + sources.length + ' source' +
+            (sources.length === 1 ? "" : "s") + ' • ' + playable.length + ' playable</div>' +
+            '</div>' +
+            '<div class="stream-count">' + playable.length + ' stream' +
+            (playable.length === 1 ? "" : "s") + '</div>' +
+            '</div>' +
+            '<div class="stream-list">' + streamRows + '</div>' +
+            '</div>';
+
+        attachStreamPicker();
 
         modal.style.display = "flex";
         document.body.style.overflow = "hidden";
@@ -2155,9 +2291,16 @@ body{
 
     async function copyEmbedCode() {
         if (!activeMatch) return;
-        const url = location.href.split("#")[0] + "#match=" + encodeURIComponent(activeMatch.id);
+        const frame = document.querySelector("#player-container iframe");
+        const firstGroup = activeMatch.streamed &&
+            activeMatch.streamed.sources && activeMatch.streamed.sources[0];
+        const firstStream = firstGroup && firstGroup.streams && firstGroup.streams[0];
+        const url = (frame && frame.src) ||
+            (firstGroup && firstStream
+                ? streamEmbedUrl(firstGroup, firstStream.streamNo)
+                : location.href.split("#")[0] + "#match=" + encodeURIComponent(activeMatch.id));
         try {
-            await navigator.clipboard.writeText(`<iframe src="${url}" width="100%" height="500" frameborder="0" allowfullscreen></iframe>`);
+            await navigator.clipboard.writeText('<iframe src="' + url + '" width="100%" height="500" frameborder="0" allowfullscreen></iframe>');
         } catch (_) {}
     }
 
