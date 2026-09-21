@@ -6,12 +6,6 @@ const SNAPSHOT_ALL_TODAY = "snapshot:all-today";
 const SNAPSHOT_FEATURED = "snapshot:featured";
 const MIGRATION_KEY = "channel_system_migrated";
 const STREAMED_STREAM_ENDPOINT = "https://streamed.pk/api/stream";
-const STREAMED_STREAMS_KEY_PREFIX = "streamed:streams:";
-const STREAMED_FRESH_TTL_MS = 45 * 60 * 1000;    // serve-from-cache window per source
-const STREAMED_STALE_TTL_SECONDS = 6 * 60 * 60;  // KV retention (stale ceiling) per source
-const STREAMED_SOURCE_TIMEOUT_MS = 8000;         // per-source fetch timeout
-const MAX_SYNC_RESOLVE_OPS = 40;                 // subrequest budget for source resolution per sync
-const SYNC_CURSOR_KEY = "sync:resolve-cursor";   // rotates which matches resolve first
 
 const jsonHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -147,279 +141,6 @@ function toStreamedMatch(match, liveIds = new Set()) {
   };
 }
 
-/*
- * Streamed source resolver
- *
- * Resolves per-source stream metadata (language / HD / stream number) from the
- * Streamed /api/stream endpoint with an SWR cache keyed per source group.
- * Playback URLs (embedUrl) are stripped before anything is cached or returned:
- * only public-safe metadata is ever persisted or emitted.
- */
-
-function streamedCacheKey(source, id) {
-  return STREAMED_STREAMS_KEY_PREFIX + source + ":" + id;
-}
-
-async function fetchWithTimeout(url, options, timeoutMs) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// Extract public-safe stream metadata from any plausible Streamed payload
-// shape and drop every other field — playback URLs must never survive.
-function sanitizeStreamedStreams(data, sourceName) {
-  let entries;
-  if (Array.isArray(data)) entries = data;
-  else if (data && typeof data === "object" && Array.isArray(data.streams)) entries = data.streams;
-  else if (data && typeof data === "object" && Array.isArray(data.data)) entries = data.data;
-  else entries = [];
-
-  const streams = [];
-  const seen = new Set();
-
-  entries.forEach((entry, index) => {
-    if (!entry || typeof entry !== "object") {
-      // Primitive payloads still count as a stream, with no metadata.
-      streams.push({ streamNo: index + 1, language: "", hd: false, source: sourceName });
-      return;
-    }
-    const qualityText = String(entry.quality || entry.label || "");
-    const language = String(entry.language ?? entry.lang ?? "").trim();
-    const hd = entry.hd === true || entry.hd === "true" || entry.isHd === true ||
-      /(\bhd\b|fhd|4k)/i.test(qualityText);
-    const streamNo = Number(entry.streamNo ?? entry.stream_no ?? index + 1) || index + 1;
-    const key = streamNo + "|" + language + "|" + (hd ? "1" : "0");
-    if (seen.has(key)) return;
-    seen.add(key);
-    streams.push({ streamNo, language, hd, source: sourceName });
-  });
-
-  return streams;
-}
-
-// Fetch one source group's streams with a hard timeout. Returns
-// { ok: true, streams } or { ok: false, error }. Never throws.
-async function fetchStreamedSourceStreams(source, id) {
-  const endpoint = STREAMED_STREAM_ENDPOINT +
-    "?source=" + encodeURIComponent(source) +
-    "&id=" + encodeURIComponent(id);
-
-  try {
-    const response = await fetchWithTimeout(
-      endpoint,
-      { headers: { "Accept": "application/json" } },
-      STREAMED_SOURCE_TIMEOUT_MS
-    );
-
-    // Source group exists but has no streams — cache the empty result.
-    if (response.status === 404) return { ok: true, streams: [] };
-    if (response.status === 429) return { ok: false, error: "streamed-429" };
-    if (!response.ok) return { ok: false, error: "streamed-503" };
-
-    let data;
-    try {
-      data = await response.json();
-    } catch (_) {
-      return { ok: false, error: "fetch-failed" };
-    }
-    return { ok: true, streams: sanitizeStreamedStreams(data, source) };
-  } catch (error) {
-    return { ok: false, error: error?.name === "AbortError" ? "timeout" : "fetch-failed" };
-  }
-}
-
-// Cache read. Returns { streams, resolvedAt, fresh } or null.
-async function readStreamedSourceCache(env, source, id) {
-  try {
-    const raw = await env.SPORTZFY_DB.get(streamedCacheKey(source, id), "json");
-    if (!raw || typeof raw !== "object" || !Array.isArray(raw.streams)) return null;
-    const resolvedAt = Number(raw.resolvedAt) || 0;
-    return {
-      streams: raw.streams,
-      resolvedAt,
-      fresh: Date.now() - resolvedAt < STREAMED_FRESH_TTL_MS
-    };
-  } catch (_) {
-    return null;
-  }
-}
-
-// Fetch + sanitize + write-through on success only. A failing or rate-limited
-// source never overwrites an existing cache entry.
-async function refreshStreamedSource(env, source, id) {
-  const fetched = await fetchStreamedSourceStreams(source, id);
-  if (!fetched.ok) return { ok: false, error: fetched.error };
-
-  const record = { streams: fetched.streams, resolvedAt: Date.now() };
-  try {
-    await env.SPORTZFY_DB.put(
-      streamedCacheKey(source, id),
-      JSON.stringify(record),
-      { expirationTtl: STREAMED_STALE_TTL_SECONDS }
-    );
-  } catch (_) {}
-  return { ok: true, record };
-}
-
-// Sync-path resolver: cache-first, inline refresh of stale entries, cold fetch
-// on miss. The optional budget (a mutable { remaining } counter) keeps each
-// sync invocation inside Worker subrequest limits — groups that would exceed
-// it are reported as deferred and retried on later syncs.
-async function resolveStreamedSource(env, source, id, budget = null) {
-  if (budget) {
-    if (budget.remaining < 1) return { streams: [], resolvedAt: null, deferred: true };
-    budget.remaining -= 1;
-  }
-
-  const cached = await readStreamedSourceCache(env, source, id);
-
-  if (cached) {
-    if (cached.fresh) {
-      return { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: false };
-    }
-    if (budget && budget.remaining < 2) {
-      return { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: true };
-    }
-    const refreshed = await refreshStreamedSource(env, source, id);
-    return refreshed.ok
-      ? { streams: refreshed.record.streams, resolvedAt: refreshed.record.resolvedAt, stale: false }
-      : { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: true, error: refreshed.error };
-  }
-
-  if (budget && budget.remaining < 2) return { streams: [], resolvedAt: null, deferred: true };
-  const refreshed = await refreshStreamedSource(env, source, id);
-  if (refreshed.ok) {
-    return { streams: refreshed.record.streams, resolvedAt: refreshed.record.resolvedAt, stale: false };
-  }
-  return { streams: [], resolvedAt: null, error: refreshed.error };
-}
-
-function emptyStreamedSummary(groups = []) {
-  return { sourceCount: groups.length, streamCount: 0, sources: [], streams: [] };
-}
-
-// Resolve every source group of a streamed match into a public-safe summary.
-// Uses all-settled semantics per group: one failing source never breaks the
-// match. Groups the budget could not cover keep their previously resolved
-// data, if any.
-async function buildStreamedSummary(env, match, previousSummary, budget) {
-  const groups = Array.isArray(match.sources) ? match.sources : [];
-  if (!groups.length) return emptyStreamedSummary();
-
-  const previousGroups = new Map();
-  for (const group of (previousSummary && Array.isArray(previousSummary.sources) ? previousSummary.sources : [])) {
-    if (group && group.source && group.id) {
-      previousGroups.set(group.source + ":" + group.id, group);
-    }
-  }
-
-  const resolvedGroups = [];
-  for (const group of groups) {
-    if (!group || !group.source || !group.id) continue;
-    const prior = previousGroups.get(group.source + ":" + group.id);
-    const result = await resolveStreamedSource(env, group.source, group.id, budget);
-    if (result.deferred) {
-      if (prior) resolvedGroups.push(prior);
-      continue;
-    }
-    resolvedGroups.push({
-      source: group.source,
-      id: group.id,
-      streamCount: result.streams.length,
-      streams: result.streams,
-      ...(result.stale ? { stale: true } : {}),
-      ...(result.error ? { error: result.error } : {})
-    });
-  }
-
-  const streams = [];
-  const seen = new Set();
-  for (const group of resolvedGroups) {
-    for (const stream of (group.streams || [])) {
-      const key = stream.streamNo + "|" + stream.language + "|" + (stream.hd ? "1" : "0");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      streams.push(stream);
-    }
-  }
-
-  return {
-    sourceCount: groups.length,
-    streamCount: streams.length,
-    sources: resolvedGroups,
-    streams
-  };
-}
-
-function publicStreamMeta(stream) {
-  return {
-    streamNo: Number(stream?.streamNo) || 0,
-    language: String(stream?.language ?? ""),
-    hd: Boolean(stream?.hd),
-    source: String(stream?.source ?? "")
-  };
-}
-
-/*
- * Public response shaping. Builds a fresh object from a whitelist, so stored
- * admin fields (match URL, live window, manual stream rows) and any unknown
- * fields — including playback URLs — can never leak into a public response.
- */
-function enrichMatchForPublic(match) {
-  if (!match || typeof match !== "object") return match;
-
-  const groups = Array.isArray(match.sources)
-    ? match.sources
-        .filter(group => group && group.source && group.id)
-        .map(group => ({ source: String(group.source), id: String(group.id) }))
-    : [];
-
-  const summary = match.streamedSummary && typeof match.streamedSummary === "object"
-    ? match.streamedSummary
-    : emptyStreamedSummary(groups);
-  const summarySources = Array.isArray(summary.sources) ? summary.sources : [];
-
-  const enriched = {
-    id: String(match.id ?? ""),
-    externalId: String(match.externalId ?? ""),
-    title: String(match.title ?? ""),
-    category: String(match.category ?? ""),
-    startTime: String(match.startTime ?? ""),
-    status: String(match.status ?? ""),
-    poster: String(match.poster ?? ""),
-    description: String(match.description ?? ""),
-    teams: match.teams && typeof match.teams === "object" ? match.teams : null,
-    competition: String(match.competition ?? ""),
-    popular: Boolean(match.popular),
-    source: String(match.source ?? ""),
-    sources: groups,
-    streamed: {
-      sourceCount: Number(summary.sourceCount) || groups.length,
-      streamCount: Number(summary.streamCount) || 0,
-      sources: summarySources.map(group => ({
-        source: String(group?.source ?? ""),
-        id: String(group?.id ?? ""),
-        streamCount: Number(group?.streamCount) || 0,
-        streams: (Array.isArray(group?.streams) ? group.streams : []).map(publicStreamMeta),
-        ...(group?.stale ? { stale: true } : {}),
-        ...(group?.error ? { error: String(group.error) } : {})
-      })),
-      streams: (Array.isArray(summary.streams) ? summary.streams : []).map(publicStreamMeta)
-    }
-  };
-
-  if (Array.isArray(match.streams) && match.streams.length) {
-    enriched.manual = { streamCount: match.streams.length };
-  }
-
-  return enriched;
-}
-
 async function syncStreamedMatches(env) {
   await migrateLegacyChannelSystem(env);
 
@@ -466,37 +187,6 @@ async function syncStreamedMatches(env) {
     !freshIds.has(String(match.externalId || ""))
   );
 
-  // Resolve Streamed source groups through the SWR cache. The resolve budget
-  // keeps each sync invocation inside Worker subrequest limits (50 on the free
-  // plan); groups it cannot cover are deferred and retried on later syncs via
-  // a rotating cursor so no match is starved.
-  let resolveCount = 0;
-  const budget = { remaining: MAX_SYNC_RESOLVE_OPS };
-  let cursor = 0;
-  try { cursor = Number(await env.SPORTZFY_DB.get(SYNC_CURSOR_KEY, "text")) || 0; } catch (_) {}
-  const rotateBy = fresh.length ? cursor % fresh.length : 0;
-
-  for (let index = 0; index < fresh.length; index++) {
-    const match = fresh[(index + rotateBy) % fresh.length];
-    const previous = existingStreamed.get(String(match.externalId || ""));
-    match.streamedSummary = await buildStreamedSummary(
-      env,
-      match,
-      previous?.streamedSummary,
-      budget
-    );
-  }
-
-  if (fresh.length) {
-    try {
-      await env.SPORTZFY_DB.put(SYNC_CURSOR_KEY, String((rotateBy + 1) % fresh.length));
-    } catch (_) {}
-  }
-  resolveCount = fresh.reduce(
-    (total, match) => total + (Number(match.streamedSummary?.streamCount) || 0),
-    0
-  );
-
   const finalMatches = [...manual, ...fresh];
   await env.SPORTZFY_DB.put("matches", JSON.stringify(finalMatches));
   await rebuildSnapshots(env, finalMatches);
@@ -505,12 +195,11 @@ async function syncStreamedMatches(env) {
     success: true,
     streamedCount: fresh.length,
     totalMatches: finalMatches.length,
-    removed: removed.length,
-    resolvedCount: resolveCount
+    removed: removed.length
   };
 }
 
-async function apiHandler(request, env, ctx) {
+async function apiHandler(request, env) {
   const url = new URL(request.url);
 
   if (request.method === "OPTIONS") {
@@ -551,60 +240,16 @@ async function apiHandler(request, env, ctx) {
   }
 
   if (request.method === "GET" && url.pathname === "/api/matches") {
-    return json((await readArray(env, "matches")).map(enrichMatchForPublic));
+    return json(await readArray(env, "matches"));
   }
 
   if (request.method === "GET" && url.pathname === "/api/matches/all-today") {
     const snapshot = await env.SPORTZFY_DB.get(SNAPSHOT_ALL_TODAY, "text");
-    if (snapshot) {
-      try {
-        const parsed = JSON.parse(snapshot);
-        if (Array.isArray(parsed)) {
-          return new Response(JSON.stringify(parsed.map(enrichMatchForPublic)), { headers: jsonHeaders });
-        }
-      } catch (_) {}
-    }
+    if (snapshot) return new Response(snapshot, { headers: jsonHeaders });
 
     await migrateLegacyChannelSystem(env);
     const built = await rebuildSnapshots(env);
-    let body = "[]";
-    try {
-      const parsed = JSON.parse(built.allTodayJson);
-      body = JSON.stringify((Array.isArray(parsed) ? parsed : []).map(enrichMatchForPublic));
-    } catch (_) {}
-    return new Response(body, { headers: jsonHeaders });
-  }
-
-  // On-demand single-source resolver with SWR semantics: stale entries are
-  // served immediately and refreshed in the background via ctx.waitUntil.
-  if (request.method === "GET" && url.pathname === "/api/streamed/streams") {
-    const source = url.searchParams.get("source") || "";
-    const id = url.searchParams.get("id") || "";
-    if (!source || !id) return json({ error: "Missing source or id parameter" }, 400);
-
-    const cached = await readStreamedSourceCache(env, source, id);
-    let payload;
-    if (cached && cached.fresh) {
-      payload = { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: false };
-    } else if (cached) {
-      payload = { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: true };
-      if (ctx) ctx.waitUntil(refreshStreamedSource(env, source, id).catch(() => {}));
-    } else {
-      const refreshed = await refreshStreamedSource(env, source, id);
-      payload = refreshed.ok
-        ? { streams: refreshed.record.streams, resolvedAt: refreshed.record.resolvedAt, stale: false }
-        : { streams: [], resolvedAt: null, error: refreshed.error };
-    }
-
-    return json({
-      source,
-      id,
-      streamCount: payload.streams.length,
-      streams: payload.streams.map(publicStreamMeta),
-      resolvedAt: payload.resolvedAt ? new Date(payload.resolvedAt).toISOString() : null,
-      ...(payload.stale ? { stale: true } : {}),
-      ...(payload.error ? { error: payload.error } : {})
-    });
+    return new Response(built.allTodayJson, { headers: jsonHeaders });
   }
 
   if (request.method === "GET" && url.pathname === "/api/status") {
@@ -719,8 +364,7 @@ async function apiHandler(request, env, ctx) {
     let featuredMatch = null;
     if (featuredId) {
       const matches = await readArray(env, "matches");
-      const found = matches.find(match => String(match.id) === String(featuredId));
-      featuredMatch = found ? enrichMatchForPublic(found) : null;
+      featuredMatch = matches.find(match => String(match.id) === String(featuredId)) || null;
     }
 
     return json({
@@ -781,7 +425,7 @@ async function apiHandler(request, env, ctx) {
 
 export default {
   async fetch(request, env, ctx) {
-    const response = await apiHandler(request, env, ctx);
+    const response = await apiHandler(request, env);
 
     if (
       request.method !== "GET" &&
