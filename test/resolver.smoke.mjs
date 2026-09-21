@@ -33,6 +33,7 @@ class PolyfillResponse {
 globalThis.Response = PolyfillResponse;
 
 // Scriptable fetch: tests assign `fetchHandler(url)`; every call is logged.
+const okPaths = new Set();
 const fetchLog = [];
 let fetchHandler = async () => {
   throw new Error("unexpected fetch (no handler installed)");
@@ -116,7 +117,7 @@ function ok(name) {
   console.log("  ok " + passed + " - " + name);
 }
 function streamFetchCount() {
-  return fetchLog.filter((url) => url.includes("/api/stream?")).length;
+  return fetchLog.filter((url) => url.includes("/api/stream/")).length;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,11 +177,16 @@ function installMatchHandler() {
   fetchHandler = async (url) => {
     if (url.includes("/api/matches/all-today")) return jsonResponse(200, RAW_MATCHES);
     if (url.includes("/api/matches/live")) return jsonResponse(200, [{ id: "102" }]);
-    if (url.includes("/api/stream?")) {
-      const params = new URL(url).searchParams;
-      const key = params.get("source") + ":" + params.get("id");
+    if (url.includes("/api/stream/")) {
+      // Production URL shape: /api/stream/{source}/{id} (path, not query).
+      const parts = new URL(url).pathname.split("/");
+      const key = parts[3] + ":" + parts[4];
       if (key === "GoalPass:src-101-b") return jsonResponse(429, { error: "rate limited" });
       if (key === "StreamedBasket:src-102-a") return jsonResponse(503, { error: "down" });
+  if (key === "StreamedSoccerHD:src-101-a") {
+    // Assert the path-form URL the worker must use.
+    okPaths.add(url);
+  }
       if (key === "HindiSrc:n1") {
         return jsonResponse(200, [{ streamNo: 1, language: "Hindi", hd: false }]);
       }
@@ -230,6 +236,12 @@ assert.equal(soccerGroup.streamCount, 2);
 assert.equal(soccerGroup.streams.length, 2);
 assert.ok(!soccerGroup.stale && !soccerGroup.error);
 ok("multi-source match resolved with dedupe (2 streams)");
+
+assert.ok(
+  [...okPaths].every((u) => /\/api\/stream\/StreamedSoccerHD\/src-101-a$/.test(u)) && okPaths.size > 0,
+  "resolver must call /api/stream/{source}/{id} (path form)"
+);
+ok("resolver uses path-form /api/stream/{source}/{id} URL");
 
 const goalGroup = valencia.streamedSummary.sources.find(
   (group) => group.source === "GoalPass"

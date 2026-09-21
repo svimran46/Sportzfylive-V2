@@ -9,6 +9,7 @@ const STREAMED_STREAM_ENDPOINT = "https://streamed.pk/api/stream";
 const STREAMED_STREAMS_KEY_PREFIX = "streamed:streams:";
 const STREAMED_FRESH_TTL_MS = 45 * 60 * 1000;    // serve-from-cache window per source
 const STREAMED_STALE_TTL_SECONDS = 6 * 60 * 60;  // KV retention (stale ceiling) per source
+const STREAMED_EMPTY_TTL_SECONDS = 15 * 60;      // empty results re-check quickly (lineups appear near go-live)
 const STREAMED_SOURCE_TIMEOUT_MS = 8000;         // per-source fetch timeout
 const MAX_SYNC_RESOLVE_OPS = 40;                 // subrequest budget for source resolution per sync
 const SYNC_CURSOR_KEY = "sync:resolve-cursor";   // rotates which matches resolve first
@@ -205,9 +206,11 @@ function sanitizeStreamedStreams(data, sourceName) {
 // Fetch one source group's streams with a hard timeout. Returns
 // { ok: true, streams } or { ok: false, error }. Never throws.
 async function fetchStreamedSourceStreams(source, id) {
+  // Streamed exposes per-source streams as a path, not query params:
+  // /api/stream/{source}/{id} (query-param form returns 404 for everything).
   const endpoint = STREAMED_STREAM_ENDPOINT +
-    "?source=" + encodeURIComponent(source) +
-    "&id=" + encodeURIComponent(id);
+    "/" + encodeURIComponent(source) +
+    "/" + encodeURIComponent(id);
 
   try {
     const response = await fetchWithTimeout(
@@ -260,7 +263,9 @@ async function refreshStreamedSource(env, source, id) {
     await env.SPORTZFY_DB.put(
       streamedCacheKey(source, id),
       JSON.stringify(record),
-      { expirationTtl: STREAMED_STALE_TTL_SECONDS }
+      // Empty results expire fast so newly published lineups are picked up
+      // without waiting out the full stale window.
+      { expirationTtl: fetched.streams.length ? STREAMED_STALE_TTL_SECONDS : STREAMED_EMPTY_TTL_SECONDS }
     );
   } catch (_) {}
   return { ok: true, record };
