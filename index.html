@@ -2081,8 +2081,7 @@ body{
      * STREAMED SOURCES ONLY
      *
      * The public site displays only Streamed-origin source metadata.
-     * Manual/admin-added stream entries are intentionally not rendered.
-     * Playback URLs are not exposed by this client.
+     * No manual/admin-added stream section is rendered on the public site.
      */
     let activeMatch = null;
 
@@ -2096,12 +2095,6 @@ body{
                 source: String(item.source),
                 id: String(item.id)
             }));
-    }
-
-    function getStreamedStreams(matchId) {
-        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
-        if (!Array.isArray(match?.streamed?.streams)) return [];
-        return match.streamed.streams.filter(item => item && typeof item === "object");
     }
 
     function openStreamSources(matchId) {
@@ -2121,8 +2114,7 @@ body{
 
         document.getElementById("stream-subtitle").textContent =
             title + " • " +
-            sources.length + " Streamed source" + (sources.length === 1 ? "" : "s") +
-            (streams.length ? " • " + streams.length + " stream metadata" : "");
+            sources.length + " Streamed source" + (sources.length === 1 ? "" : "s");
 
         player.hidden = true;
         player.replaceChildren();
@@ -2141,19 +2133,6 @@ body{
                 </div>
             `;
 
-        const streamRows = streams.length
-            ? `
-                <div class="stream-list" style="border-top:1px solid rgba(91,119,163,.16)">
-                    ${streams.map(stream => `
-                        <div class="source-meta-item">
-                            <span class="source-meta-name">${esc(stream.source || "Stream")} #${esc(String(stream.streamNo || "?"))}</span>
-                            <span class="source-meta-id">${esc(stream.language || "Unknown")} • ${stream.hd ? "HD" : "SD"}</span>
-                        </div>
-                    `).join("")}
-                </div>
-            `
-            : "";
-
         picker.innerHTML = `
             <div class="stream-source-box">
                 <div class="source-head">
@@ -2164,7 +2143,6 @@ body{
                     <div class="stream-count">${sources.length} source${sources.length === 1 ? "" : "s"}</div>
                 </div>
                 <div class="stream-list">${sourceRows}</div>
-                ${streamRows}
             </div>
         `;
 
