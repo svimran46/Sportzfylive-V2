@@ -18,41 +18,38 @@ const styleBlocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m
 assert.ok(styleBlocks.length >= 2, "index.html has multiple style blocks");
 ok("style blocks present (" + styleBlocks.length + ")");
 
-const lastTwo = styleBlocks.slice(-2).join("");
-assert.ok(lastTwo.includes('id="sportzfy-neon-ui"'), "neon layer is in the last two style blocks (cascade wins)");
-ok("neon layer ordered last (cascade protected)");
+// SportzfyPlay design tokens — canvas + pitch green + pill system.
+const css = styleBlocks.map(b => b.replace(/<\/?style[^>]*>/g, "")).join("\n");
+assert.ok(css.includes("#121212"), "canvas token #121212 present");
+assert.ok(css.includes("#1ed760"), "pitch green #1ed760 present");
+assert.ok(css.includes("border-radius:var(--radius-pill)"), "pill radii via --radius-pill token");
+assert.ok(css.includes("prefers-reduced-motion"), "reduced-motion guard present");
+ok("SportzfyPlay design tokens present (canvas, pitch, pills, motion guard)");
 
-assert.ok(lastTwo.includes('id="sportzfy-polish"'), "polish layer is in the last two style blocks");
-ok("polish layer ordered last (cascade protected)");
+// Layout: SportzfyPlay top-header shell — no sidebar dashboard.
+assert.ok(html.includes('class="sfy-header"'), "sticky top header present");
+assert.ok(!html.includes("sfy-sidebar"), "sidebar dashboard removed");
+assert.ok(html.includes("sfy-hero"), "hero section present");
+assert.ok(html.includes("sfy-tiles"), "category tiles present");
+assert.ok(html.includes("sfy-chips"), "category chips present");
+assert.ok(html.includes("sfy-footer"), "site footer present");
+ok("SportzfyPlay layout structure (header, hero, tiles, chips, footer)");
 
-// Pill radii: the neon promise — every control is a pill.
-const neonBlock = styleBlocks.find(b => b.includes('id="sportzfy-neon-ui"'));
-assert.ok(neonBlock.includes("border-radius:999px"), "neon layer defines pill radii");
-for (const sel of [".sfy-chip", ".sfy-nav button", ".category-arrow", ".sfy-icon-btn", ".stream-embed-chip"]) {
-  assert.ok(neonBlock.includes(sel), "neon pill rule covers " + sel);
-}
-ok("pill radii cover all control groups");
-
-// Polish layer signature rules.
-const polishBlock = styleBlocks.find(b => b.includes('id="sportzfy-polish"'));
-assert.ok(polishBlock.includes('"DM Sans"'), "polish layer sets DM Sans typography");
-assert.ok(polishBlock.includes("sfy-live-pulse"), "polish layer has the LIVE glow animation");
-assert.ok(polishBlock.includes(":focus-visible"), "polish layer has keyboard focus rings");
-assert.ok(polishBlock.includes("sfy-stream-chip"), "polish layer styles stream chips");
-ok("polish layer complete (typography, LIVE glow, focus, chips)");
-
-// Stream chips: conditional markup in BOTH card templates (no "0 streams" noise).
+// Stream chips: conditional markup shared by both card templates (no "0 streams" noise).
 const chipCount = (html.match(/sfy-stream-chip/g) || []).length;
-assert.ok(chipCount >= 5, "stream chip class used in CSS + both templates (found " + chipCount + ")");
+assert.ok(chipCount >= 3, "stream chip class used in CSS + shared template variable (found " + chipCount + ")");
 assert.ok(!/sfy-stream-chip"[^>]*>\$\{match\.streamed\?\.streamCount \|\| 0\}/.test(html),
   "no unconditional zero-count chips");
 ok("stream chips conditional in both card templates");
 
-// Fonts: preconnect + non-blocking stylesheet.
-assert.ok(html.includes('rel="preconnect" href="https://fonts.gstatic.com"'), "font preconnect present");
-assert.ok(html.includes("family=DM+Sans"), "DM Sans stylesheet linked");
-assert.ok(html.includes('media="print" onload='), "font loads non-blocking");
-ok("DM Sans wired with preconnect + async load");
+// Fonts: self-hosted variable DM Sans (preloaded woff2, zero external font CSS).
+assert.ok(html.includes('href="/fonts/dm-sans-latin.woff2"'), "latin woff2 is preloaded");
+assert.ok(html.includes('rel="preload"'), "font preload hint present");
+assert.ok(html.includes("@font-face"), "DM Sans self-hosted via @font-face");
+assert.ok(!html.includes("fonts.googleapis.com"), "no external Google Fonts CSS (render-blocking removed)");
+assert.ok(!html.includes("cdnjs.cloudflare.com"), "no Font Awesome CDN (icons are inline SVG)");
+assert.ok(!html.includes("<i class=\"fas"), "no <i> icon tags remain (XSS-safe inline SVG only)");
+ok("DM Sans self-hosted with preload; all icon fonts removed");
 
 // CSS brace balance across all blocks.
 let open = 0, close = 0;
