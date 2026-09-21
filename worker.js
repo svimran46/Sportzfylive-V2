@@ -5,6 +5,7 @@
 const SNAPSHOT_ALL_TODAY = "snapshot:all-today";
 const SNAPSHOT_FEATURED = "snapshot:featured";
 const MIGRATION_KEY = "channel_system_migrated";
+const STREAMED_STREAM_ENDPOINT = "https://streamed.pk/api/stream";
 
 const jsonHeaders = {
   "Access-Control-Allow-Origin": "*",
