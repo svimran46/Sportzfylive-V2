@@ -77,6 +77,73 @@
   .editor-actions{margin-left:38px;gap:18px;flex-wrap:wrap}
   .editor-title h1{font-size:22px}
 }
+
+<style id="sportzfy-neon-admin">
+/* ===== Neon glow buttons (green), radius + responsive normalization ===== */
+
+/* ---- 1. Every interactive control becomes a neon pill ---- */
+.btn,.btn.secondary,.btn.danger,.btn.small,.nav-item,.pagination button,
+.back,.mobile-menu,.pill{border-radius:999px}
+
+/* ---- 2. Idle neon rings ---- */
+.btn.secondary,.btn.danger,.pagination button,.nav-item,.back,.mobile-menu{
+  box-shadow:0 0 6px rgba(32,230,106,.10),inset 0 0 8px rgba(32,230,106,.04);
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease,color .18s ease;
+}
+.pagination button{border-color:rgba(32,230,106,.28)}
+.nav-item{border:1px solid transparent}
+
+/* ---- 3. Primary action: full neon bloom ---- */
+.btn{
+  text-shadow:0 0 8px rgba(120,240,160,.55);
+  box-shadow:0 0 12px rgba(32,230,106,.38),0 0 34px rgba(32,230,106,.16),inset 0 0 12px rgba(120,240,160,.10);
+  transition:box-shadow .18s ease,transform .12s ease,filter .18s ease;
+}
+.btn:hover{
+  filter:brightness(1.06);
+  box-shadow:0 0 18px rgba(32,230,106,.6),0 0 48px rgba(32,230,106,.26),inset 0 0 14px rgba(120,240,160,.14);
+}
+.btn:active{transform:scale(.98)}
+.btn.secondary:hover,.btn.danger:hover,.pagination button:hover,.nav-item:hover{
+  box-shadow:0 0 12px rgba(32,230,106,.3),inset 0 0 10px rgba(32,230,106,.07);
+}
+
+/* ---- 4. Inputs: neon focus glow ---- */
+.search:focus,.field input:focus,.field select:focus,.field textarea:focus,
+.login-card input:focus{
+  border-color:#45e984;
+  box-shadow:0 0 12px rgba(32,230,106,.35),0 0 0 3px rgba(32,230,106,.08);
+}
+
+/* ---- 5. Radius normalization — one consistent language ---- */
+.stat,.panel,.editor-card,.modal,.login-card{border-radius:20px}
+.stat-icon{border-radius:14px}
+.row{border-radius:16px}
+.search,.field input,.field select,.field textarea,.login-card input,
+#streamedStreamList li,.toast{border-radius:12px}
+.modal-bg{padding:16px}
+
+/* ---- 6. Responsive hardening ---- */
+html,body{max-width:100%;overflow-x:hidden}
+.main,.page,.panel,.editor-card,.form-grid,.modal-grid,.stats,.lower{min-width:0}
+.field input,.field select,.field textarea,.search{min-width:0}
+.head h1{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .modal{width:min(560px,100%)}
+  .btn{padding:13px 18px}
+  .actions{gap:10px}
+}
+@media(max-width:480px){
+  .head{margin-bottom:22px}
+  .head h1{font-size:28px}
+  .head p{font-size:15px}
+  .stat-value{font-size:34px}
+  .btn{padding:12px 14px;font-size:14px}
+  .editor-card{padding:22px 16px;margin-bottom:16px}
+  .editor-actions{margin-left:34px}
+  .panel-head,.pad{padding-top:20px;padding-bottom:20px}
+}
+</style>
 </style></head><body>
 <div id="login" class="login"><div class="login-card"><h2>Sportzfy Admin</h2><p>Sign in to manage matches and website content.</p><input id="adminToken" type="password" placeholder="Admin token"><div id="loginError" class="error"></div><button class="btn" onclick="loginAdmin()">Continue</button></div></div>
 <aside id="sidebar" class="sidebar"><div class="brand">SPORTZFY <span>ADMIN</span></div><div class="nav-label">Management</div><button class="nav-item active" data-page="dashboard"><span class="ico">⌂</span>Dashboard</button><button class="nav-item" data-page="matches"><span class="ico">▣</span>Matches</button><button class="nav-item" data-page="settings"><span class="ico">⚙</span>Website Content</button><button class="nav-item" data-page="sync"><span class="ico">↻</span>Sync &amp; Automation</button><div class="nav-label">Account</div><button class="nav-item" type="button" onclick="logoutAdmin()"><span class="ico">↩</span>Logout</button></aside>

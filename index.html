@@ -1655,7 +1655,125 @@ body{
 <style id="sportzfy-site-content-style">
 .sfy-site-notice{display:none;margin:0 0 16px;padding:11px 14px;border:1px solid rgba(88,101,242,.3);background:#0d1626;border-radius:11px;color:#dbe3f2;font-size:13px}.sfy-site-notice.show{display:flex;gap:9px;align-items:center}.sfy-site-notice a{color:#8d98ff;font-weight:800;text-decoration:none}.sfy-site-banner{display:none;margin:0 0 20px;border-radius:14px;overflow:hidden;border:1px solid #1c2a3e}.sfy-site-banner.show{display:block}.sfy-site-banner img{display:block;width:100%;max-height:190px;object-fit:cover}.sfy-featured{display:none;margin:0 0 28px}.sfy-featured.show{display:block}.sfy-featured-label{font-size:11px;font-weight:900;color:#7d89ff;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px}.sfy-featured-card{position:relative;overflow:hidden;border-radius:20px;min-height:300px;background:radial-gradient(circle at 20% 45%,rgba(52,95,255,.22),transparent 34%),radial-gradient(circle at 80% 45%,rgba(37,200,255,.12),transparent 30%),linear-gradient(105deg,#0a1630,#07101f 52%,#0a1425);border:1px solid rgba(101,124,176,.26);box-shadow:var(--ui-shadow)}.sfy-featured-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.14;filter:saturate(1.15)}.sfy-featured-overlay{position:relative;z-index:2;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;background:linear-gradient(90deg,rgba(4,9,18,.12),rgba(4,9,18,.05) 50%,rgba(4,9,18,.32))}.sfy-featured-kicker{font-size:11px;font-weight:900;letter-spacing:2px;color:#7f8cff;margin-bottom:8px}.sfy-featured-title{font-size:clamp(24px,4vw,42px);font-weight:950;letter-spacing:-1px}.sfy-featured-teams{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:18px}.sfy-featured-team{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:110px;color:#f7f9ff;font-size:13px;font-weight:800}.sfy-featured-team img,.sfy-featured-team .sfy-logo-fallback{width:58px;height:58px}.sfy-featured-team img{object-fit:contain;border-radius:50%;background:rgba(255,255,255,.06);padding:7px}.sfy-featured-vs{width:34px;height:34px;display:grid;place-items:center;border:1px solid rgba(120,140,180,.25);border-radius:50%;background:rgba(5,9,18,.6);color:#8491a9;font-size:10px;font-weight:900}.sfy-featured-meta{margin-top:12px;color:#aab5c7;font-size:12px}.sfy-featured-btn{margin-top:18px;min-height:44px;padding:0 22px;border:0;border-radius:11px;background:linear-gradient(90deg,#5865f2,#737cff);color:#fff;font-weight:850;cursor:pointer;box-shadow:0 10px 28px rgba(88,101,242,.25)}.sfy-logo-fallback{display:grid;place-items:center;border:1px solid rgba(120,140,180,.25);border-radius:50%;background:#111c2e;color:#9da9ff;font-size:15px;font-weight:900}
 @media(max-width:600px){.sfy-featured-card,.sfy-featured-overlay{min-height:280px}.sfy-featured-overlay{padding:22px 14px}.sfy-featured-teams{gap:12px}.sfy-featured-team{min-width:90px;font-size:11px}.sfy-featured-team img,.sfy-featured-team .sfy-logo-fallback{width:52px;height:52px}}
-</style></head>
+</style><style id="sportzfy-neon-ui">
+/* ===== Neon glow buttons, pill shapes, radius + responsive normalization ===== */
+:root{--neon:#737cff;--neon-dim:rgba(115,124,255,.38)}
+
+/* ---- 1. Every interactive control becomes a neon pill ---- */
+.sfy-chip,.sfy-nav button,.sfy-sidebar-promo button,.category-arrow,
+.sfy-icon-btn,.sfy-mobile-menu,#stream-modal .back-btn,#stream-modal .embed-btn,
+#stream-modal .theater-btn,.stream-embed-chip,.watch-btn{border-radius:999px}
+
+/* ---- 2. Idle neon ring on interactive controls ---- */
+.sfy-chip,.category-arrow,.sfy-icon-btn,.sfy-mobile-menu,
+#stream-modal .back-btn,#stream-modal .embed-btn,#stream-modal .theater-btn{
+  border-color:rgba(115,124,255,.34);
+  box-shadow:0 0 6px rgba(115,124,255,.16),inset 0 0 8px rgba(115,124,255,.06);
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease,color .18s ease;
+}
+
+/* Hover/focus: bloom */
+.sfy-chip:hover,.category-arrow:hover:not(:disabled),.sfy-icon-btn:hover,
+.sfy-mobile-menu:hover,#stream-modal .back-btn:hover,#stream-modal .embed-btn:hover,
+#stream-modal .theater-btn:hover{
+  border-color:rgba(160,168,255,.9);
+  box-shadow:0 0 12px rgba(115,124,255,.45),inset 0 0 10px rgba(115,124,255,.10);
+  color:#fff;
+}
+
+/* ---- 3. Neon text glow on active/selected controls ---- */
+.sfy-chip.active,.sfy-nav button.active{
+  box-shadow:0 0 14px rgba(115,124,255,.5),0 0 34px rgba(88,101,242,.25);
+  text-shadow:0 0 10px rgba(255,255,255,.85),0 0 22px rgba(199,204,255,.45);
+}
+
+/* ---- 4. Watch + stream chips: full neon treatment ---- */
+.watch-btn{
+  position:relative;
+  border:1px solid rgba(115,124,255,.5)!important;
+  background:linear-gradient(90deg,rgba(88,101,242,.20),rgba(115,124,255,.12))!important;
+  box-shadow:0 0 10px rgba(115,124,255,.3),inset 0 0 12px rgba(115,124,255,.08)!important;
+  text-shadow:0 0 8px rgba(199,204,255,.55);
+  overflow:hidden;
+}
+.watch-btn::after{ /* sweep highlight on hover */
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.14) 50%,transparent 70%);
+  transform:translateX(-120%);
+  transition:transform .5s ease;
+}
+.watch-btn:hover{
+  border-color:rgba(199,204,255,.9)!important;
+  box-shadow:0 0 18px rgba(115,124,255,.6),0 0 44px rgba(88,101,242,.28),inset 0 0 14px rgba(115,124,255,.12)!important;
+}
+.watch-btn:hover::after{transform:translateX(120%)}
+.watch-btn:active{transform:scale(.98)}
+
+.stream-embed-chip{
+  border:1px solid rgba(115,124,255,.4)!important;
+  box-shadow:0 0 8px rgba(115,124,255,.16),inset 0 0 8px rgba(115,124,255,.05)!important;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease,transform .18s ease;
+}
+.stream-embed-chip:hover{
+  border-color:rgba(199,204,255,.95)!important;
+  box-shadow:0 0 16px rgba(115,124,255,.55),inset 0 0 12px rgba(115,124,255,.1)!important;
+}
+.stream-embed-chip.active{
+  border-color:rgba(199,204,255,.95)!important;
+  background:linear-gradient(90deg,rgba(88,101,242,.3),rgba(115,124,255,.16))!important;
+  box-shadow:0 0 16px rgba(115,124,255,.6),0 0 40px rgba(88,101,242,.25),inset 0 0 12px rgba(115,124,255,.12)!important;
+  text-shadow:0 0 8px rgba(255,255,255,.75);
+}
+
+/* ---- 5. Search: neon focus glow ---- */
+#sfy-search-input:focus{
+  border-color:rgba(160,168,255,.85);
+  box-shadow:0 0 12px rgba(115,124,255,.4),0 0 0 3px rgba(88,101,242,.10);
+}
+
+/* ---- 6. Radius normalization — one consistent language ---- */
+.sfy-card{border-radius:16px!important}
+.sfy-event-visual{border-radius:16px}
+.sfy-hero,.sfy-sidebar-promo,.sfy-featured-card{border-radius:20px}
+.sfy-shortcut{border-radius:999px}
+.stream-source-box{border-radius:18px}
+#stream-modal .stream-source-box{border-radius:18px}
+#stream-modal .stream-page{border-radius:22px}
+.sfy-event-fallback{border-radius:14px}
+.sfy-team-logo,.sfy-event-logo,.team-logo{border-radius:14px}
+.sfy-logo-fallback{border-radius:50%!important}
+.sfy-event-favorite{border-radius:50%}
+.category-progress,.category-progress span{border-radius:999px}
+
+/* ---- 7. Responsive hardening ---- */
+html,body{max-width:100%;overflow-x:hidden}
+.sfy-main{min-width:0}
+.sfy-content{min-width:0;overflow-x:clip}
+#matches-container{max-width:100%}
+.category-viewport{min-width:0;overflow:hidden}
+
+/* Chips row: full-bleed edge-to-edge scroll on phones */
+@media(max-width:720px){
+  .sfy-content{padding:16px 14px 48px}
+  .sfy-chips{margin:0 -14px;padding:2px 14px 18px}
+  .sfy-chip{min-height:44px}
+  .sfy-topbar{gap:10px;padding:0 14px}
+  .sfy-search{min-width:0}
+  #sfy-search-input{padding-right:12px}
+  .sfy-shortcut{display:none}
+  .sfy-top-actions{gap:6px}
+  .sfy-icon-btn{width:38px;height:38px}
+  .sfy-event-visual{border-radius:14px}
+}
+@media(max-width:380px){
+  .sfy-content{padding:12px 10px 44px}
+  .sfy-chips{margin:0 -10px;padding:2px 10px 16px}
+  .sfy-chip{padding:0 12px;font-size:11px}
+  .sfy-icon-btn{width:36px;height:36px}
+}
+</style>
+
+</head>
 <body>
 <div class="sfy-shell">
   <aside class="sfy-sidebar" id="sfy-sidebar">
