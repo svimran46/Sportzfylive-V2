@@ -2195,7 +2195,7 @@ body{
         if ((event.key === "Enter" || event.key === " ") && event.target?.closest?.(".sfy-match-item")) {
             event.preventDefault();
             const item = event.target.closest(".sfy-match-item");
-            if (item?.dataset.matchId) openManualStream(item.dataset.matchId);
+            if (item?.dataset.matchId) openStreamSources(item.dataset.matchId);
         }
     });
 
