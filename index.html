@@ -1662,7 +1662,7 @@ body{
       <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
     </div>
     <div class="stream-heading">
-      <div><h2>Available Streams</h2><p id="stream-subtitle">Select a stream to watch</p></div>
+      <div><h2>Streamed Sources</h2><p id="stream-subtitle">Streamed source information</p></div>
       <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Enter theater mode</span></button>
     </div>
     <div id="stream-picker"></div>
@@ -2078,89 +2078,33 @@ body{
             </article>`;
     }
     /*
-     * MANUAL STREAMS ONLY
+     * STREAMED SOURCES ONLY
      *
-     * Nothing is fetched from a stream-source API.
-     * The match/channel names come from /api/matches/all-today.
-     * Add your own playable URLs here.
-     *
-     * Supported format:
-     *
-     * "admin-tennis-channel": [
-     *   { name: "Stream 1", quality: "HD", language: "English", url: "YOUR_URL" },
-     *   { name: "Stream 2", quality: "SD", language: "English", url: "YOUR_URL" }
-     * ]
+     * The public site displays only Streamed-origin source metadata.
+     * Manual/admin-added stream entries are intentionally not rendered.
+     * Playback URLs are not exposed by this client.
      */
-    const MANUAL_STREAMS = {};
-
     let activeMatch = null;
 
-    function getManualStreams(matchId) {
-        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
-        const configured = MANUAL_STREAMS[String(matchId)];
-
-        if (Array.isArray(configured)) return configured;
-        if (configured && typeof configured === "object" && configured.url) return [configured];
-
-        // Admin-managed manual streams (match.streams[]). Only entries that
-        // already carry their own url are playable; nothing is generated here.
-        if (Array.isArray(match?.streams) && match.streams.length) {
-            return match.streams
-                .filter(stream => stream && typeof stream === "object")
-                .map((stream, index) => ({
-                    name: stream.name || `Stream ${index + 1}`,
-                    quality: stream.quality || "HD",
-                    language: stream.language || "English",
-                    url: stream.url || ""
-                }));
-        }
-
-        if (Array.isArray(match?.channels)) {
-            return match.channels
-                .filter(channel => channel && channel.url)
-                .map(channel => ({
-                    name: channel.name || "Stream",
-                    quality: channel.quality || "HD",
-                    language: channel.language || channel.genre || "Sports",
-                    url: channel.url
-                }));
-        }
-
-        return [];
-    }
-
-    // Streamed source metadata (match.sources[]). Display only: these are
-    // source names and IDs supplied by Streamed, not playable stream objects.
     function getStreamedSources(matchId) {
         const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
         if (!Array.isArray(match?.sources)) return [];
 
         return match.sources
             .filter(item => item && typeof item === "object" && item.source && item.id)
-            .map(item => ({ source: String(item.source), id: String(item.id) }));
+            .map(item => ({
+                source: String(item.source),
+                id: String(item.id)
+            }));
     }
 
-    // Resolved Streamed streams (match.streamed.streams[]) — metadata only.
-    // Never contains a playback URL; playback URLs stay server-side.
     function getStreamedStreams(matchId) {
         const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
         if (!Array.isArray(match?.streamed?.streams)) return [];
         return match.streamed.streams.filter(item => item && typeof item === "object");
     }
 
-    function getStreamedCounts(matchId) {
-        const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
-        const sources = getStreamedSources(matchId);
-        const streams = getStreamedStreams(matchId);
-        const sourceCount = Number(match?.streamed?.sourceCount);
-        const streamCount = Number(match?.streamed?.streamCount);
-        return {
-            sourceCount: Number.isFinite(sourceCount) ? sourceCount : sources.length,
-            streamCount: Number.isFinite(streamCount) ? streamCount : streams.length
-        };
-    }
-
-    function openManualStream(matchId) {
+    function openStreamSources(matchId) {
         const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
         if (!match) return;
 
@@ -2169,160 +2113,63 @@ body{
         const modal = document.getElementById("stream-modal");
         const picker = document.getElementById("stream-picker");
         const player = document.getElementById("player-container");
-
         if (!modal || !picker || !player) return;
 
-        const streams = getManualStreams(matchId);
         const sources = getStreamedSources(matchId);
-        const streamedStreams = getStreamedStreams(matchId);
-        const streamedCounts = getStreamedCounts(matchId);
-        const title = match.title || "Channel";
-        const manualCount = streams.length;
+        const streams = getStreamedStreams(matchId);
+        const title = match.title || "Match";
 
-        document.getElementById("stream-subtitle").textContent = [
-            title,
-            streamedCounts.sourceCount
-                ? `${streamedCounts.sourceCount} Streamed source${streamedCounts.sourceCount === 1 ? "" : "s"}`
-                : "",
-            streamedCounts.streamCount
-                ? `${streamedCounts.streamCount} Streamed stream${streamedCounts.streamCount === 1 ? "" : "s"}`
-                : "",
-            `${manualCount} manual stream${manualCount === 1 ? "" : "s"}`
-        ].filter(Boolean).join(" • ");
+        document.getElementById("stream-subtitle").textContent =
+            title + " • " +
+            sources.length + " Streamed source" + (sources.length === 1 ? "" : "s") +
+            (streams.length ? " • " + streams.length + " stream metadata" : "");
 
         player.hidden = true;
         player.replaceChildren();
 
-        if (!manualCount) {
-            picker.innerHTML = `
-                <div class="stream-source-box">
-                    <div class="source-head">
-                        <div>
-                            <div class="source-name">Admin</div>
-                            <div class="source-note">✣ Admin added streams</div>
-                        </div>
-                        <div class="stream-count">0 manual streams</div>
-                    </div>
-                    <div class="no-manual-streams">
-                        <strong>${esc(title)}</strong>
-                        ${
-                            streamedCounts.streamCount
-                                ? `No manual streams added yet — ${streamedCounts.streamCount} Streamed stream${streamedCounts.streamCount === 1 ? "" : "s"} listed below.`
-                                : streamedCounts.sourceCount
-                                    ? `${streamedCounts.sourceCount} Streamed source group${streamedCounts.sourceCount === 1 ? "" : "s"} present, but no resolved streams yet.`
-                                    : `No streams available yet.`
-                        }
-                    </div>
-                </div>`;
-        } else {
-            picker.innerHTML = `
-                <div class="stream-source-box">
-                    <div class="source-head">
-                        <div>
-                            <div class="source-name">Admin</div>
-                            <div class="source-note">✣ Admin added streams</div>
-                        </div>
-                        <div class="stream-count">${manualCount} manual stream${manualCount === 1 ? "" : "s"}</div>
-                    </div>
-                    <div class="stream-list">
-                        ${streams.map((stream, index) => `
-                            <button class="stream-option ${index === 0 ? "current" : ""}"
-                                    type="button"
-                                    data-stream-index="${index}">
-                                <span class="quality-pill">${esc(stream.quality || "SD")}</span>
-                                <span class="stream-label">${esc(stream.name || `Stream ${index + 1}`)}</span>
-                                ${index === 0 ? `<span class="current-label">✓ Current</span>` : ""}
-                                <span class="stream-meta">
-                                    <span>◉ ${esc(stream.language || "English")}</span>
-                                </span>
-                            </button>
-                        `).join("")}
-                    </div>
-                </div>`;
-        }
+        const sourceRows = sources.length
+            ? sources.map(item => `
+                <div class="source-meta-item">
+                    <span class="source-meta-name">${esc(item.source)}</span>
+                    <span class="source-meta-id">Streamed source</span>
+                </div>
+            `).join("")
+            : `
+                <div class="no-manual-streams" style="padding:20px">
+                    <strong>${esc(title)}</strong>
+                    <span>No Streamed source metadata is available yet.</span>
+                </div>
+            `;
 
-        if (sources.length || streamedStreams.length) {
-            const sourcesBlock = sources.length ? `
-                <div class="stream-list">
-                    ${sources.map(item => `
-                        <div class="source-meta-item">
-                            <span class="source-meta-name">${esc(item.source)}</span>
-                            <span class="source-meta-id" title="${esc(item.id)}">Source ID: ${esc(item.id)}</span>
-                        </div>
-                    `).join("")}
-                </div>` : "";
-
-            const streamsBlock = streamedStreams.length ? `
-                <div class="stream-list" ${sources.length ? 'style="border-top:1px solid rgba(91,119,163,.16)"' : ""}>
-                    ${streamedStreams.map(stream => `
+        const streamRows = streams.length
+            ? `
+                <div class="stream-list" style="border-top:1px solid rgba(91,119,163,.16)">
+                    ${streams.map(stream => `
                         <div class="source-meta-item">
                             <span class="source-meta-name">${esc(stream.source || "Stream")} #${esc(String(stream.streamNo || "?"))}</span>
                             <span class="source-meta-id">${esc(stream.language || "Unknown")} • ${stream.hd ? "HD" : "SD"}</span>
                         </div>
                     `).join("")}
-                </div>` : "";
+                </div>
+            `
+            : "";
 
-            picker.insertAdjacentHTML("beforeend", `
-                <div class="stream-source-box" style="margin-top:14px">
-                    <div class="source-head">
-                        <div>
-                            <div class="source-name">Streamed</div>
-                            <div class="source-note">✣ Source groups &amp; resolved streams</div>
-                        </div>
-                        <div class="stream-count">
-                            ${streamedCounts.sourceCount} source${streamedCounts.sourceCount === 1 ? "" : "s"}
-                            •
-                            ${streamedCounts.streamCount} stream${streamedCounts.streamCount === 1 ? "" : "s"}
-                        </div>
+        picker.innerHTML = `
+            <div class="stream-source-box">
+                <div class="source-head">
+                    <div>
+                        <div class="source-name">Streamed</div>
+                        <div class="source-note">✣ Streamed source groups</div>
                     </div>
-                    ${sourcesBlock}
-                    ${streamsBlock}
-                    ${!streamedStreams.length && sources.length ? `
-                        <div class="no-manual-streams" style="padding:20px">
-                            <span>Streamed sources listed above; no resolved stream objects returned yet.</span>
-                        </div>` : ""}
-                </div>`);
-        }
+                    <div class="stream-count">${sources.length} source${sources.length === 1 ? "" : "s"}</div>
+                </div>
+                <div class="stream-list">${sourceRows}</div>
+                ${streamRows}
+            </div>
+        `;
 
         modal.style.display = "flex";
         document.body.style.overflow = "hidden";
-    }
-
-    function playManualStream(index) {
-        if (!activeMatch) return;
-
-        const streams = getManualStreams(activeMatch.id);
-        const stream = streams[index];
-        if (!stream?.url) return;
-
-        const picker = document.getElementById("stream-picker");
-        const player = document.getElementById("player-container");
-        if (!picker || !player) return;
-
-        const iframe = document.createElement("iframe");
-        iframe.src = stream.url;
-        iframe.allowFullscreen = true;
-        iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media");
-        iframe.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
-        iframe.frameBorder = "0";
-
-        player.hidden = false;
-        player.replaceChildren(iframe);
-
-        picker.querySelectorAll(".stream-option").forEach((button, i) => {
-            button.classList.toggle("current", i === Number(index));
-            const current = button.querySelector(".current-label");
-            if (i === Number(index)) {
-                if (!current) {
-                    const label = document.createElement("span");
-                    label.className = "current-label";
-                    label.textContent = "✓ Current";
-                    button.insertBefore(label, button.querySelector(".stream-meta"));
-                }
-            } else if (current) {
-                current.remove();
-            }
-        });
     }
 
     function toggleTheaterMode() {
@@ -2354,15 +2201,10 @@ body{
     document.addEventListener("click", event => {
         const matchButton = event.target.closest("[data-match-id]");
         if (matchButton && !matchButton.disabled) {
-            openManualStream(matchButton.dataset.matchId);
+            openStreamSources(matchButton.dataset.matchId);
             return;
         }
 
-        const streamButton = event.target.closest("[data-stream-index]");
-        if (streamButton) {
-            playManualStream(Number(streamButton.dataset.streamIndex));
-            return;
-        }
 
         const modal = document.getElementById("stream-modal");
         if (modal && event.target === modal) closeModal();
