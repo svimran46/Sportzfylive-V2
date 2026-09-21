@@ -1,5 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sportzfy Play Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..1000&display=swap">
 <style>
 :root{--bg:#0b0b0d;--p:#151517;--p2:#1b1b1e;--line:#2a2a2e;--text:#f5f5f7;--muted:#a2a2a9;--green:#20e66a;--green2:#78f0a0;--red:#ff8d96}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.hidden{display:none!important}.error{color:var(--red)}.status{color:var(--green2)}
@@ -13,6 +16,17 @@
 #streamedStreamList{list-style:none;padding:0;margin:18px 0 0;display:grid;gap:8px}
 #streamedStreamList li{display:flex;justify-content:space-between;gap:12px;background:#111113;border:1px solid #29292d;border-radius:12px;padding:10px 14px;font-size:14px}
 #streamedStreamList li .stream-meta{color:#999;font-size:12px}
+/* == sportzfy-polish-admin == */
+/* ===== SportzfyPlay-grade polish: typography, numerals, focus, depth ===== */
+.main,.sidebar,.modal,.login-card,.toast{font-family:"DM Sans",Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+input,select,textarea{font-family:inherit}
+.stat-value{font-variant-numeric:tabular-nums;letter-spacing:-1.5px}
+.stat,.panel,.editor-card{box-shadow:0 12px 28px -4px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03)}
+.row{transition:border-color .15s ease}
+.row:hover{border-color:#3a3a40}
+.search:focus,.field input:focus,.field select:focus,.field textarea:focus,.login-card input:focus{box-shadow:0 0 12px rgba(32,230,106,.35),0 0 0 3px rgba(32,230,106,.10)}
+.btn:focus-visible,.nav-item:focus-visible,.pagination button:focus-visible,.text-btn:focus-visible,.mobile-menu:focus-visible{outline:none;box-shadow:0 0 12px rgba(32,230,106,.45),0 0 0 3px rgba(32,230,106,.20)}
+
 @media(max-width:1050px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .main{padding-left:24px;padding-right:24px;width:100%;min-width:0}
@@ -78,7 +92,7 @@
   .editor-title h1{font-size:22px}
 }
 
-<style id="sportzfy-neon-admin">
+/* == sportzfy-neon-admin == */
 /* ===== Neon glow buttons (green), radius + responsive normalization ===== */
 
 /* ---- 1. Every interactive control becomes a neon pill ---- */
@@ -143,7 +157,6 @@ html,body{max-width:100%;overflow-x:hidden}
   .editor-actions{margin-left:34px}
   .panel-head,.pad{padding-top:20px;padding-bottom:20px}
 }
-</style>
 </style></head><body>
 <div id="login" class="login"><div class="login-card"><h2>Sportzfy Admin</h2><p>Sign in to manage matches and website content.</p><input id="adminToken" type="password" placeholder="Admin token"><div id="loginError" class="error"></div><button class="btn" onclick="loginAdmin()">Continue</button></div></div>
 <aside id="sidebar" class="sidebar"><div class="brand">SPORTZFY <span>ADMIN</span></div><div class="nav-label">Management</div><button class="nav-item active" data-page="dashboard"><span class="ico">⌂</span>Dashboard</button><button class="nav-item" data-page="matches"><span class="ico">▣</span>Matches</button><button class="nav-item" data-page="settings"><span class="ico">⚙</span>Website Content</button><button class="nav-item" data-page="sync"><span class="ico">↻</span>Sync &amp; Automation</button><div class="nav-label">Account</div><button class="nav-item" type="button" onclick="logoutAdmin()"><span class="ico">↩</span>Logout</button></aside>

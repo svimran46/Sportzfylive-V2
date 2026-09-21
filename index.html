@@ -4,7 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sportzfylive - Live Sports</title>
-  
+
+  <!-- DM Sans (display + body) — preconnect + non-blocking load -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..1000&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..1000&display=swap"></noscript>
+
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
@@ -1773,6 +1779,88 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+<style id="sportzfy-polish">
+/* ===== SportzfyPlay-grade polish: typography, refinement, perf ===== */
+
+/* ---- 1. Typography: DM Sans (display + body), preloaded ---- */
+.sfy-shell,.sfy-main,.sfy-sidebar,#stream-modal,.modal,.stream-page{
+  font-family:"DM Sans",Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.sfy-event-title{letter-spacing:-.2px}
+.sfy-event-category,.sfy-chip,.sfy-nav button{letter-spacing:.1px}
+.sfy-event-title{font-weight:700}
+
+/* ---- 2. Refined compact radii (SportzfyPlay scale) on content surfaces ---- */
+.sfy-hero,.sfy-featured-card,.sfy-sidebar-promo{border-radius:16px}
+.sfy-event-visual{border-radius:14px}
+.sfy-event-fallback{border-radius:13px}
+.sfy-card{border-radius:14px!important}
+.sfy-team-logo,.sfy-event-logo,.team-logo{border-radius:12px}
+.stream-source-box,#stream-modal .stream-source-box{border-radius:16px}
+#stream-modal .stream-page{border-radius:18px}
+#player-container{border-radius:16px}
+
+/* ---- 3. Restrained, layered shadows (theirs: soft + hairline ring) ---- */
+.sfy-event-visual{box-shadow:0 8px 8px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.03)}
+.sfy-match-item:hover .sfy-event-visual,.sfy-match-item:focus-visible .sfy-event-visual{
+  box-shadow:0 12px 28px -4px rgba(0,0,0,.55),0 0 0 1px rgba(115,124,255,.22);
+  border-color:#41414b;
+}
+
+/* ---- 4. Signature red LIVE glow (adapted from their --live treatment) ---- */
+.sfy-event-live{
+  background:#ef4444;
+  box-shadow:inset 0 2px rgba(255,255,255,.22),0 0 12px -2px rgba(239,68,68,.55);
+  animation:sfy-live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes sfy-live-pulse{
+  0%,100%{box-shadow:inset 0 2px rgba(255,255,255,.22),0 0 12px -2px rgba(239,68,68,.55)}
+  50%{box-shadow:inset 0 2px rgba(255,255,255,.28),0 0 22px 1px rgba(239,68,68,.75)}
+}
+@media(prefers-reduced-motion:reduce){.sfy-event-live{animation:none}}
+
+/* ---- 5. "N streams" chip on cards (data-forward like theirs) ---- */
+.sfy-stream-chip{
+  position:absolute;right:10px;bottom:10px;z-index:3;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 9px;border-radius:999px;
+  background:rgba(5,9,18,.78);backdrop-filter:blur(8px);
+  border:1px solid rgba(115,124,255,.35);
+  color:#c7ccff;font-size:10.5px;font-weight:800;letter-spacing:.3px;
+  box-shadow:0 0 8px rgba(115,124,255,.18);
+}
+.sfy-stream-chip i{font-size:9px;color:#8d98ff}
+
+/* ---- 6. Focus-visible neon rings everywhere (keyboard parity) ---- */
+.sfy-chip:focus-visible,.category-arrow:focus-visible,.sfy-icon-btn:focus-visible,
+.sfy-mobile-menu:focus-visible,.sfy-nav button:focus-visible,
+#stream-modal .back-btn:focus-visible,#stream-modal .embed-btn:focus-visible,
+#stream-modal .theater-btn:focus-visible,.stream-embed-chip:focus-visible,
+.sfy-match-item:focus-visible{
+  outline:none;
+  border-color:rgba(199,204,255,.95);
+  box-shadow:0 0 12px rgba(115,124,255,.5),0 0 0 3px rgba(115,124,255,.22);
+}
+.watch-btn:focus-visible{outline:none;box-shadow:0 0 18px rgba(115,124,255,.6),0 0 0 3px rgba(115,124,255,.25)}
+
+/* ---- 7. Perf: GPU compositing + stable hover + font smoothing ---- */
+.sfy-event-visual,.stream-embed-chip,.sfy-chip{will-change:transform}
+.sfy-match-item{transition:none}
+.sfy-match-item:hover{transform:none}
+.sfy-shell *{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+/* ---- 8. Motion: tasteful entrance for cards ---- */
+@keyframes sfy-card-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.sfy-match-item{animation:sfy-card-in .3s ease both}
+@media(prefers-reduced-motion:reduce){.sfy-match-item{animation:none}}
+
+/* ---- 9. Small-screen refinements ---- */
+@media(max-width:520px){
+  .sfy-event-visual{border-radius:12px}
+  .sfy-stream-chip{right:8px;bottom:8px;padding:3px 8px;font-size:10px}
+}
+</style>
+
 </head>
 <body>
 <div class="sfy-shell">
@@ -2226,6 +2314,7 @@ html,body{max-width:100%;overflow-x:hidden}
             return `
                 <article class="match-card sfy-match-item sfy-channel-item" data-match-id="${esc(id)}" tabindex="0" role="button" aria-label="Open ${esc(match.title || "Channel")}">
                     <div class="sfy-event-visual">
+                        ${match.streamed?.streamCount ? `<span class="sfy-stream-chip"><i class="fas fa-signal"></i>${match.streamed.streamCount} stream${match.streamed.streamCount === 1 ? "" : "s"}</span>` : ""}
                         <div class="sfy-event-badge">${esc(dateText)}</div>
                         ${match.popular ? '<span class="sfy-event-favorite" aria-hidden="true">☆</span>' : ""}
                         ${poster
@@ -2244,6 +2333,7 @@ html,body{max-width:100%;overflow-x:hidden}
                     ${live
                         ? '<span class="sfy-event-live">LIVE</span>'
                         : `<span class="sfy-event-badge">${esc(dateText)}</span>`}
+                    ${match.streamed?.streamCount ? `<span class="sfy-stream-chip"><i class="fas fa-signal"></i>${match.streamed.streamCount} stream${match.streamed.streamCount === 1 ? "" : "s"}</span>` : ""}
                     <span class="sfy-event-favorite" aria-hidden="true">☆</span>
                     ${poster
                         ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="" loading="lazy">`
