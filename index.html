@@ -396,7 +396,7 @@
   padding:11px 15px;
   cursor:pointer;
 }
-.no-manual-streams{
+ .no-stream-sources{
   padding:38px 20px;
   text-align:center;
   color:#9ca7b5;
@@ -2109,7 +2109,6 @@ body{
         if (!modal || !picker || !player) return;
 
         const sources = getStreamedSources(matchId);
-        const streams = getStreamedStreams(matchId);
         const title = match.title || "Match";
 
         document.getElementById("stream-subtitle").textContent =
@@ -2127,7 +2126,7 @@ body{
                 </div>
             `).join("")
             : `
-                <div class="no-manual-streams" style="padding:20px">
+                <div class="no-stream-sources" style="padding:20px">
                     <strong>${esc(title)}</strong>
                     <span>No Streamed source metadata is available yet.</span>
                 </div>
