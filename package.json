@@ -3,5 +3,9 @@
   "devDependencies": {
     "wrangler": "^4.136.0"
   },
+  "scripts": {
+    "test": "node test/dom-ux.smoke.mjs && node test/ui-polish.smoke.mjs && node test/resolver.smoke.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
   "type": "module"
 }
