@@ -18,13 +18,17 @@ const styleBlocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m
 assert.ok(styleBlocks.length >= 2, "index.html has multiple style blocks");
 ok("style blocks present (" + styleBlocks.length + ")");
 
-// SportzfyPlay design tokens — canvas + pitch green + pill system.
+// Neumorphic dark design tokens — canvas #1a1a1a + fuchsia accent + soft-UI
+// shadow-pair button system.
 const css = styleBlocks.map(b => b.replace(/<\/?style[^>]*>/g, "")).join("\n");
-assert.ok(css.includes("#121212"), "canvas token #121212 present");
-assert.ok(css.includes("#1ed760"), "pitch green #1ed760 present");
-assert.ok(css.includes("border-radius:var(--radius-pill)"), "pill radii via --radius-pill token");
+assert.ok(css.includes("#1a1a1a"), "canvas token #1a1a1a present");
+assert.ok(css.includes("#212121"), "panel token #212121 present");
+assert.ok(css.includes("#ff00ff"), "fuchsia accent #ff00ff present");
+assert.ok(css.includes("--hover-shadows"), "neumorphic hover shadow pair present");
+assert.ok(css.includes("border-radius:1.1em"), "neumorphic 1.1em button radius present");
+assert.ok(css.includes("button:focus-visible"), "fuchsia focus-visible ring on buttons present");
 assert.ok(css.includes("prefers-reduced-motion"), "reduced-motion guard present");
-ok("SportzfyPlay design tokens present (canvas, pitch, pills, motion guard)");
+ok("Neumorphic design tokens present (canvas, panels, accent, shadow pairs, focus ring, motion guard)");
 
 // Layout: SportzfyPlay top-header shell — no sidebar dashboard.
 assert.ok(html.includes('class="sfy-header"'), "sticky top header present");
@@ -41,6 +45,13 @@ assert.ok(chipCount >= 3, "stream chip class used in CSS + shared template varia
 assert.ok(!/sfy-stream-chip"[^>]*>\$\{match\.streamed\?\.streamCount \|\| 0\}/.test(html),
   "no unconditional zero-count chips");
 ok("stream chips conditional in both card templates");
+
+// Stream picker semantics: radiogroup + persistent .selected selection.
+assert.ok(html.includes('role="radiogroup"'), "stream picker group has role=radiogroup");
+assert.ok(html.includes('role="radio"'), "stream chips have role=radio");
+assert.ok(html.includes('aria-checked'), "chips toggle aria-checked via JS");
+assert.ok(html.includes("sfy-many-buttons"), "6+ button groups get reduced shadows (perf)");
+ok("stream picker radio semantics + persistent selection + perf shadow reduction");
 
 // Fonts: self-hosted variable DM Sans (preloaded woff2, zero external font CSS).
 assert.ok(html.includes('href="/fonts/dm-sans-latin.woff2"'), "latin woff2 is preloaded");
