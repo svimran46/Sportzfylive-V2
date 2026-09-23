@@ -30,14 +30,38 @@ assert.ok(css.includes("button:focus-visible"), "fuchsia focus-visible ring on b
 assert.ok(css.includes("prefers-reduced-motion"), "reduced-motion guard present");
 ok("Neumorphic design tokens present (canvas, panels, accent, shadow pairs, focus ring, motion guard)");
 
-// Layout: SportzfyPlay top-header shell — no sidebar dashboard.
+// Layout: top-header shell + site-wide off-canvas sidebar drawer + hero.
 assert.ok(html.includes('class="sfy-header"'), "sticky top header present");
-assert.ok(!html.includes("sfy-sidebar"), "sidebar dashboard removed");
+assert.ok(html.includes('id="sfy-sidebar"'), "site-wide sidebar drawer present");
+assert.ok(html.includes('sfy-sidebar-backdrop'), "sidebar backdrop present (click-to-close)");
+assert.ok(html.includes("sfy-sidebar-locked"), "sidebar locks background scroll");
 assert.ok(html.includes("sfy-hero"), "hero section present");
 assert.ok(html.includes("sfy-tiles"), "category tiles present");
 assert.ok(html.includes("sfy-chips"), "category chips present");
 assert.ok(html.includes("sfy-footer"), "site footer present");
-ok("SportzfyPlay layout structure (header, hero, tiles, chips, footer)");
+ok("Layout structure (header, sidebar drawer, hero, tiles, chips, footer)");
+
+// Homepage order: hero → filter chips → matches → Browse grid (moved below matches).
+const heroIdx = html.indexOf('id="sfy-hero-default"');
+const chipsIdx = html.indexOf('id="sfy-chips"');
+const matchesIdx = html.indexOf('id="matches-container"');
+const tilesIdx = html.indexOf('sfy-tiles"');
+assert.ok(heroIdx !== -1 && chipsIdx !== -1 && matchesIdx !== -1 && tilesIdx !== -1);
+assert.ok(heroIdx < chipsIdx, "hero before chips");
+assert.ok(chipsIdx < matchesIdx, "chips directly above matches list");
+assert.ok(matchesIdx < tilesIdx, "Browse grid after matches list");
+ok("homepage order: hero → chips → matches → Browse by sport");
+
+// Watch page order: title → player → source list.
+const headingIdx = html.indexOf('class="stream-heading"');
+const playerIdx = html.indexOf('id="player-container"');
+const pickerIdx = html.indexOf('id="stream-picker"');
+assert.ok(headingIdx !== -1 && playerIdx !== -1 && pickerIdx !== -1);
+assert.ok(headingIdx < playerIdx, "player first under the title");
+assert.ok(playerIdx < pickerIdx, "source list below the player");
+assert.ok(html.includes("stream-sources-label"), "'Available streams' section label present");
+assert.ok(html.includes(".stream-sources-section{margin-top:28px}"), "player/source-list spacing");
+ok("watch page order: title → player → sources (+ section label & spacing)");
 
 // Stream chips: conditional markup shared by both card templates (no "0 streams" noise).
 const chipCount = (html.match(/sfy-stream-chip/g) || []).length;
