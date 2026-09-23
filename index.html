@@ -204,6 +204,54 @@
     .sfy-mobile-nav a svg{width:17px;height:17px}
     .sfy-mobile-nav a:hover,.sfy-mobile-nav a.active{background:var(--raised);color:var(--accent)}
 
+    /* ======================= SIDEBAR DRAWER =======================
+       One instance, mounted once in the body shell (outside <main>),
+       present on every route. Off-canvas by default; fixed 300px wide,
+       left edge, full height. */
+    .sfy-sidebar{
+      position:fixed;top:0;bottom:0;left:0;z-index:1100;
+      width:min(300px,86vw);
+      display:flex;flex-direction:column;
+      padding:18px 16px 24px;overflow-y:auto;
+      background:var(--raised);
+      transform:translateX(-102%);
+      transition:transform .32s var(--ease);
+      box-shadow:0 0 60px rgba(0,0,0,.55);
+      scrollbar-width:thin;scrollbar-color:#2e2e2e transparent;
+    }
+    .sfy-sidebar.open{transform:translateX(0)}
+    .sfy-sidebar-head{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:2px 4px 14px;border-bottom:1px solid var(--border);margin-bottom:14px;
+    }
+    .sfy-sidebar-title{margin:0;font-size:15px;font-weight:800;color:var(--ink)}
+    .sfy-sidebar-close{min-height:36px;padding:0 12px;font-size:12px}
+    .sfy-sidebar-nav{display:flex;flex-direction:column;gap:9px}
+    .sfy-sidebar-nav a{
+      display:flex;align-items:center;gap:11px;
+      min-height:44px;padding:0 14px;
+      border-radius:1.1em;
+      background:var(--surface);color:var(--ink-muted);
+      font-size:13.5px;font-weight:700;
+      box-shadow:var(--btn-shadow-sm);
+      transition:box-shadow .3s ease-in-out,color .15s ease,background-color .1s ease;
+    }
+    .sfy-sidebar-nav a svg{width:17px;height:17px;flex-shrink:0}
+    .sfy-sidebar-nav a:hover{color:var(--ink);box-shadow:var(--hover-shadows)}
+    .sfy-sidebar-nav a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .sfy-sidebar-nav a.active{
+      background:var(--accent);color:#1a1a1a;
+      box-shadow:var(--hover-shadows),var(--accent) 0 0 30px 5px;
+    }
+    .sfy-sidebar-backdrop{
+      position:fixed;inset:0;z-index:1050;
+      background:rgba(10,10,10,.55);
+      opacity:0;pointer-events:none;
+      transition:opacity .28s ease;
+    }
+    .sfy-sidebar-backdrop.show{opacity:1;pointer-events:auto}
+    body.sfy-sidebar-locked{overflow:hidden}
+
     /* ============================= HERO ============================= */
     /* One bold move: a floodlit pitch — center circle, touchline, mown stripes —
        rendered in CSS in soft neumorphic greys. Everything else stays quiet. */
@@ -579,17 +627,18 @@
     .stream-heading h2{margin:0 0 6px;font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--ink)}
     .stream-heading p{margin:0;color:var(--ink-muted);font-size:13px}
     .stream-source-box{border-radius:14px;background:var(--raised);box-shadow:inset 6px 6px 12px #1e1e1e,inset -6px -6px 12px #2e2e2e}
-    .source-head{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border-bottom:1px solid var(--border)}
-    .source-name{font-size:16px;font-weight:700;color:var(--ink)}
-    .source-note{margin-top:3px;color:var(--ink-muted);font-size:12.5px}
-    .stream-count{color:var(--accent);font-size:13px;font-weight:800}
-    .stream-list{padding:10px 9px}
+    /* List header, not its own block: tight bottom padding. */
+    .source-head{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border)}
+    .source-name{font-size:14px;font-weight:700;color:var(--ink)}
+    .source-note{margin-top:2px;color:var(--ink-muted);font-size:11.5px}
+    .stream-count{color:var(--accent);font-size:12px;font-weight:800}
+    .stream-list{padding:8px 7px}
     .stream-empty-note{padding:26px 18px;color:var(--ink-muted);font-size:13.5px;text-align:center}
-    /* Stream picker: neumorphic server-choice buttons with a persistent
+    /* Stream picker: compact single-line neumorphic rows with a persistent
        .selected state (JS-toggled) plus radio semantics for a11y. */
     .stream-embed-chip{
-      width:100%;display:flex;align-items:center;gap:12px;
-      padding:12px 14px;margin-bottom:8px;
+      width:100%;display:flex;align-items:center;gap:10px;
+      padding:5px 10px;margin-bottom:4px;
       border-radius:1.1em;
       background:var(--surface);color:var(--ink);text-align:left;
       box-shadow:var(--btn-shadow-sm);
@@ -601,17 +650,17 @@
       box-shadow:var(--hover-shadows),var(--accent) 0 0 30px 5px;
     }
     .stream-embed-chip[aria-checked="true"] .stream-chip-no{background:rgba(26,26,26,.35);color:#1a1a1a}
-    .stream-chip-main{display:flex;align-items:center;gap:11px;min-width:0}
+    .stream-chip-main{display:flex;align-items:center;gap:9px;min-width:0}
     .stream-chip-no{
-      min-width:34px;padding:6px 0;text-align:center;
-      border-radius:8px;background:var(--raised);color:var(--ink);
-      font-size:12px;font-weight:800;
+      min-width:26px;padding:3px 0;text-align:center;
+      border-radius:7px;background:var(--raised);color:var(--ink);
+      font-size:11px;font-weight:800;
     }
-    .stream-chip-label{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .stream-chip-tags{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+    .stream-chip-label{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .stream-chip-tags{margin-left:auto;display:flex;gap:5px;flex-shrink:0}
     .stream-chip-tag{
-      padding:4px 8px;border-radius:7px;background:var(--raised);
-      color:var(--ink-muted);font-size:10px;font-weight:800;letter-spacing:.4px;
+      padding:2px 7px;border-radius:6px;background:var(--raised);
+      color:var(--ink-muted);font-size:9.5px;font-weight:800;letter-spacing:.4px;
     }
     .stream-chip-tag.hd{background:var(--accent-dim);color:var(--accent)}
     .no-stream-sources{padding:32px 18px;text-align:center;color:var(--ink-muted)}
@@ -632,10 +681,17 @@
       --hover-shadows:8px 8px 18px #121212,-8px -8px 18px #303030;
       box-shadow:var(--btn-shadow);
     }
-    .player-container{margin-top:16px;width:100%;min-height:500px;background:#000;border-radius:13px;overflow:hidden}
+    /* Player sits directly under the title; the source list is a separate
+       labelled section below it. */
+    .player-container{margin-top:0;width:100%;min-height:500px;background:#000;border-radius:13px;overflow:hidden}
     .player-container iframe{width:100%;height:500px;border:0;display:block}
     .stream-page.theater .player-container,
     .stream-page.theater .player-container iframe{min-height:calc(100vh - 220px);height:calc(100vh - 220px)}
+    .stream-sources-section{margin-top:28px}
+    .stream-sources-label{
+      margin:0 0 10px;font-size:12.5px;font-weight:700;color:var(--ink-muted);
+    }
+    .stream-sources-label em{font-style:normal;color:var(--ink-faint);font-weight:500}
 
     /* ======================= FOOTER ======================= */
     .sfy-footer{margin-top:44px;padding:30px 0 40px;background:var(--canvas)}
@@ -704,7 +760,7 @@
         <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh matches">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         </button>
-        <button class="sfy-icon-btn sfy-mobile-toggle" type="button" id="sfy-mobile-menu" aria-label="Open menu" aria-expanded="false">
+        <button class="sfy-icon-btn" type="button" id="sfy-sidebar-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="sfy-sidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
       </div>
@@ -752,31 +808,6 @@
     </div>
   </section>
 
-  <!-- ============================= CATEGORY TILES ============================= -->
-  <section class="sfy-section" aria-label="Browse">
-    <div class="sfy-section-head">
-      <div class="sfy-section-title"><h2>Browse</h2></div>
-    </div>
-    <div class="sfy-tiles">
-      <a href="#" class="sfy-tile" data-nav="LIVE">
-        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg></span>
-        <span>Live Now</span>
-      </a>
-      <a href="#" class="sfy-tile" data-nav="FOOTBALL">
-        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg></span>
-        <span>Football</span>
-      </a>
-      <a href="#" class="sfy-tile" data-nav="CRICKET">
-        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg></span>
-        <span>Cricket</span>
-      </a>
-      <a href="#" class="sfy-tile" data-nav="ALL">
-        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg></span>
-        <span>All Sports</span>
-      </a>
-    </div>
-  </section>
-
   <!-- ============================= CATEGORY CHIPS ============================= -->
   <div class="sfy-chips scrollbar-hide" id="sfy-chips" aria-label="Sport filters">
     <button class="sfy-chip active" type="button" data-nav="ALL">All</button>
@@ -808,7 +839,54 @@
     </div>
     <div class="loading-state"><p>Loading matches...</p></div>
   </div>
+  <!-- ============================= CATEGORY TILES ============================= -->
+  <section class="sfy-section" aria-label="Browse">
+    <div class="sfy-section-head">
+      <div class="sfy-section-title"><h2>Browse by sport</h2></div>
+    </div>
+    <div class="sfy-tiles">
+      <a href="#" class="sfy-tile" data-nav="LIVE">
+        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg></span>
+        <span>Live Now</span>
+      </a>
+      <a href="#" class="sfy-tile" data-nav="FOOTBALL">
+        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg></span>
+        <span>Football</span>
+      </a>
+      <a href="#" class="sfy-tile" data-nav="CRICKET">
+        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg></span>
+        <span>Cricket</span>
+      </a>
+      <a href="#" class="sfy-tile" data-nav="ALL">
+        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg></span>
+        <span>All Sports</span>
+      </a>
+    </div>
+  </section>
+
 </main>
+
+
+<!-- ======================= SIDEBAR DRAWER (site-wide) ======================= -->
+<div class="sfy-sidebar-backdrop" id="sfy-sidebar-backdrop" aria-hidden="true"></div>
+<aside class="sfy-sidebar" id="sfy-sidebar" aria-label="Site menu" aria-hidden="true">
+  <div class="sfy-sidebar-head">
+    <p class="sfy-sidebar-title">Menu</p>
+    <button class="sfy-sidebar-close" type="button" id="sfy-sidebar-close">Close</button>
+  </div>
+  <nav class="sfy-sidebar-nav" aria-label="Sidebar navigation">
+    <a href="#" data-nav="ALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home</a>
+    <a href="#" data-nav="LIVE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>Live</a>
+    <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
+    <a href="#" data-nav="AMERICAN FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6.5" transform="rotate(-45 12 12)"/><path d="m8.5 8.5 7 7"/></svg>NFL</a>
+    <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
+    <a href="#" data-nav="CRICKET"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg>Cricket</a>
+    <a href="#" data-nav="BASEBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M5.5 5.5c2 2 2 4 0 6"/><path d="M18.5 18.5c-2-2-2-4 0-6"/></svg>Baseball</a>
+    <a href="#" data-nav="TENNIS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M6 18 18 6"/><path d="m5 10 9-5"/><path d="m10 19 9-5"/></svg>Tennis</a>
+    <a href="#" data-nav="MOTOR-SPORTS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16l2-6h7l3 3h4"/><circle cx="7.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/></svg>Motorsport</a>
+    <a href="#" data-nav="FIGHT"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3"/><path d="m5 7 3 2"/><path d="m19 7-3 2"/><circle cx="12" cy="13" r="4"/><path d="M12 17v4"/></svg>Fight</a>
+  </nav>
+</aside>
 
 <!-- ============================= FOOTER ============================= -->
 <footer class="sfy-footer">
@@ -848,8 +926,9 @@
       </div>
       <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Theater mode</span></button>
     </div>
-    <div id="stream-picker"></div>
     <div id="player-container" class="player-container" hidden></div>
+    <div class="stream-sources-section" id="stream-picker"></div>
+
   </div>
 </div>
 
@@ -1397,6 +1476,7 @@
                   '</div>';
 
         picker.innerHTML =
+            '<p class="stream-sources-label">Available streams <em>· pick a source to load it above</em></p>' +
             '<div class="stream-source-box' + (playable.length >= 6 ? " sfy-many-buttons" : "") + '">' +
             '<div class="source-head">' +
             '<div>' +
@@ -1520,17 +1600,44 @@ function initCategoryCarousels(){
 
 <script>
 (function(){
+  // Site-wide sidebar drawer: mounted once in the body shell, so it exists
+  // on every route. Toggle, backdrop, Escape and scroll-lock live here.
+  const sidebar=document.getElementById("sfy-sidebar");
+  const backdrop=document.getElementById("sfy-sidebar-backdrop");
+  const toggle=document.getElementById("sfy-sidebar-toggle");
+  const closeBtn=document.getElementById("sfy-sidebar-close");
   const mobileNav=document.getElementById("sfy-mobile-nav");
-  const menu=document.getElementById("sfy-mobile-menu");
   const search=document.getElementById("sfy-search-input");
-  function closeMenu(){
-    mobileNav?.classList.remove("open");
-    menu?.setAttribute("aria-expanded","false");
+
+  function openSidebar(){
+    if(!sidebar) return;
+    sidebar.classList.add("open");
+    sidebar.setAttribute("aria-hidden","false");
+    backdrop?.classList.add("show");
+    toggle?.setAttribute("aria-expanded","true");
+    document.body.classList.add("sfy-sidebar-locked");
   }
-  menu?.addEventListener("click",()=>{
-    const open=mobileNav?.classList.toggle("open");
-    menu.setAttribute("aria-expanded",open?"true":"false");
+  function closeSidebar(){
+    if(!sidebar) return;
+    sidebar.classList.remove("open");
+    sidebar.setAttribute("aria-hidden","true");
+    backdrop?.classList.remove("show");
+    toggle?.setAttribute("aria-expanded","false");
+    document.body.classList.remove("sfy-sidebar-locked");
+  }
+  toggle?.addEventListener("click",()=>{
+    const isOpen=!sidebar.classList.contains("open");
+    isOpen?openSidebar():closeSidebar();
   });
+  closeBtn?.addEventListener("click",closeSidebar);
+  backdrop?.addEventListener("click",closeSidebar);
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&sidebar?.classList.contains("open")) closeSidebar();
+  });
+  function closeMenu(){
+    closeSidebar();
+    mobileNav?.classList.remove("open");
+  }
 
   function normalizeNav(v){
     return String(v||"").trim().toUpperCase();
