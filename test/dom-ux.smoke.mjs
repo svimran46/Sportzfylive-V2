@@ -145,8 +145,17 @@ const windowStub = {
   location: { href: "https://site.test/", origin: "https://site.test", pathname: "/", assign(url) { this.assigned = url; } }
 };
 
+const historyStub = {
+  pushStateCalls: [],
+  backCalls: 0,
+  pushState(state, title, url) { this.pushStateCalls.push({ state, title, url }); },
+  back() { this.backCalls++; }
+};
+
 const context = {
   document: documentStub,
+  history: historyStub,
+  encodeURIComponent,
   window: windowStub,
   navigator: { clipboard: { async writeText() {} } },
   location: windowStub.location,
@@ -339,9 +348,10 @@ assert.ok(
 ok("matches without resolved streams show the empty state");
 
 // ---------------------------------------------------------------------------
-// 3. Back button: in-app navigation only. navigateBack() is the exact handler
-//    the Back button's onclick invokes; it must route to a fixed in-app
-//    destination and never touch browser history.
+// 3. Back — in-app, from the button AND from the device/browser back control.
+//    The watch view claims one history entry on open (pushState #match=...);
+//    closing pops exactly that entry. The only history calls in the shipped
+//    page are that push and that pop, so no path can leave the site.
 // ---------------------------------------------------------------------------
 assert.ok(typeof context.navigateBack === "function", "navigateBack handler is defined");
 const modalBefore = documentStub.getElementById("stream-modal");
@@ -349,14 +359,36 @@ modalBefore.style.display = "flex";
 context.navigateBack();
 assert.equal(modalBefore.style.display, "none", "Back closes the watch overlay");
 assert.ok(!windowStub.location.assigned, "Back performs NO navigation (no location.assign)");
-assert.ok(!html.includes("history.back"), "no window.history.back anywhere in the page");
-assert.ok(!html.includes("location.assign"), "no location.assign anywhere in the page");
-assert.ok(!html.includes("location.replace"), "no location.replace anywhere in the page");
-assert.ok(!html.includes("location.reload"), "no location.reload anywhere in the page");
 assert.ok(html.includes("onclick=\"navigateBack()\""), "Back button is wired to navigateBack");
 assert.ok(html.includes('getElementById("matches-container")?.scrollIntoView'),
   "Back returns to the matches list inside the app");
-ok("Back closes the overlay in-app and can never exit the site (zero navigation)");
+
+// Watch view claims its own history entry on open (device Back closes it).
+assert.ok(html.includes("history.pushState"), "watch view pushes a history entry on open");
+assert.ok(html.includes('sfyWatch: matchId'), "pushed entry is tagged with the match id");
+assert.ok(html.includes('"#match=" + encodeURIComponent(matchId)'),
+  "pushed entry is a #match hash on the same page (never a different URL)");
+assert.ok(html.includes('addEventListener("popstate"'), "popstate closes the overlay on device Back");
+assert.ok(html.includes("watchHistoryOpen"), "history claim is guarded by an open flag");
+
+// The ONLY history.back( in the page is closeModal popping our own entry.
+assert.equal((html.match(/history\.back\(/g) || []).length, 1,
+  "exactly one history.back call: popping the watch view's own entry");
+assert.ok(!html.includes("history.go("), "no history.go anywhere in the page");
+assert.ok(!html.includes("history.forward"), "no history.forward anywhere in the page");
+assert.ok(!html.includes("location.assign"), "no location.assign anywhere in the page");
+assert.ok(!html.includes("location.replace"), "no location.replace anywhere in the page");
+assert.ok(!html.includes("location.reload"), "no location.reload anywhere in the page");
+assert.ok(!html.includes("location.href ="), "no location.href assignment anywhere in the page");
+
+// Dynamic balance across every open/close exercised above: every pushed
+// watch-view entry was popped again, and all pushes are #match hashes.
+assert.equal(historyStub.backCalls, historyStub.pushStateCalls.length,
+  "every claimed history entry is popped (open/close stays balanced)");
+for (const call of historyStub.pushStateCalls) {
+  assert.ok(String(call.url).startsWith("#match="), "pushState only ever pushes a #match hash");
+}
+ok("Back (button or device) closes the overlay in-app; history claim/pop stays balanced, never exits");
 
 // ---------------------------------------------------------------------------
 // 3. Static guarantee: no dangling identifier in the shipped page.

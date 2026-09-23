@@ -708,6 +708,15 @@
        labelled section below it. */
     .player-container{margin-top:0;width:100%;min-height:500px;background:#000;border-radius:13px;overflow:hidden}
     .player-container iframe{width:100%;height:500px;border:0;display:block}
+    /* Single-screen watch view: cap the player to the space left over after
+       the header chrome and one row of source cards, so the stream buttons
+       are visible without scrolling. Theater mode keeps full height. */
+    .stream-page:not(.theater) .player-container{
+      height:min(500px,max(280px,calc(100vh - 470px)));
+      height:min(500px,max(280px,calc(100dvh - 470px)));
+      min-height:0;
+    }
+    .stream-page:not(.theater) .player-container iframe{height:100%}
     .stream-page.theater .player-container,
     .stream-page.theater .player-container iframe{min-height:calc(100vh - 220px);height:calc(100vh - 220px)}
     .stream-sources-section{margin-top:28px}
@@ -739,6 +748,10 @@
       .player-container,.player-container iframe{min-height:280px;height:280px}
       .stream-page.theater .player-container,
       .stream-page.theater .player-container iframe{min-height:calc(100vh - 190px);height:calc(100vh - 190px)}
+      /* Small screens: same single-screen rule with a smaller chrome offset. */
+      .stream-page:not(.theater) .player-container{
+        height:min(280px,max(220px,calc(100dvh - 430px)));
+      }
     }
     @media(max-width:380px){
       .sfy-tile{padding:14px 10px}
@@ -1378,6 +1391,9 @@
      * No manual/admin-added stream section is rendered on the public site.
      */
     let activeMatch = null;
+    // True while the watch view has claimed its own history entry, so the
+    // device/browser Back button closes it instead of leaving the site.
+    let watchHistoryOpen = false;
 
     function getStreamedSources(matchId) {
         const match = window.__SPORTZFY_MATCHES?.get(String(matchId));
@@ -1520,7 +1536,27 @@
 
         modal.style.display = "flex";
         document.body.style.overflow = "hidden";
+
+        // Claim a history entry so the device/browser Back button closes the
+        // watch view instead of leaving the site. Guarded for the stubbed
+        // test environment (no history object) and for contexts where
+        // pushState can throw — the overlay still opens either way.
+        if (!watchHistoryOpen && typeof history !== "undefined" && history.pushState) {
+            try {
+                history.pushState({ sfyWatch: matchId }, "", "#match=" + encodeURIComponent(matchId));
+                watchHistoryOpen = true;
+            } catch (_) {}
+        }
     }
+
+    // Device/browser Back: when the watch view is open, any popstate means
+    // the user left the overlay's history entry — close it like the Back button.
+    window.addEventListener("popstate", () => {
+        if (watchHistoryOpen) {
+            watchHistoryOpen = false;
+            closeModal();
+        }
+    });
 
     function toggleTheaterMode() {
         document.querySelector(".stream-page")?.classList.toggle("theater");
@@ -1552,6 +1588,12 @@
     }
 
     function closeModal() {
+        if (watchHistoryOpen) {
+            watchHistoryOpen = false;
+            if (typeof history !== "undefined" && history.back) {
+                try { history.back(); } catch (_) {}
+            }
+        }
         const modal = document.getElementById("stream-modal");
         const player = document.getElementById("player-container");
 
