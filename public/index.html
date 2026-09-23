@@ -80,6 +80,7 @@
       text-rendering:optimizeLegibility;
     }
     img{display:block;max-width:100%}
+    a{color:inherit;text-decoration:none}
     button{font-family:inherit}
     ::selection{background:rgba(255,0,255,.28)}
 
@@ -215,7 +216,9 @@
       width:min(300px,86vw);
       display:flex;flex-direction:column;
       padding:18px 16px 24px;overflow-y:auto;
-      background:var(--raised);
+      /* Dedicated panel tone, a visible step below the item surfaces (#262626).
+         Without this gap the drawer reads as one flat block. */
+      background:#1d1d1d;
       transform:translateX(-102%);
       transition:transform .32s var(--ease);
       box-shadow:0 0 60px rgba(0,0,0,.55);
@@ -227,19 +230,25 @@
       padding:2px 4px 14px;border-bottom:1px solid var(--border);margin-bottom:14px;
     }
     .sfy-sidebar-title{margin:0;font-size:15px;font-weight:800;color:var(--ink)}
-    .sfy-sidebar-close{min-height:36px;padding:0 12px;font-size:12px}
-    .sfy-sidebar-nav{display:flex;flex-direction:column;gap:9px}
+    .sfy-sidebar-close{min-height:36px;padding:0 12px;font-size:12px;background:var(--raised)}
+    /* Nav items are raised cards on the darker panel: lighter surface than the
+       backdrop, shadow pair tuned to this panel (dark #151515, light #282828),
+       fuchsia glow on hover and on the active/current item. */
+    .sfy-sidebar-nav{display:flex;flex-direction:column;gap:7px}
     .sfy-sidebar-nav a{
       display:flex;align-items:center;gap:11px;
-      min-height:44px;padding:0 14px;
-      border-radius:1.1em;
-      background:var(--surface);color:var(--ink-muted);
+      min-height:44px;padding:10px 15px;
+      border-radius:10px;
+      background:var(--raised);color:var(--ink-muted);
       font-size:13.5px;font-weight:700;
-      box-shadow:var(--btn-shadow-sm);
+      box-shadow:5px 5px 10px #151515,-5px -5px 10px #282828;
       transition:box-shadow .3s ease-in-out,color .15s ease,background-color .1s ease;
     }
     .sfy-sidebar-nav a svg{width:17px;height:17px;flex-shrink:0}
-    .sfy-sidebar-nav a:hover{color:var(--ink);box-shadow:var(--hover-shadows)}
+    .sfy-sidebar-nav a:hover{
+      color:var(--ink);
+      box-shadow:8px 8px 18px #151515,-8px -8px 18px #282828,0 0 16px rgba(255,0,255,.2);
+    }
     .sfy-sidebar-nav a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
     .sfy-sidebar-nav a.active{
       background:var(--accent);color:#1a1a1a;
