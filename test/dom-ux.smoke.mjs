@@ -290,7 +290,11 @@ assert.ok(
 const picker2 = documentStub.getElementById("stream-picker");
 const chips = picker2.children.filter(el => el.classList && el.classList.contains("stream-embed-chip"));
 assert.equal(chips.length, 2, "should render one chip per resolved stream");
-ok("playable streams render as one clickable chip per stream");
+assert.ok(picker2.innerHTML.includes(">Stream 1<") && picker2.innerHTML.includes(">Stream 2<"),
+  "cards are labeled Stream 1..N (flat numbering, no per-source restart)");
+assert.ok(!picker2.innerHTML.includes("stream-chip-tag watch"),
+  "no separate Watch pill — the whole card is the click target");
+ok("playable streams render as one clickable card per stream");
 
 const wantUrl1 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1";
 const wantUrl2 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/2";
@@ -340,15 +344,19 @@ ok("matches without resolved streams show the empty state");
 //    destination and never touch browser history.
 // ---------------------------------------------------------------------------
 assert.ok(typeof context.navigateBack === "function", "navigateBack handler is defined");
+const modalBefore = documentStub.getElementById("stream-modal");
+modalBefore.style.display = "flex";
 context.navigateBack();
-assert.equal(
-  windowStub.location.assigned,
-  "https://site.test/#matches",
-  "Back assigns an in-app URL (origin + pathname + #matches)"
-);
+assert.equal(modalBefore.style.display, "none", "Back closes the watch overlay");
+assert.ok(!windowStub.location.assigned, "Back performs NO navigation (no location.assign)");
 assert.ok(!html.includes("history.back"), "no window.history.back anywhere in the page");
+assert.ok(!html.includes("location.assign"), "no location.assign anywhere in the page");
+assert.ok(!html.includes("location.replace"), "no location.replace anywhere in the page");
+assert.ok(!html.includes("location.reload"), "no location.reload anywhere in the page");
 assert.ok(html.includes("onclick=\"navigateBack()\""), "Back button is wired to navigateBack");
-ok("Back navigates in-app to a fixed destination and can never exit the site");
+assert.ok(html.includes('getElementById("matches-container")?.scrollIntoView'),
+  "Back returns to the matches list inside the app");
+ok("Back closes the overlay in-app and can never exit the site (zero navigation)");
 
 // ---------------------------------------------------------------------------
 // 3. Static guarantee: no dangling identifier in the shipped page.

@@ -94,11 +94,17 @@ assert.ok(html.includes('id="sfy-sidebar"') && html.includes('id="sfy-sidebar-to
   "site-wide sidebar + trigger present on every route");
 assert.ok(/z-index:1150/.test(html) && /z-index:1140/.test(html),
   "sidebar drawer + backdrop stack above the stream modal (z1000)");
-assert.ok(html.includes("min-height:40px"), "source rows ~40px tall");
-assert.ok(html.includes("width:20px;height:20px"), "index chip is a 20×20 badge");
-assert.ok(html.includes("font-size:13.5px;font-weight:500"), "source label 13.5px medium");
-assert.ok(html.includes('stream-chip-tag watch'), "Watch renders as a small pill");
-ok("watch view: one header, player→list order, reachable sidebar, compact rows");
+assert.ok(html.includes("grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"),
+  "stream sources render as a responsive card grid (min 150px columns)");
+assert.ok(/\.stream-list\{[^}]*gap:10px/.test(html), "grid gap ~10px between cards");
+assert.ok(html.includes("min-height:74px;padding:12px") && html.includes("border-radius:12px"),
+  "cards are ~74px tall with 12px padding and radius");
+assert.ok(html.includes('esc("Stream " + flatIndex)'), "cards labeled Stream N (flat sequence)");
+assert.ok(!html.includes("stream-chip-tag watch"), "no separate Watch button on cards");
+assert.ok(html.includes(".stream-embed-chip.selected"), "persistent selected state on cards");
+assert.ok(html.includes("sfy-many-buttons .stream-embed-chip{box-shadow:none}"),
+  "6+ card groups drop expensive shadows (perf)");
+ok("watch view: one header, player→list order, reachable sidebar, compact card grid");
 
 // Fonts: self-hosted variable DM Sans (preloaded woff2, zero external font CSS).
 assert.ok(html.includes('href="/fonts/dm-sans-latin.woff2"'), "latin woff2 is preloaded");
