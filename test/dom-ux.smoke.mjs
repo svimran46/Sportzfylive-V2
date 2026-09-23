@@ -57,7 +57,10 @@ function makeElement(id = "") {
     referrerPolicy: "",
     scrollIntoView() {},
     appendChild(child) { el.children.push(child); },
-    getBoundingClientRect() { return { width: 800 }; }
+    getBoundingClientRect() { return { width: 800 }; },
+    _attrs: {},
+    setAttribute(name, value) { el._attrs[name] = String(value); },
+    getAttribute(name) { return name in el._attrs ? el._attrs[name] : null; }
   };
 
   // Minimal innerHTML simulation: materializes .stream-embed-chip buttons as
@@ -79,8 +82,10 @@ function makeElement(id = "") {
         chip.classList.add("stream-embed-chip");
         const url = m[1].match(/data-embed-url="([^"]*)"/);
         const label = m[1].match(/data-stream-label="([^"]*)"/);
+        const checked = m[1].match(/aria-checked="([^"]*)"/);
         chip.dataset.embedUrl = url ? unescapeAttr(url[1]) : "";
         chip.dataset.streamLabel = label ? unescapeAttr(label[1]) : "";
+        chip._attrs["aria-checked"] = checked ? checked[1] : "false";
         el.children.push(chip);
       }
     }
@@ -90,9 +95,10 @@ function makeElement(id = "") {
     if (selector === ".stream-embed-chip") {
       return el.children.filter(c => c.classList && c.classList.contains("stream-embed-chip"));
     }
-    if (selector === ".stream-embed-chip.active") {
+    if (selector === ".stream-embed-chip.active" || selector === ".stream-embed-chip.selected") {
+      const cls = selector.split(".")[2];
       return el.children.filter(c =>
-        c.classList && c.classList.contains("stream-embed-chip") && c.classList.contains("active"));
+        c.classList && c.classList.contains("stream-embed-chip") && c.classList.contains(cls));
     }
     return [];
   };
@@ -301,17 +307,20 @@ assert.equal(frame2.tagName, "iframe", "mounted element must be an iframe");
 assert.equal(frame2.src, wantUrl1, "iframe must point at the exact embed.st URL");
 assert.equal(frame2.allowFullscreen, true, "iframe must allow fullscreen");
 assert.ok(
-  chips[0].classList.contains("active") && !chips[1].classList.contains("active"),
-  "clicked chip should be marked active"
+  chips[0].classList.contains("selected") && !chips[1].classList.contains("selected"),
+  "clicked chip should be marked selected (persistent state, not :active)"
 );
-ok("clicking a chip mounts the embed.st iframe in the player");
+assert.equal(chips[0].getAttribute("aria-checked"), "true", "selected chip exposes aria-checked=true");
+assert.equal(chips[1].getAttribute("aria-checked"), "false", "unselected chip exposes aria-checked=false");
+ok("clicking a chip persists .selected + aria-checked and mounts the embed.st iframe in the player");
 
 // Switching streams swaps the iframe without stacking players.
 chips[1].click();
 assert.equal(player2.children.length, 1, "only one iframe at a time");
 assert.equal(player2.children[0].src, wantUrl2, "second chip swaps the iframe src");
-assert.ok(chips[1].classList.contains("active"), "active state follows the click");
-ok("switching chips replaces the active stream");
+assert.ok(chips[1].classList.contains("selected"), "selection follows the click");
+assert.equal(chips[0].getAttribute("aria-checked"), "false", "previous chip is deselected (single-selection radio group)");
+ok("switching chips replaces the active stream and moves the single selection");
 
 // The no-streams match must still degrade to a friendly note, not a crash.
 documentStub.dispatch("keydown", {
