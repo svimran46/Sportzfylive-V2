@@ -1,0 +1,19 @@
+# Netlify static hosting for the public site (free tier, *.netlify.app subdomain).
+# The frontend is plain HTML/CSS/JS with no build step; the API stays on
+# Cloudflare Workers (PROXY_URL in index.html) and is called cross-origin
+# with CORS already enabled on the Worker.
+[build]
+  publish = "public"
+  command = "echo 'static site: no build step'"
+
+# Self-hosted DM Sans woff2 files never change — cache hard.
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
