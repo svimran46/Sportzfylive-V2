@@ -142,7 +142,7 @@ const windowStub = {
   __SPORTZFY_MATCHES: new Map(),
   addEventListener() {},
   innerWidth: 1280,
-  location: { href: "https://site.test/", origin: "https://site.test", pathname: "/" }
+  location: { href: "https://site.test/", origin: "https://site.test", pathname: "/", assign(url) { this.assigned = url; } }
 };
 
 const context = {
@@ -333,6 +333,22 @@ assert.ok(
   "matches without lineups should show the empty state"
 );
 ok("matches without resolved streams show the empty state");
+
+// ---------------------------------------------------------------------------
+// 3. Back button: in-app navigation only. navigateBack() is the exact handler
+//    the Back button's onclick invokes; it must route to a fixed in-app
+//    destination and never touch browser history.
+// ---------------------------------------------------------------------------
+assert.ok(typeof context.navigateBack === "function", "navigateBack handler is defined");
+context.navigateBack();
+assert.equal(
+  windowStub.location.assigned,
+  "https://site.test/#matches",
+  "Back assigns an in-app URL (origin + pathname + #matches)"
+);
+assert.ok(!html.includes("history.back"), "no window.history.back anywhere in the page");
+assert.ok(html.includes("onclick=\"navigateBack()\""), "Back button is wired to navigateBack");
+ok("Back navigates in-app to a fixed destination and can never exit the site");
 
 // ---------------------------------------------------------------------------
 // 3. Static guarantee: no dangling identifier in the shipped page.

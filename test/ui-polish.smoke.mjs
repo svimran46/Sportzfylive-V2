@@ -77,6 +77,29 @@ assert.ok(html.includes('aria-checked'), "chips toggle aria-checked via JS");
 assert.ok(html.includes("sfy-many-buttons"), "6+ button groups get reduced shadows (perf)");
 ok("stream picker radio semantics + persistent selection + perf shadow reduction");
 
+// Watch view: single header block, player above list, above-modal sidebar,
+// compact source rows.
+assert.equal((html.match(/class="stream-topbar"/g) || []).length, 1,
+  "exactly one stream topbar (Back + Embed Code row)");
+assert.equal((html.match(/class="stream-heading"/g) || []).length, 1,
+  "exactly one Streamed Sources heading block");
+const modalHtml = html.slice(html.indexOf('id="stream-modal"'));
+const orderTopbar = modalHtml.indexOf('class="stream-topbar"');
+const orderPlayer = modalHtml.indexOf('id="player-container"');
+const orderPicker = modalHtml.indexOf('id="stream-picker"');
+assert.ok(orderTopbar > -1 && orderTopbar < orderPlayer && orderPlayer < orderPicker,
+  "watch view order: header → player → source list");
+assert.ok(modalHtml.includes('stream-sources-label'), "source list carries its label");
+assert.ok(html.includes('id="sfy-sidebar"') && html.includes('id="sfy-sidebar-toggle"'),
+  "site-wide sidebar + trigger present on every route");
+assert.ok(/z-index:1150/.test(html) && /z-index:1140/.test(html),
+  "sidebar drawer + backdrop stack above the stream modal (z1000)");
+assert.ok(html.includes("min-height:40px"), "source rows ~40px tall");
+assert.ok(html.includes("width:20px;height:20px"), "index chip is a 20×20 badge");
+assert.ok(html.includes("font-size:13.5px;font-weight:500"), "source label 13.5px medium");
+assert.ok(html.includes('stream-chip-tag watch'), "Watch renders as a small pill");
+ok("watch view: one header, player→list order, reachable sidebar, compact rows");
+
 // Fonts: self-hosted variable DM Sans (preloaded woff2, zero external font CSS).
 assert.ok(html.includes('href="/fonts/dm-sans-latin.woff2"'), "latin woff2 is preloaded");
 assert.ok(html.includes('rel="preload"'), "font preload hint present");
@@ -109,7 +132,7 @@ ok("admin style structure valid (single block)");
 assert.equal((admin.match(/<\/style>/g) || []).length, 1, "admin.html has exactly one style closer");
 ok("admin style closers valid");
 
-assert.ok(admin.includes("border-radius:999px"), "admin neon pills present");
+assert.ok(admin.includes("border-radius:1.1em"), "admin neumorphic radius present");
 assert.ok(admin.includes("DM Sans"), "admin DM Sans present");
 assert.ok(admin.includes("tabular-nums"), "admin tabular numerals present");
 assert.ok(admin.includes(":focus-visible"), "admin keyboard focus rings present");

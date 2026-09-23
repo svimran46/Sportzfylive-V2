@@ -209,7 +209,9 @@
        present on every route. Off-canvas by default; fixed 300px wide,
        left edge, full height. */
     .sfy-sidebar{
-      position:fixed;top:0;bottom:0;left:0;z-index:1100;
+      position:fixed;top:0;bottom:0;left:0;z-index:1150;
+      /* Above the stream modal (z1000) so the menu stays reachable on the
+         watch view — the drawer is body-level and exists on every route. */
       width:min(300px,86vw);
       display:flex;flex-direction:column;
       padding:18px 16px 24px;overflow-y:auto;
@@ -244,7 +246,7 @@
       box-shadow:var(--hover-shadows),var(--accent) 0 0 30px 5px;
     }
     .sfy-sidebar-backdrop{
-      position:fixed;inset:0;z-index:1050;
+      position:fixed;inset:0;z-index:1140;
       background:rgba(10,10,10,.55);
       opacity:0;pointer-events:none;
       transition:opacity .28s ease;
@@ -615,6 +617,9 @@
       flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
       margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);
     }
+    /* Back always navigates in-app to a fixed destination — it never calls
+       into browser history, which exits the site when the watch view is
+       the first history entry (direct link, new tab, refresh). */
     .back-btn,.embed-btn,.theater-btn{
       display:inline-flex;align-items:center;gap:7px;
       min-height:40px;padding:0 16px;
@@ -635,10 +640,12 @@
     .stream-list{padding:8px 7px}
     .stream-empty-note{padding:26px 18px;color:var(--ink-muted);font-size:13.5px;text-align:center}
     /* Stream picker: compact single-line neumorphic rows with a persistent
-       .selected state (JS-toggled) plus radio semantics for a11y. */
+       .selected state (JS-toggled) plus radio semantics for a11y.
+       Metrics: ~40px row, 20×20 index chip, 13.5px/500 label, small pills. */
     .stream-embed-chip{
       width:100%;display:flex;align-items:center;gap:10px;
-      padding:5px 10px;margin-bottom:4px;
+      padding:8px 13px;margin-bottom:7px;
+      min-height:40px;
       border-radius:1.1em;
       background:var(--surface);color:var(--ink);text-align:left;
       box-shadow:var(--btn-shadow-sm);
@@ -652,16 +659,17 @@
     .stream-embed-chip[aria-checked="true"] .stream-chip-no{background:rgba(26,26,26,.35);color:#1a1a1a}
     .stream-chip-main{display:flex;align-items:center;gap:9px;min-width:0}
     .stream-chip-no{
-      min-width:26px;padding:3px 0;text-align:center;
-      border-radius:7px;background:var(--raised);color:var(--ink);
+      width:20px;height:20px;padding:0;display:grid;place-items:center;
+      border-radius:6px;background:var(--raised);color:var(--ink);
       font-size:11px;font-weight:800;
     }
-    .stream-chip-label{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .stream-chip-label{font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .stream-chip-tags{margin-left:auto;display:flex;gap:5px;flex-shrink:0}
     .stream-chip-tag{
       padding:2px 7px;border-radius:6px;background:var(--raised);
-      color:var(--ink-muted);font-size:9.5px;font-weight:800;letter-spacing:.4px;
+      color:var(--ink-muted);font-size:10px;font-weight:700;letter-spacing:.4px;
     }
+    .stream-chip-tag.watch{padding:6px 13px;font-size:12px}
     .stream-chip-tag.hd{background:var(--accent-dim);color:var(--accent)}
     .no-stream-sources{padding:32px 18px;text-align:center;color:var(--ink-muted)}
     .no-stream-sources strong{display:block;margin-bottom:6px;color:var(--ink);font-size:16px}
@@ -916,7 +924,7 @@
 <div id="stream-modal" class="modal" role="dialog" aria-modal="true" aria-label="Stream sources">
   <div class="stream-page">
     <div class="stream-topbar">
-      <button class="back-btn" type="button" onclick="closeModal()">← <span>Back</span></button>
+      <button class="back-btn" type="button" onclick="navigateBack()" aria-label="Back to matches">← <span>Back</span></button>
       <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
     </div>
     <div class="stream-heading">
@@ -1401,7 +1409,7 @@
             const label = "S" + item.stream.streamNo + " • " +
                 (item.stream.language || "Default");
             const tags = (item.stream.hd ? '<span class="stream-chip-tag hd">HD</span>' : "") +
-                '<span class="stream-chip-tag">Watch</span>';
+                '<span class="stream-chip-tag watch">Watch</span>';
             return '<button class="stream-embed-chip" type="button" role="radio" aria-checked="false"' +
                 ' data-embed-url="' + esc(url) + '"' +
                 ' data-stream-label="' + esc(label) + '">' +
@@ -1513,6 +1521,14 @@
         try {
             await navigator.clipboard.writeText('<iframe src="' + url + '" width="100%" height="500" frameborder="0" allowfullscreen></iframe>');
         } catch (_) {}
+    }
+
+    // In-app Back: the watch view is a modal over the homepage, so Back
+    // returns to the homepage (fixed known destination). It never touches
+    // window.history, so it can never exit the site — even when the visitor
+    // arrived via direct link, new tab, or refresh.
+    function navigateBack() {
+        location.assign(location.origin + location.pathname + "#matches");
     }
 
     function closeModal() {
