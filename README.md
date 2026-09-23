@@ -74,6 +74,20 @@ Matches are synced automatically from the Streamed API every 10 minutes. Admins 
 - **Player**: hls.js for HLS stream playback
 - **Video API**: Native HTML5 `<video>` element
 
+## Testing
+
+Three Node smoke suites cover the UI contracts and the Worker logic. Run them all:
+
+```bash
+bun run test
+# equivalent to:
+#   node test/dom-ux.smoke.mjs    # keyboard access, modal behavior, stream picker selection
+#   node test/ui-polish.smoke.mjs # design-system structure, layout order, a11y semantics
+#   node test/resolver.smoke.mjs  # Streamed sync, per-source failure isolation, API shaping
+```
+
+The DOM and UI suites parse the real `index.html` and run its JavaScript against a DOM stub, so changes to markup, styles or interaction code are validated against the shipped page — not a copy.
+
 ## Error Handling
 
 The application provides user-friendly error messages for:
