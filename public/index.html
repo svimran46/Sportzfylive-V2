@@ -35,27 +35,30 @@
     }
 
     :root{
-      --canvas:#121212;
-      --header-bg:#0c1017;
-      --surface:#131722;
-      --surface-2:#151b27;
-      --surface-hover:#181f30;
-      --surface-focus:#1b2436;
-      --raised:#1f1f1f;
-      --raised-hover:#202020;
-      --ink:#ffffff;
-      --ink-muted:#b3b3b3;
-      --ink-faint:#7c7c7c;
+      /* Stadium night: green-cast black, never neutral grey */
+      --canvas:#0a0e0b;
+      --header-bg:rgba(10,14,11,.88);
+      --surface:#101610;
+      --surface-2:#131a14;
+      --surface-hover:#18211a;
+      --surface-focus:#1b251d;
+      --raised:#141b15;
+      --raised-hover:#19211a;
+      --ink:#f2f8f3;
+      --ink-muted:#a3b3a5;
+      --ink-faint:#6f7d70;
       --pitch:#1ed760;
-      --pitch-400:#4ade80;
-      --pitch-300:#86efac;
-      --live:#ef4444;
-      --live-dim:rgba(239,68,68,.14);
-      --border:rgba(255,255,255,.05);
-      --border-strong:rgba(255,255,255,.1);
+      --pitch-400:#4ee77f;
+      --pitch-300:#9ff0b6;
+      --pitch-dim:rgba(30,215,96,.09);
+      --live:#ff3b47;
+      --live-dim:rgba(255,59,71,.12);
+      --brand-ink:#121212;
+      --border:rgba(158,240,182,.07);
+      --border-strong:rgba(158,240,182,.15);
       --radius-pill:999px;
-      --radius-card:16px;
-      --shadow-card:0 12px 24px -4px rgba(0,0,0,.35);
+      --radius-card:14px;
+      --shadow-card:0 18px 40px -18px rgba(0,0,0,.65);
       --ease:cubic-bezier(.16,1,.3,1);
       --container:1280px;
     }
@@ -70,6 +73,7 @@
       font-family:"DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
       font-size:15px;
       line-height:1.55;
+      font-variant-numeric:tabular-nums;
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
@@ -91,6 +95,8 @@
     .sfy-header{
       position:sticky;top:0;z-index:40;
       background:var(--header-bg);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
       border-bottom:1px solid var(--border);
     }
     .sfy-header-row{
@@ -101,9 +107,9 @@
 
     .sfy-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
     .sfy-brand-mark{
-      width:34px;height:34px;border-radius:50%;
+      width:36px;height:36px;border-radius:12px;
       display:grid;place-items:center;
-      background:var(--pitch);color:#121212;flex-shrink:0;
+      background:var(--pitch);color:var(--brand-ink);flex-shrink:0;
     }
     .sfy-brand-mark svg{width:20px;height:20px}
     .sfy-brand-text{font-size:16px;font-weight:700;letter-spacing:-.3px;color:#fff;white-space:nowrap}
@@ -158,7 +164,7 @@
     .sfy-mobile-nav{
       display:none;flex-direction:column;gap:2px;
       padding:10px 16px 14px;border-top:1px solid var(--border);
-      background:var(--header-bg);
+      background:#0d120e;
     }
     .sfy-mobile-nav.open{display:flex}
     .sfy-mobile-nav a{
@@ -170,26 +176,50 @@
     .sfy-mobile-nav a:hover,.sfy-mobile-nav a.active{background:var(--surface);color:#fff}
 
     /* ============================= HERO ============================= */
+    /* One bold move: a floodlit pitch — center circle, touchline, mown stripes —
+       rendered in CSS. Everything around it stays quiet. */
     .sfy-hero{
       position:relative;overflow:hidden;
       margin-top:16px;
-      border:1px solid var(--border);border-radius:20px;
+      border:1px solid var(--border-strong);border-radius:20px;
       background:
-        radial-gradient(620px 320px at 82% 0%,rgba(30,215,96,.14),transparent 62%),
-        linear-gradient(105deg,#131722 0%,#10141d 55%,#0e1219 100%);
-      min-height:280px;
+        radial-gradient(900px 340px at 88% -10%,rgba(30,215,96,.16),transparent 62%),
+        radial-gradient(520px 260px at -8% 110%,rgba(30,215,96,.07),transparent 60%),
+        linear-gradient(160deg,#101910 0%,#0b100c 58%,#090d0a 100%);
+      min-height:300px;
     }
-    @media(min-width:640px){.sfy-hero{min-height:320px}}
+    @media(min-width:640px){.sfy-hero{min-height:340px}}
+    /* Mown pitch stripes */
+    .sfy-hero::before{
+      content:"";position:absolute;inset:0;
+      background:repeating-linear-gradient(100deg,
+        transparent 0 64px,rgba(158,240,182,.028) 64px 128px);
+      pointer-events:none;
+    }
+    /* Halfway line + center circle + kickoff spot */
+    .sfy-hero::after{
+      content:"";position:absolute;
+      top:-14%;bottom:-30%;right:min(2vw,28px);width:min(48vw,560px);
+      border:1.5px solid rgba(30,215,96,.22);
+      border-radius:50%;
+      background:
+        radial-gradient(circle 5px at 50% 42%,rgba(30,215,96,.5) 0 4.5px,transparent 5px);
+      pointer-events:none;
+    }
+    @media(max-width:640px){
+      .sfy-hero::after{right:-36%;opacity:.7}
+    }
     .sfy-hero-inner{
       position:relative;z-index:2;
-      min-height:280px;padding:28px 22px;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      min-height:300px;padding:34px 24px 38px;
+      display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+      max-width:640px;
     }
-    @media(min-width:640px){.sfy-hero-inner{min-height:320px;padding:36px}}
+    @media(min-width:640px){.sfy-hero-inner{min-height:340px;padding:44px}}
     .sfy-hero-pill{
       display:inline-flex;align-items:center;gap:6px;
-      padding:4px 12px;margin-bottom:12px;
-      border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-pill);
+      padding:5px 12px;margin-bottom:14px;
+      border:1px solid rgba(255,59,71,.32);border-radius:var(--radius-pill);
       background:var(--live-dim);color:var(--live);
       font-size:11px;font-weight:700;letter-spacing:1px;
     }
@@ -198,44 +228,56 @@
       animation:sfy-live-glow 2s ease-in-out infinite;
     }
     @keyframes sfy-live-glow{
-      0%,100%{opacity:1;box-shadow:0 0 6px rgba(239,68,68,.8)}
-      50%{opacity:.7;box-shadow:0 0 1px rgba(239,68,68,.4)}
+      0%,100%{opacity:1;box-shadow:0 0 6px rgba(255,59,71,.8)}
+      50%{opacity:.7;box-shadow:0 0 1px rgba(255,59,71,.4)}
     }
     .sfy-hero-title{
-      margin:0 0 10px;
-      font-size:clamp(24px,5vw,46px);font-weight:800;
-      letter-spacing:-1.2px;line-height:1.12;color:#fff;
+      margin:0 0 12px;
+      font-size:clamp(34px,6vw,62px);font-weight:1000;
+      letter-spacing:-3px;line-height:1.02;color:var(--ink);
     }
     .sfy-hero-title span{
-      display:block;color:var(--pitch-400);
-      text-shadow:0 0 20px rgba(30,215,96,.3);
+      display:block;color:var(--pitch);
+      text-shadow:0 0 32px rgba(30,215,96,.35);
     }
     .sfy-hero-sub{
-      margin:0 0 18px;max-width:420px;
-      color:var(--ink-muted);font-size:13px;line-height:1.5;
+      margin:0 0 18px;max-width:460px;
+      color:var(--ink-muted);font-size:14px;line-height:1.6;
     }
     @media(min-width:640px){.sfy-hero-sub{font-size:15px}}
-    .sfy-hero-teams{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:6px}
+    .sfy-hero-facts{
+      display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;
+      margin:0 0 22px;padding:0;list-style:none;
+    }
+    .sfy-hero-facts li{
+      display:inline-flex;align-items:center;gap:8px;
+      color:var(--ink-muted);font-size:12.5px;font-weight:600;
+    }
+    .sfy-hero-facts li::before{
+      content:"";width:6px;height:6px;border-radius:50%;
+      background:var(--pitch);flex-shrink:0;
+    }
+    .sfy-hero-teams{display:flex;align-items:center;justify-content:flex-start;gap:18px;margin-bottom:8px}
     .sfy-hero-team{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700}
     .sfy-hero-team img{
       width:46px;height:46px;object-fit:contain;
       padding:5px;border-radius:50%;
-      background:rgba(255,255,255,.05);border:1px solid var(--border);
+      background:rgba(158,240,182,.06);border:1px solid var(--border-strong);
     }
     .sfy-hero-vs{font-size:12px;font-weight:800;color:var(--ink-faint)}
-    .sfy-hero-meta{margin:0 0 16px;color:var(--ink-muted);font-size:12px}
+    .sfy-hero-meta{margin:0 0 18px;color:var(--ink-muted);font-size:12px}
     .sfy-hero-btn{
       display:inline-flex;align-items:center;gap:8px;
-      min-height:44px;padding:0 24px;
+      min-height:46px;padding:0 26px;
       border:0;border-radius:var(--radius-pill);
-      background:var(--pitch);color:#121212;
-      font-size:13px;font-weight:800;cursor:pointer;
-      box-shadow:0 0 16px rgba(30,215,96,.35);
+      background:var(--pitch);color:var(--brand-ink);
+      font-size:13.5px;font-weight:800;cursor:pointer;
+      box-shadow:0 4px 20px rgba(30,215,96,.32);
       transition:background .2s ease,transform .2s var(--ease),box-shadow .2s ease;
     }
     .sfy-hero-btn:hover{
       background:var(--pitch-400);
-      box-shadow:0 0 24px rgba(30,215,96,.55);
+      box-shadow:0 6px 26px rgba(30,215,96,.48);
       transform:translateY(-1px);
     }
     .sfy-hero-btn:active{transform:translateY(0) scale(.97)}
@@ -261,9 +303,13 @@
       width:100%;height:100%;object-fit:cover;opacity:.22;
       filter:saturate(1.15);
     }
-    .sfy-featured .sfy-hero::before{
+    .sfy-featured .sfy-hero::before,.sfy-featured .sfy-hero::after{
+      content:none;
+    }
+    .sfy-featured .sfy-hero-inner{align-items:flex-start;text-align:left}
+    .sfy-featured .sfy-hero-gradient{
       content:"";position:absolute;inset:0;z-index:1;
-      background:linear-gradient(90deg,rgba(14,18,25,.72),rgba(14,18,25,.35) 55%,rgba(14,18,25,.8));
+      background:linear-gradient(90deg,rgba(9,13,10,.85),rgba(9,13,10,.5) 55%,rgba(9,13,10,.9));
     }
 
     .sfy-site-notice{
@@ -282,12 +328,12 @@
   <!-- ============ DESIGN SYSTEM: tiles, chips, carousels, cards, modal, footer ============ -->
   <style id="sportzfy-play-ui">
     /* ======================= SECTION HEADINGS ======================= */
-    .sfy-section{padding:20px 0 4px}
-    @media(min-width:640px){.sfy-section{padding:26px 0 6px}}
+    .sfy-section{padding:22px 0 4px}
+    @media(min-width:640px){.sfy-section{padding:28px 0 6px}}
     .sfy-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
     .sfy-section-title{display:flex;align-items:center;gap:9px;min-width:0}
     .sfy-section-title::before{content:"";width:5px;height:20px;border-radius:999px;background:var(--pitch);flex-shrink:0}
-    .sfy-section h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.4px;line-height:1.15;color:#fff}
+    .sfy-section h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.4px;line-height:1.15;color:var(--ink)}
     @media(min-width:640px){.sfy-section h2{font-size:21px}}
 
     /* ======================= CATEGORY TILES ======================= */
@@ -295,23 +341,24 @@
     @media(min-width:640px){.sfy-tiles{grid-template-columns:repeat(4,1fr);gap:16px}}
     .sfy-tile{
       display:flex;flex-direction:column;align-items:center;justify-content:center;
-      padding:18px 14px;border:1px solid var(--border);border-radius:16px;
+      padding:18px 14px;border:1px solid var(--border);border-radius:var(--radius-card);
       background:var(--surface);cursor:pointer;
       transition:transform .28s var(--ease),box-shadow .28s var(--ease),background .15s ease,border-color .2s ease;
     }
-    .sfy-tile:hover{background:var(--surface-hover);transform:translateY(-2px)}
+    .sfy-tile:hover{background:var(--surface-hover);transform:translateY(-2px);border-color:var(--border-strong)}
     .sfy-tile-icon{
-      width:48px;height:48px;border-radius:16px;
+      width:48px;height:48px;border-radius:14px;
       display:grid;place-items:center;margin-bottom:10px;color:#fff;
       transition:transform .3s var(--ease);
     }
     .sfy-tile:hover .sfy-tile-icon{transform:scale(1.1)}
     .sfy-tile-icon svg{width:24px;height:24px}
-    .sfy-tile[data-nav="LIVE"] .sfy-tile-icon{background:linear-gradient(135deg,#ef4444,#b91c1c);box-shadow:0 8px 20px -4px rgba(239,68,68,.45)}
-    .sfy-tile[data-nav="FOOTBALL"] .sfy-tile-icon{background:linear-gradient(135deg,#22c55e,#15803d);box-shadow:0 8px 20px -4px rgba(34,197,94,.45)}
-    .sfy-tile[data-nav="CRICKET"] .sfy-tile-icon{background:linear-gradient(135deg,#38bdf8,#0369a1);box-shadow:0 8px 20px -4px rgba(56,189,248,.45)}
-    .sfy-tile[data-nav="ALL"] .sfy-tile-icon{background:linear-gradient(135deg,#a78bfa,#6d28d9);box-shadow:0 8px 20px -4px rgba(167,139,250,.45)}
-    .sfy-tile span:last-child{font-size:13px;font-weight:700;color:#fff}
+    /* Flat sport color marks — no gradients, no glow */
+    .sfy-tile[data-nav="LIVE"] .sfy-tile-icon{background:var(--live)}
+    .sfy-tile[data-nav="FOOTBALL"] .sfy-tile-icon{background:#1ed760;color:var(--brand-ink)}
+    .sfy-tile[data-nav="CRICKET"] .sfy-tile-icon{background:#38bdf8;color:var(--brand-ink)}
+    .sfy-tile[data-nav="ALL"] .sfy-tile-icon{background:#a78bfa;color:var(--brand-ink)}
+    .sfy-tile span:last-child{font-size:13px;font-weight:700;color:var(--ink)}
 
     /* ======================= CATEGORY CHIPS ======================= */
     .sfy-chips{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 20px;scrollbar-width:none}
@@ -324,15 +371,15 @@
       font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
       transition:border-color .15s ease,color .15s ease,background .15s ease;
     }
-    .sfy-chip:hover{border-color:var(--pitch);color:#fff}
-    .sfy-chip.active{background:var(--pitch);border-color:var(--pitch);color:#121212;font-weight:700}
+    .sfy-chip:hover{border-color:var(--pitch);color:var(--ink)}
+    .sfy-chip.active{background:var(--pitch);border-color:var(--pitch);color:var(--brand-ink);font-weight:700}
 
     /* ======================= MATCH CAROUSELS ======================= */
     .category-section{position:relative;margin-bottom:30px}
     .category-heading-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
     .category-heading-row h2{
       margin:0;display:flex;align-items:center;gap:9px;min-width:0;
-      font-size:18px;font-weight:700;letter-spacing:-.4px;color:#fff;line-height:1.15;
+      font-size:18px;font-weight:700;letter-spacing:-.4px;color:var(--ink);line-height:1.15;
     }
     @media(min-width:640px){.category-heading-row h2{font-size:21px}}
     .category-heading-row h2::before{
@@ -349,7 +396,7 @@
       font-size:19px;line-height:1;cursor:pointer;
       transition:background .15s ease,border-color .15s ease,color .15s ease;
     }
-    .category-arrow:hover:not(:disabled){background:var(--surface-hover);border-color:var(--pitch);color:#fff}
+    .category-arrow:hover:not(:disabled){background:var(--surface-hover);border-color:var(--pitch);color:var(--ink)}
     .category-arrow:disabled{opacity:.28;cursor:not-allowed}
     .category-viewport{overflow:hidden}
     .category-track{
@@ -371,8 +418,8 @@
       position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;
       border:1px solid var(--border);border-radius:14px;
       background:
-        radial-gradient(circle at 50% 42%,rgba(30,215,96,.1),transparent 55%),
-        linear-gradient(135deg,#161c28,#0f141d);
+        radial-gradient(circle at 50% 42%,rgba(30,215,96,.08),transparent 55%),
+        linear-gradient(135deg,#141c15,#0d120e);
       transition:transform .25s var(--ease),border-color .2s ease,box-shadow .25s var(--ease);
     }
     .sfy-match-item:hover .sfy-event-visual,
@@ -397,7 +444,7 @@
       width:clamp(50px,7vw,72px);height:clamp(50px,7vw,72px);
       object-fit:contain;padding:8px;
       border-radius:50%;
-      background:rgba(255,255,255,.045);border:1px solid var(--border);
+      background:rgba(158,240,182,.05);border:1px solid var(--border);
     }
     .sfy-event-logo.placeholder{display:grid;place-items:center;color:var(--ink-faint)}
     .sfy-event-logo.placeholder svg{width:40%;height:40%}
@@ -405,7 +452,7 @@
       display:grid;place-items:center;
       width:clamp(50px,7vw,72px);height:clamp(50px,7vw,72px);
       border-radius:50%;
-      background:rgba(255,255,255,.045);border:1px solid var(--border);
+      background:rgba(158,240,182,.05);border:1px solid var(--border);
       color:var(--ink-muted);font-size:14px;font-weight:800;letter-spacing:.5px;
     }
     .sfy-hero-team .sfy-logo-fallback{width:46px;height:46px;font-size:13px}
@@ -417,7 +464,7 @@
       font-size:11px;line-height:1;font-weight:700;
       backdrop-filter:blur(8px);
     }
-    .sfy-event-badge{background:rgba(10,10,12,.78);color:#f4f4f5}
+    .sfy-event-badge{background:rgba(10,14,11,.82);color:#f4f4f5}
     .sfy-event-live{background:var(--live);color:#fff;letter-spacing:.5px}
     .sfy-event-live::before{
       content:"";width:6px;height:6px;border-radius:50%;background:#fff;
@@ -427,7 +474,7 @@
       position:absolute;z-index:3;right:10px;top:10px;
       display:inline-flex;align-items:center;gap:5px;
       padding:5px 9px;border-radius:var(--radius-pill);
-      background:rgba(10,10,12,.78);backdrop-filter:blur(8px);
+      background:rgba(10,14,11,.82);backdrop-filter:blur(8px);
       color:var(--pitch-400);font-size:11px;font-weight:700;
     }
     .sfy-stream-chip svg{width:11px;height:11px}
@@ -435,11 +482,11 @@
       position:absolute;z-index:3;right:10px;bottom:10px;
       display:grid;place-items:center;
       width:30px;height:30px;border-radius:50%;
-      background:rgba(10,10,12,.72);backdrop-filter:blur(8px);
+      background:rgba(10,14,11,.72);backdrop-filter:blur(8px);
       color:#facc15;font-size:15px;line-height:1;
     }
     .sfy-event-title{
-      margin-top:11px;color:#f5f5f5;
+      margin-top:11px;color:var(--ink);
       font-size:14px;font-weight:700;letter-spacing:-.2px;line-height:1.35;
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
@@ -447,7 +494,7 @@
     .sfy-event-category span{margin:0 4px;color:#4b5563}
     .sfy-match-item:focus-visible{outline:2px solid var(--pitch);outline-offset:4px}
 
-    .sfy-channel-item .sfy-event-visual{background:linear-gradient(135deg,#141a24,#0f141d)}
+    .sfy-channel-item .sfy-event-visual{background:linear-gradient(135deg,#131a14,#0d120e)}
     .sfy-channel-item .sfy-event-poster{object-fit:contain;padding:16px}
 
     /* ======================= LOADING / EMPTY / ERROR ======================= */
@@ -458,15 +505,15 @@
     .loading-state p{margin:10px 0 0;font-size:14px}
     .sfy-skeletons{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin:24px 0}
     .sfy-skeleton{border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden}
-    .sfy-skeleton::before{content:"";display:block;aspect-ratio:16/9;background:linear-gradient(100deg,#171c27 40%,#1d2432 50%,#171c27 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
-    .sfy-skeleton::after{content:"";display:block;height:11px;width:72%;margin:14px 12px 0;border-radius:6px;background:linear-gradient(100deg,#171c27 40%,#1d2432 50%,#171c27 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
+    .sfy-skeleton::before{content:"";display:block;aspect-ratio:16/9;background:linear-gradient(100deg,#121a13 40%,#182319 50%,#121a13 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
+    .sfy-skeleton::after{content:"";display:block;height:11px;width:72%;margin:14px 12px 0;border-radius:6px;background:linear-gradient(100deg,#121a13 40%,#182319 50%,#121a13 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
     @keyframes sfy-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-    .error-state h3{margin:0 0 6px;color:#fff;font-size:18px}
+    .error-state h3{margin:0 0 6px;color:var(--ink);font-size:18px}
     .error-state p{margin:0;font-size:14px}
     .error-state button{
       min-height:42px;margin-top:18px;padding:0 20px;
       border:0;border-radius:var(--radius-pill);
-      background:var(--pitch);color:#121212;font-size:13px;font-weight:800;cursor:pointer;
+      background:var(--pitch);color:var(--brand-ink);font-size:13px;font-weight:800;cursor:pointer;
       transition:background .15s ease;
     }
     .error-state button:hover{background:var(--pitch-400)}
@@ -476,20 +523,20 @@
       display:none;position:fixed;inset:0;z-index:1000;
       padding:16px;
       align-items:center;justify-content:center;
-      background:rgba(8,10,13,.9);backdrop-filter:blur(10px);
+      background:rgba(6,9,7,.9);backdrop-filter:blur(10px);
     }
     .stream-page{
       position:relative;
       width:min(1180px,96vw);max-height:94vh;overflow:auto;
       display:flex;flex-direction:column;
       padding:18px clamp(14px,3vw,28px) 26px;
-      border:1px solid var(--border);border-radius:20px;
-      background:linear-gradient(180deg,#10141d,#0c1017);
+      border:1px solid var(--border-strong);border-radius:20px;
+      background:linear-gradient(180deg,#0e130f,#0a0e0b);
       box-shadow:0 34px 90px rgba(0,0,0,.6);
-      scrollbar-width:thin;scrollbar-color:#2a3242 transparent;
+      scrollbar-width:thin;scrollbar-color:#22301f transparent;
     }
     .stream-page::-webkit-scrollbar{width:7px}
-    .stream-page::-webkit-scrollbar-thumb{background:#2a3242;border-radius:999px}
+    .stream-page::-webkit-scrollbar-thumb{background:#22301f;border-radius:999px}
     .stream-page.theater{
       width:100vw;max-width:none;height:100vh;max-height:none;
       border-radius:0;border:0;padding:14px 22px;
@@ -512,11 +559,11 @@
     .stream-heading{
       display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;
     }
-    .stream-heading h2{margin:0 0 6px;font-size:22px;font-weight:700;letter-spacing:-.4px;color:#fff}
+    .stream-heading h2{margin:0 0 6px;font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--ink)}
     .stream-heading p{margin:0;color:var(--ink-muted);font-size:13px}
     .stream-source-box{border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;background:var(--surface)}
     .source-head{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border-bottom:1px solid var(--border)}
-    .source-name{font-size:16px;font-weight:700;color:#fff}
+    .source-name{font-size:16px;font-weight:700;color:var(--ink)}
     .source-note{margin-top:3px;color:var(--pitch-400);font-size:12.5px;font-weight:600}
     .stream-count{color:var(--pitch-400);font-size:13px;font-weight:800}
     .stream-list{padding:10px 9px}
@@ -537,29 +584,29 @@
     .stream-chip-main{display:flex;align-items:center;gap:11px;min-width:0}
     .stream-chip-no{
       min-width:34px;padding:6px 0;text-align:center;
-      border-radius:8px;background:#232a37;color:#fff;
+      border-radius:8px;background:#1c261d;color:#fff;
       font-size:12px;font-weight:800;
     }
-    .stream-embed-chip.active .stream-chip-no{background:var(--pitch);color:#121212}
+    .stream-embed-chip.active .stream-chip-no{background:var(--pitch);color:var(--brand-ink)}
     .stream-chip-label{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .stream-chip-tags{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
     .stream-chip-tag{
-      padding:4px 8px;border-radius:7px;background:#232a37;
+      padding:4px 8px;border-radius:7px;background:#1c261d;
       color:var(--ink-muted);font-size:10px;font-weight:800;letter-spacing:.4px;
     }
     .stream-chip-tag.hd{background:rgba(30,215,96,.14);color:var(--pitch-400)}
     .no-stream-sources{padding:32px 18px;text-align:center;color:var(--ink-muted)}
-    .no-stream-sources strong{display:block;margin-bottom:6px;color:#fff;font-size:16px}
+    .no-stream-sources strong{display:block;margin-bottom:6px;color:var(--ink);font-size:16px}
     .player-container{margin-top:16px;width:100%;min-height:500px;background:#000;border-radius:13px;overflow:hidden}
     .player-container iframe{width:100%;height:500px;border:0;display:block}
     .stream-page.theater .player-container,
     .stream-page.theater .player-container iframe{min-height:calc(100vh - 220px);height:calc(100vh - 220px)}
 
     /* ======================= FOOTER ======================= */
-    .sfy-footer{margin-top:44px;padding:30px 0 40px;border-top:1px solid var(--border);background:#0f1216}
+    .sfy-footer{margin-top:44px;padding:30px 0 40px;border-top:1px solid var(--border);background:#080b09}
     .sfy-footer-inner{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
-    .sfy-footer-brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#fff}
-    .sfy-footer-brand .sfy-brand-mark{width:30px;height:30px}
+    .sfy-footer-brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:var(--ink)}
+    .sfy-footer-brand .sfy-brand-mark{width:30px;height:30px;border-radius:10px}
     .sfy-footer-brand .sfy-brand-mark svg{width:17px;height:17px}
     .sfy-footer-tag{color:var(--ink-muted);font-size:13px;max-width:420px;margin:0}
     .sfy-footer-nav{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px}
@@ -569,7 +616,7 @@
 
     /* ======================= RESPONSIVE / MOTION ======================= */
     @media(max-width:640px){
-      .sfy-hero-inner{padding:24px 16px}
+      .sfy-hero-inner{padding:28px 18px 32px}
       .sfy-hero-teams{gap:12px}
       .sfy-hero-team{font-size:12px;flex-direction:column;gap:5px}
       .sfy-hero-team img{width:42px;height:42px}
@@ -582,6 +629,7 @@
     @media(max-width:380px){
       .sfy-tile{padding:14px 10px}
       .sfy-brand-text{font-size:15px}
+      .sfy-hero-title{letter-spacing:-2px}
     }
     @media(prefers-reduced-motion:reduce){
       *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
@@ -655,11 +703,16 @@
   <section class="sfy-hero" id="sfy-hero-default" aria-label="Live sports">
     <div class="sfy-hero-inner">
       <div class="sfy-hero-pill"><i aria-hidden="true"></i>LIVE</div>
-      <h1 class="sfy-hero-title">Live Sports <span>Anytime, Anywhere</span></h1>
-      <p class="sfy-hero-sub">Your favorite sports, all in one place. Stream live matches from around the world in HD.</p>
+      <h1 class="sfy-hero-title">All today's games,<span>live in HD.</span></h1>
+      <p class="sfy-hero-sub">Football, cricket, tennis and more — kickoff times, live badges and multi-source streams, all on one page.</p>
+      <ul class="sfy-hero-facts" aria-label="What this site provides">
+        <li>Matches refresh every 10 minutes</li>
+        <li>Multiple streams per match</li>
+        <li>No account needed</li>
+      </ul>
       <button class="sfy-hero-btn sfy-sheen" type="button" onclick="document.getElementById('matches-container')?.scrollIntoView({behavior:'smooth',block:'start'})">
         <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        <span>Watch Now</span>
+        <span>Watch now</span>
       </button>
     </div>
   </section>
@@ -963,7 +1016,8 @@
                     featured.innerHTML =
                         '<section class="sfy-hero" aria-label="Featured match">' +
                             (match.poster
-                                ? '<img class="sfy-hero-bg" src="' + esc(resolveAssetUrl(match.poster)) + '" alt="" aria-hidden="true" decoding="async">'
+                                ? '<img class="sfy-hero-bg" src="' + esc(resolveAssetUrl(match.poster)) + '" alt="" aria-hidden="true" decoding="async">' +
+                                  '<span class="sfy-hero-gradient" aria-hidden="true"></span>'
                                 : '') +
                             '<div class="sfy-hero-inner">' +
                                 '<div class="sfy-hero-pill"><i aria-hidden="true"></i>' + (isLiveMatch ? "LIVE" : "FEATURED") + '</div>' +
@@ -978,7 +1032,7 @@
                                 '<p class="sfy-hero-meta">' + esc(dateText || ((match.category || "") + (match.status ? " • " + match.status : ""))) + '</p>' +
                                 '<button class="sfy-hero-btn sfy-sheen" type="button" data-match-id="' + esc(match.id || "") + '">' +
                                     '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
-                                    '<span>' + (isLiveMatch ? "Watch Now" : "View Match") + '</span>' +
+                                    '<span>' + (isLiveMatch ? "Watch now" : "View match") + '</span>' +
                                 '</button>' +
                             '</div>' +
                         '</section>';
