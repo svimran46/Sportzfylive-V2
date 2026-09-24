@@ -535,4 +535,22 @@ console.log("# image proxy");
 }
 ok("image proxy allows streamed.pk only and re-serves the bytes");
 
+// ---------------------------------------------------------------------------
+// 8. Unknown paths: the assets layer owns the site, so a request that falls
+//    through to the Worker is a real miss. It used to be answered with
+//    200 "SportzfyLive API Online", which turned every 404 (crawler and icon
+//    probes, typos) into a cached text/plain 200.
+// ---------------------------------------------------------------------------
+
+console.log("# unknown paths");
+{
+  const unknownApi = await worker.default.fetch(req("/api/does-not-exist"), env, ctx);
+  assert.equal(unknownApi.status, 404, "unknown /api path is 404");
+  assert.equal((await unknownApi.json()).error, "Unknown endpoint");
+
+  const unknownPath = await worker.default.fetch(req("/favicon.ico"), env, ctx);
+  assert.equal(unknownPath.status, 404, "non-asset path is not answered with 200");
+}
+ok("unknown paths return 404 instead of a 200 placeholder");
+
 console.log("\nAll " + passed + " assertions groups passed.");

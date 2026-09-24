@@ -858,7 +858,18 @@ async function apiHandler(request, env, ctx) {
     }
   }
 
-  return new Response("SportzfyLive API Online", { headers: jsonHeaders });
+  // Anything that reaches this point is not an API route, and the static assets
+  // layer has already had its chance to answer. Answering 200 here masked real
+  // misses (crawler/icon probes, typo'd paths) as "API Online" text.
+  const pathname = new URL(request.url).pathname;
+  if (pathname === "/api" || pathname.startsWith("/api/")) {
+    return json({ error: "Unknown endpoint" }, 404);
+  }
+
+  return new Response("Not found", {
+    status: 404,
+    headers: { "Content-Type": "text/plain; charset=utf-8" }
+  });
 }
 
 export default {
@@ -887,7 +898,16 @@ export default {
         scheduledAt: controller.scheduledTime
       });
     } catch (error) {
-      console.error("Failed to queue scheduled sync:", error);
+      // No queue binding (a plan or config without Queues, or a queue outage):
+      // run the same sync inline so the 10-minute refresh keeps working instead
+      // of stopping silently.
+      console.error("Failed to queue scheduled sync, syncing inline:", error);
+      try {
+        const result = await syncStreamedMatches(env);
+        console.log("Inline scheduled sync completed:", JSON.stringify(result));
+      } catch (inlineError) {
+        console.error("Inline scheduled sync failed:", inlineError);
+      }
     }
   },
 

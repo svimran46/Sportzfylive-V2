@@ -1,0 +1,44 @@
+name: Deploy to Cloudflare
+
+# Cloudflare Workers is the only host: this one Worker serves both the public
+# API and the static site in ./public (see wrangler.jsonc), so a single
+# `wrangler deploy` publishes everything. Drops the Netlify dependency and its
+# build-minute/deploy quotas entirely.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   - token with the "Edit Cloudflare Workers" permissions
+#   CLOUDFLARE_ACCOUNT_ID  - the account id from the Cloudflare dashboard
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run smoke tests
+        run: npm test
+
+  deploy:
+    name: Deploy Worker
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish Worker + static assets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

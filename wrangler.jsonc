@@ -1,9 +1,25 @@
 {
+  // Cloudflare Workers is the only host. This one Worker serves the public API
+  // (/api/*) and the static site from ./public, so the page, the image proxy and
+  // the API share a single origin. `npm run deploy` (wrangler deploy) publishes
+  // both, and GitHub Actions does the same on every push to main
+  // (see .github/workflows/deploy.yml).
+  //
+  // Custom domain: add a routes entry here,
+  //   "routes": [{ "pattern": "example.com", "custom_domain": true }]
+  // then update the canonical origin in index.html (og:url, canonical link,
+  // og:image, twitter:image) plus public/robots.txt and public/sitemap.xml.
+  //
+  // Free plan: the queues block below needs the Workers Paid plan. On the free
+  // plan remove it — scheduled() then runs the same sync inline every 10 minutes.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sportzfylive",
   "main": "worker.js",
   "compatibility_date": "2026-09-17",
   "observability": { "enabled": true },
+  // Everything inside ./public is published publicly; response headers for it
+  // are declared in public/_headers. Keep public/index.html in sync with
+  // index.html — the deploy smoke test fails the build if they drift.
   "assets": { "directory": "./public" },
   "triggers": { "crons": ["*/10 * * * *"] },
   "queues": {

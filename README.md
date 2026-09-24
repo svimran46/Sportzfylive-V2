@@ -31,13 +31,24 @@ admin.html + admin.js     Admin SPA (login, matches, content, sync)
 
 ```
 Sportzfylive-V2/
-├── worker.js        # Cloudflare Worker: API, auth, Streamed sync + resolver
-├── index.html       # Public site (embedded CSS and JavaScript)
-├── admin.html       # Admin shell (markup + styles)
-├── admin.js         # Admin SPA logic (login, match CRUD, sync)
-├── test/            # Functional smoke tests (node test/resolver.smoke.mjs)
-├── wrangler.jsonc   # Worker config (KV, queue, cron, assets)
-└── README.md        # This file
+├── worker.js          # Cloudflare Worker: API, auth, Streamed sync + resolver
+├── index.html         # Public site (embedded CSS and JavaScript) — source copy
+├── admin.html         # Admin shell (markup + styles) — source copy
+├── admin.js           # Admin SPA logic (login, match CRUD, sync) — source copy
+├── og-card.png        # Social share card — source copy
+├── public/            # The entire published site (Worker static assets)
+│   ├── index.html     #   published copy of the root pages above
+│   ├── admin.html
+│   ├── admin.js
+│   ├── og-card.png
+│   ├── fonts/         #   self-hosted DM Sans woff2
+│   ├── _headers       #   response headers for static assets
+│   ├── robots.txt
+│   └── sitemap.xml
+├── test/              # Node smoke suites (UI contracts, worker logic, deploy)
+├── .github/workflows/ # Cloudflare deploy on push to main
+├── wrangler.jsonc     # Worker config (KV, queue, cron, assets)
+└── README.md          # This file
 ```
 
 ## Getting Started
@@ -54,7 +65,15 @@ git clone https://github.com/svimran46/Sportzfylive-V2.git
 cd Sportzfylive-V2
 ```
 
-2. Open `index.html` in your browser or deploy to GitHub Pages
+2. Preview locally (serves the same `public/` directory the Worker publishes):
+```bash
+bun install     # installs wrangler for deploys
+bun run serve   # http://localhost:3000
+```
+
+The local server has no API — match data and the `/api/images` poster proxy come
+from the deployed Worker, so the page talks to `PROXY_URL` in `index.html` while
+you develop.
 
 ## Usage
 
@@ -77,14 +96,16 @@ Matches are synced automatically from the Streamed API every 10 minutes. Admins 
 
 ## Testing
 
-Three Node smoke suites cover the UI contracts and the Worker logic. Run them all:
+Four Node smoke suites cover the UI contracts, the Worker logic and the deploy
+configuration. Run them all:
 
 ```bash
-bun run test
+bun run test     # or: npm test
 # equivalent to:
 #   node test/dom-ux.smoke.mjs    # keyboard access, modal behavior, stream picker selection
 #   node test/ui-polish.smoke.mjs # design-system structure, layout order, a11y semantics
-#   node test/resolver.smoke.mjs  # Streamed sync, per-source failure isolation, API shaping
+#   node test/resolver.smoke.mjs  # Streamed sync, per-source failure isolation, API shaping, image proxy
+#   node test/deploy.smoke.mjs    # published copies in sync, no host leftovers, deploy workflow
 ```
 
 The DOM and UI suites parse the real `index.html` and run its JavaScript against a DOM stub, so changes to markup, styles or interaction code are validated against the shipped page — not a copy.
@@ -114,33 +135,80 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 | Safari 11+ | ✅ Yes (native) | ✅ Yes |
 | Edge 79+ | ✅ Yes | ✅ Yes |
 
-## Deployment
+## Deployment (Cloudflare Workers)
 
-### GitHub Pages
+One Worker is the whole production surface: it serves the API **and** the static
+site in `public/` from the same origin, so there is no second host to keep in
+sync. Bindings live in `wrangler.jsonc`.
 
-The repository is configured for automatic deployment to GitHub Pages:
-
-1. Push changes to the `main` branch
-2. GitHub Actions automatically builds and deploys
-3. Access at: `https://svimran46.github.io/Sportzfylive-V2/`
-
-### Worker Deployment (Cloudflare)
-
-The backend is a Cloudflare Worker configured in `wrangler.jsonc`:
+### Deploy from your machine
 
 ```bash
-npx wrangler deploy          # deploy worker.js with KV, queue and cron bindings
-npx wrangler secret put ADMIN_TOKEN   # set the admin token secret
+bun install                            # installs wrangler
+bun run deploy                         # wrangler deploy: worker.js + ./public
+npx wrangler secret put ADMIN_TOKEN    # admin panel token (once)
 ```
 
-After deploying, run one admin sync (Admin panel → Sync & Automation) to populate the match list and per-source stream caches.
+Wrangler authenticates with `wrangler login`, or with the `CLOUDFLARE_API_TOKEN`
+and `CLOUDFLARE_ACCOUNT_ID` environment variables when you want it
+non-interactive. The site is live at
+`https://sportzfylive.svimranmy.workers.dev/`.
 
-### Self-Hosted
+### Deploy on every push (GitHub Actions)
 
-Simply copy all files to your web server and ensure:
-- `index.html` is the document root
-- All files are in the same directory
-- HTTPS is enabled (recommended for embedded content)
+`.github/workflows/deploy.yml` runs the smoke suites and then `wrangler deploy`
+on each push to `main`. Add two repository secrets (Settings → Secrets and
+variables → Actions):
+
+| Secret | Value |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | API token created from the **Edit Cloudflare Workers** template |
+| `CLOUDFLARE_ACCOUNT_ID` | Account ID from the Cloudflare dashboard |
+
+### First-time setup on a fresh Cloudflare account
+
+1. Create the KV namespace and put the printed id in `wrangler.jsonc`:
+   ```bash
+   npx wrangler kv namespace create SPORTZFY_DB
+   ```
+2. Create the sync queue — or, on the Workers **free** plan (Queues need the paid
+   plan), delete the `queues` block from `wrangler.jsonc`; the 10-minute cron then
+   runs the same sync inline in `scheduled()`.
+3. `npx wrangler secret put ADMIN_TOKEN`
+4. `bun run deploy`, then trigger one sync (Admin panel → Sync & Automation).
+
+### Custom domain
+
+Add a route in `wrangler.jsonc` and update the canonical origin in `index.html`
+(`og:url`, the `canonical` link, `og:image`, `twitter:image`) plus
+`public/robots.txt` and `public/sitemap.xml`:
+
+```jsonc
+"routes": [{ "pattern": "example.com", "custom_domain": true }]
+```
+
+### Caching and headers
+
+`public/_headers` sets the static-asset response headers (`/fonts/*` cached for a
+year, `nosniff` + `Referrer-Policy`); Worker-generated responses set their own.
+Assets ship with `Cache-Control: public, max-age=0, must-revalidate` and an ETag,
+so a deploy is visible immediately, while `/api/images` responses are cached at
+the edge for 24 hours.
+
+### Keeping the published copy in sync
+
+The repo root holds the source of `index.html`, `admin.html`, `admin.js` and
+`og-card.png`; `public/` holds the published copies. Edit the root file, copy it
+into `public/`, and run `bun run test` — the deploy suite fails when the two
+diverge. (`public/` is also the only thing uploaded, so anything placed there
+becomes public.)
+
+### Self-hosted static copy (optional)
+
+`public/` can be dropped on any static host, but the API, the admin panel and the
+`/api/images` poster proxy still run on the Worker — keep `PROXY_URL` in
+`index.html` and `API` in `admin.js` pointed at the deployed Worker origin and
+serve over HTTPS for embedded content.
 
 ## Performance
 
@@ -159,6 +227,16 @@ Simply copy all files to your web server and ensure:
 - Verify the stream URL is correct and accessible
 - Check if the stream URL is CORS-enabled
 - Some streams may require a VPN or geolocation
+
+### Posters or team crests missing on desktop?
+- Poster art is hotlinked from `streamed.pk`; a blocked or filtered request retries
+  once through `/api/images?url=` (same origin) and then falls back to team initials
+- If every image is missing, redeploy so `/api/images` is live: `bun run deploy`
+- Matches the Streamed API ships without a badge (`badge: ""`) show team initials by design
+
+### A change is not showing up on the live site?
+- Run `bun run test`: the deploy suite fails when `public/index.html` drifts from `index.html`
+- Confirm the latest deploy succeeded: `gh run list --workflow=deploy.yml`
 
 ### Performance issues?
 - Clear browser cache (Ctrl+Shift+Delete)

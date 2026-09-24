@@ -1,0 +1,10 @@
+# Sportzfylive — public site served by the Cloudflare Worker in worker.js.
+# The canonical origin is the Worker host; update it here, in sitemap.xml and in
+# the og:/canonical tags of index.html if a custom domain is added.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /admin.html
+
+Sitemap: https://sportzfylive.svimranmy.workers.dev/sitemap.xml
