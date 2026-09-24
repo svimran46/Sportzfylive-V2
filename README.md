@@ -19,6 +19,7 @@ A modern, responsive web application for streaming live sports matches. The publ
 Streamed API ──▶ Cloudflare Worker (worker.js)
                  ├─ 10-min cron sync + source resolution (SWR cache in KV)
                  ├─ Public API: /api/matches/all-today (sanitized, no embedUrl)
+                 ├─ Image proxy: /api/images?url= (same-origin posters/crests, streamed.pk only)
                  ├─ On-demand resolver: /api/streamed/streams?source=&id=
                  └─ Admin API (token → 24h session, match CRUD, site content)
                        │

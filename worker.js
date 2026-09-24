@@ -171,6 +171,79 @@ async function fetchWithTimeout(url, options, timeoutMs) {
   }
 }
 
+/*
+ * Same-origin image proxy
+ *
+ * Posters and team crests are hotlinked from streamed.pk, a DDoS-Guard fronted
+ * host. Browsers, extensions and filtered networks that block those third-party
+ * requests leave every card with an empty frame, so the public site retries a
+ * failed image through /api/images?url=... and the Worker re-serves it from the
+ * site's own origin, cached at the edge. Only https images on streamed.pk are
+ * allowed, so the route cannot be turned into an open proxy.
+ */
+const IMAGE_PROXY_HOST = "streamed.pk";
+const IMAGE_CACHE_SECONDS = 24 * 60 * 60;
+
+function allowedImageUrl(value) {
+  try {
+    const url = new URL(String(value ?? ""));
+    if (url.protocol !== "https:") return null;
+    const host = url.hostname.toLowerCase();
+    if (host !== IMAGE_PROXY_HOST && !host.endsWith("." + IMAGE_PROXY_HOST)) return null;
+    return url;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function fetchProxiedImage(target) {
+  const upstream = await fetchWithTimeout(
+    target.href,
+    { headers: { "Accept": "image/*" }, redirect: "follow" },
+    STREAMED_SOURCE_TIMEOUT_MS
+  );
+  if (!upstream.ok || !upstream.body) return null;
+
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": upstream.headers.get("Content-Type") || "image/webp",
+      "Cache-Control": "public, max-age=" + IMAGE_CACHE_SECONDS + ", immutable",
+      "Access-Control-Allow-Origin": "*"
+    }
+  });
+}
+
+async function serveProxiedImage(request) {
+  const target = allowedImageUrl(new URL(request.url).searchParams.get("url"));
+  if (!target) return json({ error: "Image url is not allowed" }, 400);
+
+  // Edge cache: each poster/crest is fetched from streamed.pk only once.
+  const cache = typeof caches === "object" && caches ? caches.default : null;
+  const cacheKey = cache
+    ? new Request("https://sportzfylive-images.internal/" + encodeURIComponent(target.href), { method: "GET" })
+    : null;
+
+  if (cache) {
+    const hit = await cache.match(cacheKey);
+    if (hit) return hit;
+  }
+
+  let response = null;
+  try {
+    response = await fetchProxiedImage(target);
+  } catch (_) {
+    response = null;
+  }
+  if (!response) return json({ error: "Image unavailable" }, 502);
+
+  if (cache && typeof response.clone === "function") {
+    try { await cache.put(cacheKey, response.clone()); } catch (_) {}
+  }
+
+  return response;
+}
+
 // Extract public-safe stream metadata from any plausible Streamed payload
 // shape and drop every other field — playback URLs must never survive.
 function sanitizeStreamedStreams(data, sourceName) {
@@ -610,6 +683,10 @@ async function apiHandler(request, env, ctx) {
       ...(payload.stale ? { stale: true } : {}),
       ...(payload.error ? { error: payload.error } : {})
     });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/images") {
+    return serveProxiedImage(request);
   }
 
   if (request.method === "GET" && url.pathname === "/api/status") {
