@@ -13,6 +13,7 @@ const ok = (name) => { passed += 1; console.log("  ok " + passed + " - " + name)
 // ---------------------------------------------------------------------------
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+// probe-quotes
 
 const styleBlocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[0]);
 assert.ok(styleBlocks.length >= 2, "index.html has multiple style blocks");
