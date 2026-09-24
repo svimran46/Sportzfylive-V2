@@ -2,12 +2,17 @@ name: Deploy to Cloudflare
 
 # Cloudflare Workers is the only host: this one Worker serves both the public
 # API and the static site in ./public (see wrangler.jsonc), so a single
-# `wrangler deploy` publishes everything. Drops the Netlify dependency and its
-# build-minute/deploy quotas entirely.
+# `wrangler deploy` publishes everything.
 #
-# Required repository secrets (Settings → Secrets and variables → Actions):
+# Two repository secrets arm automatic deploys
+# (Settings → Secrets and variables → Actions):
 #   CLOUDFLARE_API_TOKEN   - token with the "Edit Cloudflare Workers" permissions
 #   CLOUDFLARE_ACCOUNT_ID  - the account id from the Cloudflare dashboard
+#
+# Until they exist the run stays green: the smoke tests still run and the
+# preflight reports which secret is missing instead of failing the build, with
+# the publish step skipped. Add the secrets and the next push deploys; until
+# then `bun run deploy` is the manual path.
 
 on:
   push:
@@ -37,6 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Cloudflare secrets
+        id: preflight
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -45,10 +51,13 @@ jobs:
           [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
           if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing — add them under Settings → Secrets and variables → Actions, then re-run this job."
-            exit 1
+            echo "::notice::Deploy skipped — missing repository secret(s):$missing. Add them under Settings → Secrets and variables → Actions and the next push deploys automatically; until then run 'bun run deploy'."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Publish Worker + static assets
+        if: steps.preflight.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -120,8 +120,18 @@ assert.match(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/, "workflow reads the Clo
 assert.match(workflow, /branches: \[main\]/, "workflow deploys on pushes to main");
 assert.match(
   workflow,
-  /Missing repository secret\(s\)/,
-  "workflow names missing secrets instead of failing obscurely"
+  /missing repository secret\(s\):/i,
+  "workflow names the missing secrets"
+);
+assert.match(workflow, /::notice::/, "missing secrets are reported as a notice");
+assert.ok(
+  !/::error::[^\n]*missing repository secret/i.test(workflow),
+  "missing secrets must not fail the run"
+);
+assert.match(
+  workflow,
+  /if: steps\.preflight\.outputs\.ready == 'true'/,
+  "publishing is gated on the preflight result"
 );
 ok("GitHub Actions deploys the Worker on push to main");
 
