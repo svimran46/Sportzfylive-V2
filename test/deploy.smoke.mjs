@@ -118,6 +118,27 @@ assert.match(workflow, /cloudflare\/wrangler-action@v3/, "workflow deploys with 
 assert.match(workflow, /secrets\.CLOUDFLARE_API_TOKEN/, "workflow reads the Cloudflare API token secret");
 assert.match(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/, "workflow reads the Cloudflare account id secret");
 assert.match(workflow, /branches: \[main\]/, "workflow deploys on pushes to main");
+assert.match(
+  workflow,
+  /Missing repository secret\(s\)/,
+  "workflow names missing secrets instead of failing obscurely"
+);
 ok("GitHub Actions deploys the Worker on push to main");
+
+// Secrets must never be committable: the workspace env files and wrangler's
+// local secret file are all gitignored.
+const ignore = read(".gitignore").toString("utf8");
+for (const entry of [".env", ".env.local", ".dev.vars"]) {
+  assert.ok(
+    new RegExp("^" + entry.replace(/\./g, "\\.") + "$", "m").test(ignore),
+    entry + " is gitignored"
+  );
+}
+ok("env and wrangler secret files stay out of git");
+
+// The README must state where secrets belong, so a future contributor does not
+// reach for a committed file.
+assert.match(read("README.md").toString("utf8"), /wrangler secret put ADMIN_TOKEN/, "README documents Worker secrets");
+ok("README documents Worker-side secrets");
 
 console.log("\nAll " + passed + " deploy assertions passed.");

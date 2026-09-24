@@ -1,6 +1,8 @@
 .wrangler
 node_modules
 .DS_Store
-.env 
+.env
 .env.local
- 
+# Wrangler's local secret file (used by `wrangler dev`) — never commit it.
+.dev.vars
+.dev.vars.*

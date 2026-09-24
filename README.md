@@ -154,6 +154,18 @@ and `CLOUDFLARE_ACCOUNT_ID` environment variables when you want it
 non-interactive. The site is live at
 `https://sportzfylive.svimranmy.workers.dev/`.
 
+### Secrets
+
+Secrets never live in the repository. They go into the Worker:
+
+```bash
+npx wrangler secret put ADMIN_TOKEN   # admin panel token
+```
+
+For local work (`wrangler dev`), put the same names in `.dev.vars` at the repo
+root — it is gitignored, as are `.env` and `.env.local`. `wrangler deploy` only
+ever reads Worker secrets, so a local file can never be published.
+
 ### Deploy on every push (GitHub Actions)
 
 `.github/workflows/deploy.yml` runs the smoke suites and then `wrangler deploy`
