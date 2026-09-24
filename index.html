@@ -221,19 +221,20 @@
 
     /* ======================= SIDEBAR DRAWER =======================
        One instance, mounted once in the body shell (outside <main>),
-       present on every route. Off-canvas by default; fixed 300px wide,
-       left edge, full height. */
+       present on every route. Off-canvas by default; docked to the RIGHT
+       edge, capped at a real drawer width so it stays slim on phones.
+       Slide axis matches the dock edge: translateX(100%) -> 0. */
     .sfy-sidebar{
-      position:fixed;top:0;bottom:0;left:0;z-index:1150;
+      position:fixed;top:0;bottom:0;right:0;z-index:1150;
       /* Above the stream modal (z1000) so the menu stays reachable on the
          watch view — the drawer is body-level and exists on every route. */
-      width:min(300px,86vw);
+      width:min(300px,82vw);
       display:flex;flex-direction:column;
       padding:18px 16px 24px;overflow-y:auto;
       /* Dedicated panel tone, a visible step below the item surfaces (#262626).
          Without this gap the drawer reads as one flat block. */
       background:#1d1d1d;
-      transform:translateX(-102%);
+      transform:translateX(102%);
       transition:transform .32s var(--ease);
       box-shadow:0 0 60px rgba(0,0,0,.55);
       scrollbar-width:thin;scrollbar-color:#2e2e2e transparent;
@@ -245,28 +246,31 @@
     }
     .sfy-sidebar-title{margin:0;font-size:15px;font-weight:800;color:var(--ink)}
     .sfy-sidebar-close{min-height:36px;padding:0 12px;font-size:12px;background:var(--raised)}
-    /* Nav items are raised cards on the darker panel: lighter surface than the
-       backdrop, shadow pair tuned to this panel (dark #151515, light #282828),
-       fuchsia glow on hover and on the active/current item. */
+    /* Nav items are raised neumorphic cards on the darker panel — the same
+       soft-UI language as the sitewide button system: lighter surface than the
+       backdrop, tuned shadow pair (dark #151515, light #282828), fuchsia glow
+       on hover and on the active/current item. */
     .sfy-sidebar-nav{display:flex;flex-direction:column;gap:7px}
     .sfy-sidebar-nav a{
       display:flex;align-items:center;gap:11px;
       min-height:44px;padding:10px 15px;
-      border-radius:10px;
+      border-radius:14px;
       background:var(--raised);color:var(--ink-muted);
-      font-size:13.5px;font-weight:700;
+      font-size:13.5px;font-weight:700;letter-spacing:.02em;
       box-shadow:5px 5px 10px #151515,-5px -5px 10px #282828;
-      transition:box-shadow .3s ease-in-out,color .15s ease,background-color .1s ease;
+      transition:box-shadow .3s ease-in-out,color .15s ease,background-color .1s ease,transform .1s ease;
     }
-    .sfy-sidebar-nav a svg{width:17px;height:17px;flex-shrink:0}
+    .sfy-sidebar-nav a svg{width:17px;height:17px;flex-shrink:0;color:var(--ink-faint);transition:color .15s ease}
     .sfy-sidebar-nav a:hover{
       color:var(--ink);
       box-shadow:8px 8px 18px #151515,-8px -8px 18px #282828,0 0 16px rgba(255,0,255,.2);
+      transform:translateY(-1px);
     }
+    .sfy-sidebar-nav a:hover svg,.sfy-sidebar-nav a.active svg{color:var(--accent)}
     .sfy-sidebar-nav a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
     .sfy-sidebar-nav a.active{
-      background:var(--accent);color:#1a1a1a;
-      box-shadow:var(--hover-shadows),var(--accent) 0 0 30px 5px;
+      background:var(--accent-dim);color:var(--accent);
+      box-shadow:0 0 18px rgba(255,0,255,.3),inset 0 0 12px rgba(255,0,255,.08);
     }
     .sfy-sidebar-backdrop{
       position:fixed;inset:0;z-index:1140;
@@ -277,12 +281,14 @@
     .sfy-sidebar-backdrop.show{opacity:1;pointer-events:auto}
     body.sfy-sidebar-locked{overflow:hidden}
 
-    /* ============================= HERO ============================= */
-    /* One bold move: a floodlit pitch — center circle, touchline, mown stripes —
-       rendered in CSS in soft neumorphic greys. Everything else stays quiet. */
+    /* ============================= HERO =============================
+       One bold move: a floodlit pitch — center circle, touchline, mown
+       stripes — rendered in CSS in soft neumorphic greys. Everything else
+       stays quiet. The decorative ::after circle is clipped by the card's
+       own overflow:hidden so it can never bleed onto the filter row. */
     .sfy-hero{
       position:relative;overflow:hidden;
-      margin-top:16px;
+      margin:16px 0 24px;
       border-radius:20px;
       background:
         radial-gradient(900px 340px at 88% -10%,rgba(255,255,255,.045),transparent 62%),
@@ -291,7 +297,7 @@
       box-shadow:13px 13px 10px #141414,-13px -13px 10px #202020;
       min-height:300px;
     }
-    @media(min-width:640px){.sfy-hero{min-height:340px}}
+    @media(min-width:640px){.sfy-hero{min-height:340px;margin-bottom:28px}}
     /* Mown pitch stripes */
     .sfy-hero::before{
       content:"";position:absolute;inset:0;
@@ -372,9 +378,17 @@
     .sfy-hero-btn{
       display:inline-flex;align-items:center;gap:8px;
       min-height:46px;padding:1em 2em;
-      color:var(--ink);
+      /* Primary CTA: the sitewide fuchsia accent treatment (same language as
+         the active chip + Unmute button) so it reads as the thing to tap. */
+      color:#1a1a1a;
+      background:linear-gradient(120deg,#e800e8,#ff3bff 55%,#ff00ff);
+      box-shadow:var(--btn-shadow),0 0 22px rgba(255,0,255,.35);
     }
-    .sfy-hero-btn:active{transform:scale(.95)}
+    .sfy-hero-btn:hover{
+      color:#1a1a1a;
+      box-shadow:var(--hover-shadows),0 0 30px rgba(255,0,255,.45);
+    }
+    .sfy-hero-btn:active{transform:scale(.95);color:#1a1a1a}
     .sfy-hero-btn svg{width:14px;height:14px;fill:currentColor}
 
     .sfy-sheen{position:relative;overflow:hidden}
