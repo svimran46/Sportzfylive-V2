@@ -221,19 +221,19 @@
 
     /* ======================= SIDEBAR DRAWER =======================
        One instance, mounted once in the body shell (outside <main>),
-       present on every route. Off-canvas by default; fixed 300px wide,
-       left edge, full height. */
+       present on every route. Off-canvas by default; slim 248px panel on
+       the right edge (under the header's menu trigger), full height. */
     .sfy-sidebar{
-      position:fixed;top:0;bottom:0;left:0;z-index:1150;
+      position:fixed;top:0;bottom:0;right:0;z-index:1150;
       /* Above the stream modal (z1000) so the menu stays reachable on the
          watch view — the drawer is body-level and exists on every route. */
-      width:min(300px,86vw);
+      width:min(248px,78vw);
       display:flex;flex-direction:column;
-      padding:18px 16px 24px;overflow-y:auto;
+      padding:16px 12px 22px;overflow-y:auto;
       /* Dedicated panel tone, a visible step below the item surfaces (#262626).
          Without this gap the drawer reads as one flat block. */
       background:#1d1d1d;
-      transform:translateX(-102%);
+      transform:translateX(102%);
       transition:transform .32s var(--ease);
       box-shadow:0 0 60px rgba(0,0,0,.55);
       scrollbar-width:thin;scrollbar-color:#2e2e2e transparent;
@@ -241,32 +241,36 @@
     .sfy-sidebar.open{transform:translateX(0)}
     .sfy-sidebar-head{
       display:flex;align-items:center;justify-content:space-between;gap:10px;
-      padding:2px 4px 14px;border-bottom:1px solid var(--border);margin-bottom:14px;
+      padding:2px 4px 12px;border-bottom:1px solid var(--border);margin-bottom:12px;
     }
     .sfy-sidebar-title{margin:0;font-size:15px;font-weight:800;color:var(--ink)}
-    .sfy-sidebar-close{min-height:36px;padding:0 12px;font-size:12px;background:var(--raised)}
+    .sfy-sidebar-close{min-height:34px;padding:0 12px;font-size:12px;background:var(--raised)}
     /* Nav items are raised cards on the darker panel: lighter surface than the
        backdrop, shadow pair tuned to this panel (dark #151515, light #282828),
        fuchsia glow on hover and on the active/current item. */
-    .sfy-sidebar-nav{display:flex;flex-direction:column;gap:7px}
+    .sfy-sidebar-nav{display:flex;flex-direction:column;gap:6px}
     .sfy-sidebar-nav a{
-      display:flex;align-items:center;gap:11px;
-      min-height:44px;padding:10px 15px;
+      display:flex;align-items:center;gap:10px;
+      min-height:40px;padding:8px 12px;
       border-radius:10px;
       background:var(--raised);color:var(--ink-muted);
-      font-size:13.5px;font-weight:700;
-      box-shadow:5px 5px 10px #151515,-5px -5px 10px #282828;
+      font-size:13px;font-weight:700;
+      box-shadow:4px 4px 9px #151515,-4px -4px 9px #282828;
       transition:box-shadow .3s ease-in-out,color .15s ease,background-color .1s ease;
     }
-    .sfy-sidebar-nav a svg{width:17px;height:17px;flex-shrink:0}
+    .sfy-sidebar-nav a svg{width:16px;height:16px;flex-shrink:0}
     .sfy-sidebar-nav a:hover{
       color:var(--ink);
-      box-shadow:8px 8px 18px #151515,-8px -8px 18px #282828,0 0 16px rgba(255,0,255,.2);
+      box-shadow:6px 6px 14px #151515,-6px -6px 14px #282828,0 0 16px rgba(255,0,255,.2);
     }
     .sfy-sidebar-nav a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
     .sfy-sidebar-nav a.active{
       background:var(--accent);color:#1a1a1a;
       box-shadow:var(--hover-shadows),var(--accent) 0 0 30px 5px;
+    }
+    @media(max-width:380px){
+      .sfy-sidebar{width:min(220px,80vw);padding:14px 10px 20px}
+      .sfy-sidebar-nav a{min-height:38px;padding:7px 10px;font-size:12.5px}
     }
     .sfy-sidebar-backdrop{
       position:fixed;inset:0;z-index:1140;
@@ -640,14 +644,18 @@
       flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
       margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);
     }
-    /* Back always navigates in-app to a fixed destination — it never calls
-       into browser history, which exits the site when the watch view is
-       the first history entry (direct link, new tab, refresh). */
+    /* Back closes the watch overlay in-app; the only history step it takes
+       is popping the overlay's own #match entry, so it can never exit the site. */
     .back-btn,.embed-btn,.theater-btn{
       display:inline-flex;align-items:center;gap:7px;
       min-height:40px;padding:0 16px;
       color:var(--ink);
       font-size:12.5px;
+    }
+    .stream-topbar-actions{display:flex;align-items:center;gap:10px}
+    @media(max-width:480px){
+      .back-btn,.embed-btn{padding:0 12px}
+      .embed-btn span{display:none}
     }
     .stream-heading{
       display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;
@@ -810,7 +818,7 @@
         <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh matches">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         </button>
-        <button class="sfy-icon-btn" type="button" id="sfy-sidebar-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="sfy-sidebar">
+        <button class="sfy-icon-btn sfy-sidebar-trigger" type="button" id="sfy-sidebar-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="sfy-sidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
       </div>
@@ -967,7 +975,12 @@
   <div class="stream-page">
     <div class="stream-topbar">
       <button class="back-btn" type="button" onclick="navigateBack()" aria-label="Back to matches">← <span>Back</span></button>
-      <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
+      <div class="stream-topbar-actions">
+        <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
+        <button class="sfy-icon-btn sfy-sidebar-trigger" type="button" id="sfy-watch-menu" aria-label="Open menu" aria-expanded="false" aria-controls="sfy-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
     <div class="stream-heading">
       <div>
@@ -1563,14 +1576,24 @@
         }
     }
 
-    // Device/browser Back: when the watch view is open, any popstate means
-    // the user left the overlay's history entry — close it like the Back button.
-    window.addEventListener("popstate", () => {
-        if (watchHistoryOpen) {
+    // Device/browser Back: when the watch view is open and the user lands on
+    // an entry that isn't a watch entry, close it like the Back button. The
+    // state check keeps a late pop from a previous close (still in flight when
+    // a new match is opened quickly) from shutting the newly opened overlay.
+    window.addEventListener("popstate", event => {
+        if (watchHistoryOpen && !(event.state && event.state.sfyWatch)) {
             watchHistoryOpen = false;
             closeModal();
         }
     });
+
+    // The overlay's own history entry would otherwise restore the page's old
+    // scroll offset when popped, cancelling the in-app scroll that Back and
+    // the sidebar links start. Matches load asynchronously, so browser scroll
+    // restoration on reload never had a list to restore into anyway.
+    if (typeof history !== "undefined" && "scrollRestoration" in history) {
+        try { history.scrollRestoration = "manual"; } catch (_) {}
+    }
 
     function toggleTheaterMode() {
         document.querySelector(".stream-page")?.classList.toggle("theater");
@@ -1602,20 +1625,24 @@
     }
 
     function closeModal() {
+        const modal = document.getElementById("stream-modal");
+        const player = document.getElementById("player-container");
+
+        // Discard the stream iframe BEFORE popping history. Embed pages
+        // navigate internally, and those steps live in the same session
+        // history as the page — with the iframe still attached, going back
+        // steps the embed instead of popping the watch view's entry.
+        if (player) {
+            player.hidden = true;
+            player.replaceChildren();
+        }
         if (watchHistoryOpen) {
             watchHistoryOpen = false;
             if (typeof history !== "undefined" && history.back) {
                 try { history.back(); } catch (_) {}
             }
         }
-        const modal = document.getElementById("stream-modal");
-        const player = document.getElementById("player-container");
-
         if (modal) modal.style.display = "none";
-        if (player) {
-            player.hidden = true;
-            player.replaceChildren();
-        }
         document.querySelector(".stream-page")?.classList.remove("theater");
         document.body.style.overflow = "";
         activeMatch = null;
@@ -1635,6 +1662,8 @@
 
     document.addEventListener("keydown", event => {
         if (event.key === "Escape") {
+            // Sidebar open over the watch view: Escape closes only the sidebar.
+            if (document.getElementById("sfy-sidebar")?.classList.contains("open")) return;
             closeModal();
             return;
         }
@@ -1696,7 +1725,9 @@ function initCategoryCarousels(){
   // on every route. Toggle, backdrop, Escape and scroll-lock live here.
   const sidebar=document.getElementById("sfy-sidebar");
   const backdrop=document.getElementById("sfy-sidebar-backdrop");
-  const toggle=document.getElementById("sfy-sidebar-toggle");
+  // Triggers: the header menu button and the watch view's menu button (the
+  // stream overlay covers the header, so it carries its own trigger).
+  const triggers=[...document.querySelectorAll(".sfy-sidebar-trigger")];
   const closeBtn=document.getElementById("sfy-sidebar-close");
   const mobileNav=document.getElementById("sfy-mobile-nav");
   const search=document.getElementById("sfy-search-input");
@@ -1706,7 +1737,7 @@ function initCategoryCarousels(){
     sidebar.classList.add("open");
     sidebar.setAttribute("aria-hidden","false");
     backdrop?.classList.add("show");
-    toggle?.setAttribute("aria-expanded","true");
+    triggers.forEach(t=>t.setAttribute("aria-expanded","true"));
     document.body.classList.add("sfy-sidebar-locked");
   }
   function closeSidebar(){
@@ -1714,13 +1745,13 @@ function initCategoryCarousels(){
     sidebar.classList.remove("open");
     sidebar.setAttribute("aria-hidden","true");
     backdrop?.classList.remove("show");
-    toggle?.setAttribute("aria-expanded","false");
+    triggers.forEach(t=>t.setAttribute("aria-expanded","false"));
     document.body.classList.remove("sfy-sidebar-locked");
   }
-  toggle?.addEventListener("click",()=>{
+  triggers.forEach(t=>t.addEventListener("click",()=>{
     const isOpen=!sidebar.classList.contains("open");
     isOpen?openSidebar():closeSidebar();
-  });
+  }));
   closeBtn?.addEventListener("click",closeSidebar);
   backdrop?.addEventListener("click",closeSidebar);
   document.addEventListener("keydown",e=>{
@@ -1736,6 +1767,9 @@ function initCategoryCarousels(){
   }
   function filterSections(category){
     const wanted=normalizeNav(category);
+    // Picking a section from the watch view leaves it for the match list.
+    const modal=document.getElementById("stream-modal");
+    if(modal&&modal.style.display==="flex"&&typeof closeModal==="function") closeModal();
     document.querySelectorAll(".category-section").forEach(section=>{
       const title=normalizeNav(section.dataset.category||section.querySelector("h2")?.textContent);
       section.style.display=(wanted==="ALL"||title===wanted)?"":"none";
