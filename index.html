@@ -638,69 +638,88 @@
     }
     .stream-topbar{
       flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
-      margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);
+      margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);
     }
     /* Back always navigates in-app to a fixed destination — it never calls
        into browser history, which exits the site when the watch view is
        the first history entry (direct link, new tab, refresh). */
     .back-btn,.embed-btn,.theater-btn{
       display:inline-flex;align-items:center;gap:7px;
-      min-height:40px;padding:0 16px;
+      min-height:44px;padding:0 16px;
       color:var(--ink);
       font-size:12.5px;
     }
-    .stream-heading{
-      display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;
+    /* Watch header: eyebrow → match title (primary heading) → live status.
+       The old "Streamed Sources" heading is demoted to the eyebrow so the
+       match name is always the largest, boldest text on the page. */
+    .stream-heading{margin:0 0 12px}
+    .stream-eyebrow{
+      margin:0 0 5px;font-size:11.5px;font-weight:700;
+      letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);
     }
-    .stream-heading h2{margin:0 0 6px;font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--ink)}
-    .stream-heading p{margin:0;color:var(--ink-muted);font-size:13px}
-    .stream-source-box{border-radius:14px;background:var(--surface);box-shadow:6px 6px 14px #161616,-6px -6px 14px #272727}
-    /* List header, not its own block: tight bottom padding. */
-    .source-head{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border)}
-    .source-name{font-size:14px;font-weight:700;color:var(--ink)}
-    .source-note{margin-top:2px;color:var(--ink-muted);font-size:11.5px}
-    .stream-count{color:var(--accent);font-size:12px;font-weight:800}
-    /* Stream picker: responsive card grid. Cards wrap to multiple per row and
-       reflow with the viewport — compacting is structural (the grid), not a
-       padding trick. Whole card is the click target; selection is persistent
-       .selected + radio semantics. */
-    .stream-list{
-      display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
-      gap:10px;padding:12px;
+    .stream-title{
+      margin:0 0 7px;font-size:clamp(22px,5vw,34px);font-weight:1000;
+      letter-spacing:-.6px;line-height:1.1;color:var(--ink);
+      overflow-wrap:anywhere;
     }
-    .stream-empty-note{padding:26px 18px;color:var(--ink-muted);font-size:13.5px;text-align:center}
-    .stream-embed-chip{
-      position:relative;display:flex;flex-direction:column;justify-content:space-between;
-      gap:7px;min-height:74px;padding:12px;
-      border-radius:12px;
-      border:1px solid var(--border-strong);
-      background:var(--surface);color:var(--ink);text-align:left;
+    .stream-status{
+      margin:0;display:flex;align-items:center;gap:7px;
+      color:var(--ink-muted);font-size:13px;font-weight:600;letter-spacing:.02em;
+    }
+    .stream-status .live-dot{
+      width:8px;height:8px;border-radius:50%;background:var(--live);flex-shrink:0;
+      animation:sfy-live-glow 2s ease-in-out infinite;
+    }
+    /* Stream picker: compact horizontal toggle strip — one small chip per
+       stream (glyph + number). Full channel/language/HD detail moves into a
+       tooltip revealed on hover, keyboard focus and tap. The active chip
+       glows with the site's fuchsia accent. The strip is the page's only
+       horizontal scroller; its bottom padding reserves the tooltip's space
+       so nothing shifts when it appears. */
+    .stream-toggle-strip{
+      display:flex;align-items:flex-start;gap:10px;
+      overflow-x:auto;overscroll-behavior-x:contain;
+      padding:4px 2px 42px;margin:0 -2px;
+    }
+    .stream-toggle{
+      position:relative;flex:0 0 auto;
+      display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+      width:54px;min-height:54px;padding:8px 6px;
+      border-radius:16px;border:1px solid var(--border-strong);
+      background:var(--surface);color:var(--ink-muted);
+      letter-spacing:0;font-size:15px;font-weight:800;line-height:1;
       box-shadow:4px 4px 10px #171717,-4px -4px 10px #272727;
-      transition:box-shadow .25s var(--ease),border-color .15s ease,background-color .15s ease,transform .15s ease;
+      transition:box-shadow .25s var(--ease),border-color .15s ease,background-color .15s ease,color .15s ease,transform .15s ease;
     }
-    .stream-embed-chip:hover{
-      border-color:rgba(255,0,255,.35);
-      box-shadow:4px 4px 10px #171717,-4px -4px 10px #272727,0 0 14px rgba(255,0,255,.16);
+    .stream-toggle:hover{
+      color:var(--ink);
+      box-shadow:4px 4px 10px #171717,-4px -4px 10px #272727,0 0 14px rgba(255,0,255,.18);
       transform:translateY(-1px);
     }
-    .stream-embed-chip:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-    .stream-embed-chip.selected{
-      border-color:var(--accent);
-      background:var(--accent-dim);
-      box-shadow:0 0 18px rgba(255,0,255,.28),inset 0 0 12px rgba(255,0,255,.06);
+    .stream-toggle.selected{
+      background:var(--accent-dim);color:var(--accent);border-color:rgba(255,0,255,.55);
+      box-shadow:0 0 18px rgba(255,0,255,.3),inset 0 0 12px rgba(255,0,255,.08);
     }
-    .stream-chip-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
-    .stream-chip-name{font-size:13.5px;font-weight:700;letter-spacing:-.1px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .stream-chip-sub{
-      font-size:11.5px;font-weight:500;color:var(--ink-faint);letter-spacing:normal;
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    .stream-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .stream-toggle-glyph{display:grid;place-items:center}
+    .stream-toggle-glyph svg{width:18px;height:18px}
+    .stream-toggle-tip{
+      position:absolute;top:calc(100% + 8px);left:0;z-index:6;
+      padding:6px 11px;border-radius:10px;
+      background:var(--raised);color:var(--ink);
+      border:1px solid var(--border-strong);
+      font-size:11px;font-weight:700;letter-spacing:.02em;white-space:nowrap;
+      box-shadow:0 10px 24px rgba(0,0,0,.5);
+      opacity:0;visibility:hidden;pointer-events:none;
+      transform:translateY(4px);
+      transition:opacity .25s ease,transform .25s ease,visibility .25s;
     }
-    .stream-chip-tag{
-      flex-shrink:0;padding:2px 7px;border-radius:6px;background:var(--raised);
-      color:var(--ink-muted);font-size:10px;font-weight:700;letter-spacing:.4px;
+    .stream-toggle:hover .stream-toggle-tip,
+    .stream-toggle:focus-visible .stream-toggle-tip,
+    .stream-toggle.tip-show .stream-toggle-tip{
+      opacity:1;visibility:visible;transform:translateY(0);
     }
-    .stream-chip-tag.hd{background:var(--accent-dim);color:var(--accent)}
+    .stream-empty-note{padding:22px 16px;color:var(--ink-muted);font-size:13.5px;text-align:center}
     .no-stream-sources{padding:32px 18px;text-align:center;color:var(--ink-muted)}
     .no-stream-sources strong{display:block;margin-bottom:6px;color:var(--ink);font-size:16px}
 
@@ -713,31 +732,64 @@
         --btn-shadow-sm:5px 5px 10px #1c1c1c,-5px -5px 10px #262626;
       }
       button:hover{box-shadow:var(--btn-shadow)}
-      /* Grid + 1px border carry card separation on mobile; large blurred
-         shadows per card would be wasteful at list scale. */
-      .stream-embed-chip{box-shadow:none}
     }
-    .sfy-many-buttons .stream-embed-chip{box-shadow:none}
-    /* Player sits directly under the title; the source list is a separate
-       labelled section below it. */
-    .player-container{margin-top:0;width:100%;min-height:500px;background:#000;border-radius:13px;overflow:hidden}
-    .player-container iframe{width:100%;height:500px;border:0;display:block}
-    /* Single-screen watch view: cap the player to the space left over after
-       the header chrome and one row of source cards, so the stream buttons
-       are visible without scrolling. Theater mode keeps full height. */
-    .stream-page:not(.theater) .player-container{
-      height:min(500px,max(280px,calc(100vh - 470px)));
-      height:min(500px,max(280px,calc(100dvh - 470px)));
-      min-height:0;
+    [hidden]{display:none!important}
+    /* Player unit: slim control row (current source · unmute · theater)
+       attached to a fluid 16/9 player. aspect-ratio reserves the exact space
+       before the media loads — no fixed pixel height anywhere in its parent
+       chain — so sizing is correct at every width and nothing shifts. */
+    .player-unit{margin:0 0 16px}
+    .player-bar{
+      display:flex;align-items:center;gap:10px;
+      min-height:44px;margin-bottom:8px;
     }
-    .stream-page:not(.theater) .player-container iframe{height:100%}
-    .stream-page.theater .player-container,
-    .stream-page.theater .player-container iframe{min-height:calc(100vh - 220px);height:calc(100vh - 220px)}
-    .stream-sources-section{margin-top:28px}
+    .player-bar-source{
+      flex:1;min-width:0;
+      color:var(--ink-muted);font-size:12.5px;font-weight:700;letter-spacing:.02em;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }
+    .player-bar-source strong{color:var(--ink);font-weight:800}
+    .unmute-btn{
+      flex-shrink:0;min-height:44px;padding:0 14px;
+      display:inline-flex;align-items:center;gap:7px;
+      color:var(--accent);font-size:12px;
+      background:var(--accent-dim);
+      border:1px solid rgba(255,0,255,.45);
+      box-shadow:var(--btn-shadow-sm),0 0 16px rgba(255,0,255,.22);
+    }
+    .unmute-btn:hover{box-shadow:var(--hover-shadows),0 0 22px rgba(255,0,255,.3)}
+    .unmute-btn svg{width:15px;height:15px}
+    .player-container{
+      position:relative;width:100%;max-width:100%;aspect-ratio:16/9;
+      background:#000;border-radius:13px;overflow:hidden;
+    }
+    .player-container iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+    .player-empty{
+      position:absolute;inset:0;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+      padding:20px;text-align:center;color:var(--ink-faint);
+      font-size:13.5px;font-weight:600;
+    }
+    .player-empty svg{width:34px;height:34px;opacity:.5}
+    /* Theater mode: the player leaves the 16/9 box and fills the viewport
+       height instead. */
+    .stream-page.theater .player-container{
+      aspect-ratio:auto;height:calc(100vh - 240px);height:calc(100dvh - 240px);
+    }
+    .stream-page.theater .player-container iframe{height:100%}
+    .stream-sources-section{margin-top:20px}
     .stream-sources-label{
       margin:0 0 10px;font-size:12.5px;font-weight:700;color:var(--ink-muted);
     }
     .stream-sources-label em{font-style:normal;color:var(--ink-faint);font-weight:500}
+    /* More live matches: reuses the homepage match-card component in a
+       wrapping grid — no horizontal page scroll. */
+    .stream-more{margin-top:24px;padding-top:22px;border-top:1px solid var(--border)}
+    .more-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));
+      gap:18px 14px;
+    }
 
     /* ======================= FOOTER ======================= */
     .sfy-footer{margin-top:44px;padding:30px 0 40px;background:var(--canvas)}
@@ -757,15 +809,10 @@
       .sfy-hero-teams{gap:12px}
       .sfy-hero-team{font-size:12px;flex-direction:column;gap:5px}
       .sfy-hero-team img{width:42px;height:42px}
-      .stream-heading{flex-direction:column;align-items:flex-start}
-      .stream-heading h2{font-size:19px}
-      .player-container,.player-container iframe{min-height:280px;height:280px}
-      .stream-page.theater .player-container,
-      .stream-page.theater .player-container iframe{min-height:calc(100vh - 190px);height:calc(100vh - 190px)}
-      /* Small screens: same single-screen rule with a smaller chrome offset. */
-      .stream-page:not(.theater) .player-container{
-        height:min(280px,max(220px,calc(100dvh - 430px)));
-      }
+      .stream-title{letter-spacing:-.4px}
+      .player-bar{gap:8px}
+      .theater-btn{padding:0 10px}
+      .stream-page.theater .player-container{height:calc(100vh - 200px);height:calc(100dvh - 200px)}
     }
     @media(max-width:380px){
       .sfy-tile{padding:14px 10px}
@@ -970,13 +1017,21 @@
       <button class="embed-btn" type="button" onclick="copyEmbedCode()">▣ <span>Embed Code</span></button>
     </div>
     <div class="stream-heading">
-      <div>
-        <h2>Streamed Sources</h2>
-        <p id="stream-subtitle">Streamed source information</p>
-      </div>
-      <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Theater mode</span></button>
+      <p class="stream-eyebrow">Streamed Sources</p>
+      <h2 class="stream-title" id="stream-title">&nbsp;</h2>
+      <p class="stream-status" id="stream-status" role="status"></p>
     </div>
-    <div id="player-container" class="player-container" hidden></div>
+    <div class="player-unit">
+      <div class="player-bar">
+        <span class="player-bar-source" id="player-bar-source"></span>
+        <button class="unmute-btn" type="button" id="unmute-btn" aria-label="Unmute stream" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+          <span>Unmute</span>
+        </button>
+        <button class="theater-btn" type="button" onclick="toggleTheaterMode()">⛶ <span>Theater</span></button>
+      </div>
+      <div id="player-container" class="player-container" hidden></div>
+    </div>
     <div class="stream-sources-section" id="stream-picker"></div>
 
   </div>
@@ -1448,25 +1503,30 @@
         return playable;
     }
 
-    function renderStreamChips(playable) {
-        // Card grid numbering: one continuous "Stream N" sequence across ALL
-        // provider groups — never restarting per source.
+    const STREAM_TOGGLE_ICON =
+        '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+
+    function renderStreamToggles(playable) {
+        // Toggle strip numbering: one continuous "Stream N" sequence across ALL
+        // provider groups — never restarting per source. Full channel /
+        // language / HD detail lives in the tooltip and aria-label.
         let flatIndex = 0;
         return playable.map(function (item) {
             flatIndex += 1;
             const url = streamEmbedUrl(item.group, item.stream.streamNo);
             const label = "Stream " + flatIndex + " • " +
                 (item.stream.language || "Default");
-            const hdTag = item.stream.hd ? '<span class="stream-chip-tag hd">HD</span>' : "";
-            return '<button class="stream-embed-chip" type="button" role="radio" aria-checked="false"' +
+            const tip = "Stream " + flatIndex +
+                (item.stream.hd ? " · HD" : "") +
+                " · " + (item.stream.language || "Default") +
+                " · " + item.group.source;
+            return '<button class="stream-toggle" type="button" role="radio" aria-checked="false"' +
                 ' data-embed-url="' + esc(url) + '"' +
-                ' data-stream-label="' + esc(label) + '">' +
-                '<span class="stream-chip-top">' +
-                '<span class="stream-chip-name">' + esc("Stream " + flatIndex) + '</span>' +
-                hdTag +
-                '</span>' +
-                '<span class="stream-chip-sub">' + esc(item.stream.language || "Default") +
-                ' – ' + esc(item.group.source) + '</span>' +
+                ' data-stream-label="' + esc(label) + '"' +
+                ' aria-label="' + esc(tip) + '">' +
+                '<span class="stream-toggle-glyph">' + STREAM_TOGGLE_ICON + '</span>' +
+                '<span aria-hidden="true">' + flatIndex + '</span>' +
+                '<span class="stream-toggle-tip" aria-hidden="true">' + esc(tip) + '</span>' +
                 '</button>';
         }).join("");
     }
@@ -1476,11 +1536,11 @@
         const player = document.getElementById("player-container");
         if (!picker || !player) return;
 
-        picker.querySelectorAll(".stream-embed-chip").forEach(function (chip) {
+        picker.querySelectorAll(".stream-toggle").forEach(function (chip) {
             chip.addEventListener("click", function () {
                 const url = chip.dataset.embedUrl;
                 if (!url) return;
-                picker.querySelectorAll(".stream-embed-chip.selected").forEach(function (other) {
+                picker.querySelectorAll(".stream-toggle.selected").forEach(function (other) {
                     other.classList.remove("selected");
                     other.setAttribute("aria-checked", "false");
                 });
@@ -1495,6 +1555,13 @@
                 frame.referrerPolicy = "no-referrer";
                 frame.title = chip.dataset.streamLabel || "Match stream";
                 player.appendChild(frame);
+                const barSource = document.getElementById("player-bar-source");
+                if (barSource) {
+                    barSource.innerHTML = "Now playing <strong>" +
+                        esc(chip.dataset.streamLabel || "Stream") + "</strong>";
+                }
+                const unmuteBtn = document.getElementById("unmute-btn");
+                if (unmuteBtn) unmuteBtn.setAttribute("aria-pressed", "false");
                 player.scrollIntoView({ behavior: "smooth", block: "start" });
             });
         });
@@ -1515,15 +1582,28 @@
         const playable = collectPlayableStreams(match);
         const title = match.title || "Match";
 
-        document.getElementById("stream-subtitle").textContent =
-            title + " • " +
-            playable.length + " playable stream" + (playable.length === 1 ? "" : "s");
+        // Watch header: match title (primary heading) + live status line, and
+        // the player control bar resets to its idle hint until a stream loads.
+        const titleEl = document.getElementById("stream-title");
+        if (titleEl) titleEl.textContent = title;
+
+        const statusEl = document.getElementById("stream-status");
+        if (statusEl) {
+            statusEl.innerHTML = match.status === "live"
+                ? '<span class="live-dot" aria-hidden="true"></span>Live now'
+                : "Scheduled";
+        }
+
+        const barSource = document.getElementById("player-bar-source");
+        if (barSource) barSource.textContent = "Pick a stream below";
+        const unmuteBtn = document.getElementById("unmute-btn");
+        if (unmuteBtn) unmuteBtn.setAttribute("aria-pressed", "false");
 
         player.hidden = true;
         player.replaceChildren();
 
         const streamRows = playable.length
-            ? renderStreamChips(playable)
+            ? renderStreamToggles(playable)
             : sources.length
                 ? '<div class="stream-empty-note">Lineups for this match are not published yet — streams appear here once the source publishes them.</div>'
                 : '<div class="no-stream-sources" style="padding:20px">' +
@@ -1532,19 +1612,8 @@
                   '</div>';
 
         picker.innerHTML =
-            '<p class="stream-sources-label">Available streams <em>· pick a source to load it above</em></p>' +
-            '<div class="stream-source-box' + (playable.length >= 6 ? " sfy-many-buttons" : "") + '">' +
-            '<div class="source-head">' +
-            '<div>' +
-            '<div class="source-name">Streamed</div>' +
-            '<div class="source-note">✣ ' + sources.length + ' source' +
-            (sources.length === 1 ? "" : "s") + ' • ' + playable.length + ' playable</div>' +
-            '</div>' +
-            '<div class="stream-count">' + playable.length + ' stream' +
-            (playable.length === 1 ? "" : "s") + '</div>' +
-            '</div>' +
-            '<div class="stream-list" role="radiogroup" aria-label="Stream sources">' + streamRows + '</div>' +
-            '</div>';
+            '<p class="stream-sources-label">Available streams <em>· pick one to load it above</em></p>' +
+            '<div class="stream-toggle-strip" role="radiogroup" aria-label="Stream sources">' + streamRows + '</div>';
 
         attachStreamPicker();
 

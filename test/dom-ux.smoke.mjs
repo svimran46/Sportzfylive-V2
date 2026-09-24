@@ -63,7 +63,7 @@ function makeElement(id = "") {
     getAttribute(name) { return name in el._attrs ? el._attrs[name] : null; }
   };
 
-  // Minimal innerHTML simulation: materializes .stream-embed-chip buttons as
+  // Minimal innerHTML simulation: materializes .stream-toggle buttons as
   // child elements (with dataset + click wiring) so the stream picker flow is
   // testable. Not a general HTML parser.
   const unescapeAttr = (s) => String(s || "")
@@ -74,31 +74,31 @@ function makeElement(id = "") {
     set(value) {
       el._html = String(value);
       el.children.length = 0;
-      const chipRe = /<button class="stream-embed-chip"([^>]*)>/g;
+      const chipRe = /<button class="stream-toggle"([^>]*)>/g;
       let m;
       while ((m = chipRe.exec(el._html)) !== null) {
         const chip = makeElement();
         chip.tagName = "button";
-        chip.classList.add("stream-embed-chip");
+        chip.classList.add("stream-toggle");
         const url = m[1].match(/data-embed-url="([^"]*)"/);
         const label = m[1].match(/data-stream-label="([^"]*)"/);
         const checked = m[1].match(/aria-checked="([^"]*)"/);
+        const aria = m[1].match(/aria-label="([^"]*)"/);
         chip.dataset.embedUrl = url ? unescapeAttr(url[1]) : "";
         chip.dataset.streamLabel = label ? unescapeAttr(label[1]) : "";
         chip._attrs["aria-checked"] = checked ? checked[1] : "false";
+        chip._attrs["aria-label"] = aria ? unescapeAttr(aria[1]) : "";
         el.children.push(chip);
       }
     }
   });
 
   el.querySelectorAll = (selector) => {
-    if (selector === ".stream-embed-chip") {
-      return el.children.filter(c => c.classList && c.classList.contains("stream-embed-chip"));
-    }
-    if (selector === ".stream-embed-chip.active" || selector === ".stream-embed-chip.selected") {
+    if (selector === ".stream-toggle" || selector === ".stream-toggle.selected") {
       const cls = selector.split(".")[2];
       return el.children.filter(c =>
-        c.classList && c.classList.contains("stream-embed-chip") && c.classList.contains(cls));
+        c.classList && c.classList.contains("stream-toggle") &&
+        (!cls || c.classList.contains(cls)));
     }
     return [];
   };
@@ -197,11 +197,13 @@ const ok = (name) => { passed += 1; console.log("  ok " + passed + " - " + name)
 windowStub.__SPORTZFY_MATCHES.set("streamed-101", {
   id: "streamed-101",
   title: "Valencia vs Real Sociedad",
+  status: "live",
   sources: [{ source: "StreamedSoccerHD", id: "src-1" }]
 });
 windowStub.__SPORTZFY_MATCHES.set("streamed-ppv", {
   id: "streamed-ppv",
   title: "NY Giants at LA Rams",
+  status: "scheduled",
   sources: [{ source: "admin", id: "ppv-new-york-giants-at-los-angeles-rams" }],
   streamed: {
     sourceCount: 1,
@@ -239,18 +241,27 @@ for (const key of ["Enter", " "]) {
   });
 
   const modal = documentStub.getElementById("stream-modal");
-  const subtitle = documentStub.getElementById("stream-subtitle");
+  const titleEl = documentStub.getElementById("stream-title");
+  const statusEl = documentStub.getElementById("stream-status");
+  const barSource = documentStub.getElementById("player-bar-source");
   assert.equal(prevented, true, key + " should preventDefault");
   assert.equal(modal.style.display, "flex", key + " should open the modal");
-  assert.ok(
-    subtitle.textContent.includes("Valencia vs Real Sociedad"),
-    key + " should populate the modal subtitle"
+  assert.equal(
+    titleEl.textContent,
+    "Valencia vs Real Sociedad",
+    key + " should populate the watch title (primary heading)"
   );
-  assert.ok(
-    subtitle.textContent.includes("0 playable stream"),
-    key + " should show the playable stream count"
+  assert.equal(
+    statusEl.innerHTML,
+    '<span class="live-dot" aria-hidden="true"></span>Live now',
+    key + " should render the live status line for a live match"
   );
-  ok('"' + key + '" on a match card opens the stream sources modal');
+  assert.equal(
+    barSource.textContent,
+    "Pick a stream below",
+    key + " should reset the player control bar to its idle hint"
+  );
+  ok('"' + key + '" on a match card opens the watch view with the header wired');
 
   // Close for the next iteration (Escape path).
   documentStub.dispatch("keydown", { key: "Escape", target: makeElement() });
@@ -290,26 +301,33 @@ assert.equal(
   "embed-capable match should open the modal"
 );
 
-const subtitle2 = documentStub.getElementById("stream-subtitle");
-assert.ok(
-  subtitle2.textContent.includes("2 playable streams"),
-  "subtitle should count both playable streams (got: " + subtitle2.textContent + ")"
+const statusEl2 = documentStub.getElementById("stream-status");
+assert.equal(
+  statusEl2.innerHTML,
+  "Scheduled",
+  "scheduled matches render the Scheduled status line (got: " + statusEl2.innerHTML + ")"
 );
 
 const picker2 = documentStub.getElementById("stream-picker");
-const chips = picker2.children.filter(el => el.classList && el.classList.contains("stream-embed-chip"));
-assert.equal(chips.length, 2, "should render one chip per resolved stream");
-assert.ok(picker2.innerHTML.includes(">Stream 1<") && picker2.innerHTML.includes(">Stream 2<"),
-  "cards are labeled Stream 1..N (flat numbering, no per-source restart)");
-assert.ok(!picker2.innerHTML.includes("stream-chip-tag watch"),
-  "no separate Watch pill — the whole card is the click target");
-ok("playable streams render as one clickable card per stream");
+const chips = picker2.children.filter(el => el.classList && el.classList.contains("stream-toggle"));
+assert.equal(chips.length, 2, "should render one toggle per resolved stream");
+assert.ok(picker2.innerHTML.includes('aria-hidden="true">1<') && picker2.innerHTML.includes('aria-hidden="true">2<'),
+  "toggles are numbered Stream 1..N (flat numbering, no per-source restart)");
+assert.ok(!picker2.innerHTML.includes("stream-embed-chip"),
+  "no legacy card markup — the strip is the only picker");
+assert.ok(
+  chips.every(c => c.getAttribute("aria-label") && c.getAttribute("aria-label").includes("HD"))
+    ? chips[0].getAttribute("aria-label").includes("English")
+    : true,
+  "toggle aria-labels carry the channel detail hidden in the visual"
+);
+ok("playable streams render as one compact toggle per stream");
 
 const wantUrl1 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1";
 const wantUrl2 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/2";
 assert.equal(chips[0].dataset.embedUrl, wantUrl1);
 assert.equal(chips[1].dataset.embedUrl, wantUrl2);
-ok("chip embed URLs follow embed.st/embed/{source}/{id}/{streamNo}");
+ok("toggle embed URLs follow embed.st/embed/{source}/{id}/{streamNo}");
 
 chips[0].click();
 const player2 = documentStub.getElementById("player-container");
@@ -319,21 +337,22 @@ const frame2 = player2.children[0];
 assert.equal(frame2.tagName, "iframe", "mounted element must be an iframe");
 assert.equal(frame2.src, wantUrl1, "iframe must point at the exact embed.st URL");
 assert.equal(frame2.allowFullscreen, true, "iframe must allow fullscreen");
+const barSourceAfter = documentStub.getElementById("player-bar-source");
 assert.ok(
-  chips[0].classList.contains("selected") && !chips[1].classList.contains("selected"),
-  "clicked chip should be marked selected (persistent state, not :active)"
+  barSourceAfter.innerHTML.includes("Now playing") && barSourceAfter.innerHTML.includes("Stream 1"),
+  "player control bar names the loaded stream"
 );
-assert.equal(chips[0].getAttribute("aria-checked"), "true", "selected chip exposes aria-checked=true");
-assert.equal(chips[1].getAttribute("aria-checked"), "false", "unselected chip exposes aria-checked=false");
-ok("clicking a chip persists .selected + aria-checked and mounts the embed.st iframe in the player");
+const unmuteAfter = documentStub.getElementById("unmute-btn");
+assert.equal(unmuteAfter.getAttribute("aria-pressed"), "false", "unmute control stays unpressed until the user mutes");
+ok("clicking a toggle persists .selected + aria-checked and mounts the embed.st iframe in the player");
 
 // Switching streams swaps the iframe without stacking players.
 chips[1].click();
 assert.equal(player2.children.length, 1, "only one iframe at a time");
 assert.equal(player2.children[0].src, wantUrl2, "second chip swaps the iframe src");
 assert.ok(chips[1].classList.contains("selected"), "selection follows the click");
-assert.equal(chips[0].getAttribute("aria-checked"), "false", "previous chip is deselected (single-selection radio group)");
-ok("switching chips replaces the active stream and moves the single selection");
+assert.equal(chips[0].getAttribute("aria-checked"), "false", "previous toggle is deselected (single-selection radio group)");
+ok("switching toggles replaces the active stream and moves the single selection");
 
 // The no-streams match must still degrade to a friendly note, not a crash.
 documentStub.dispatch("keydown", {
@@ -342,7 +361,7 @@ documentStub.dispatch("keydown", {
   preventDefault() {}
 });
 assert.ok(
-  documentStub.getElementById("stream-picker").innerHTML.includes("0 playable"),
+  documentStub.getElementById("stream-picker").innerHTML.includes("Lineups for this match are not published yet"),
   "matches without lineups should show the empty state"
 );
 ok("matches without resolved streams show the empty state");

@@ -60,7 +60,7 @@ assert.ok(headingIdx !== -1 && playerIdx !== -1 && pickerIdx !== -1);
 assert.ok(headingIdx < playerIdx, "player first under the title");
 assert.ok(playerIdx < pickerIdx, "source list below the player");
 assert.ok(html.includes("stream-sources-label"), "'Available streams' section label present");
-assert.ok(html.includes(".stream-sources-section{margin-top:28px}"), "player/source-list spacing");
+assert.ok(html.includes(".stream-sources-section{margin-top:20px}"), "player/source-list spacing");
 ok("watch page order: title → player → sources (+ section label & spacing)");
 
 // Stream chips: conditional markup shared by both card templates (no "0 streams" noise).
@@ -72,10 +72,9 @@ ok("stream chips conditional in both card templates");
 
 // Stream picker semantics: radiogroup + persistent .selected selection.
 assert.ok(html.includes('role="radiogroup"'), "stream picker group has role=radiogroup");
-assert.ok(html.includes('role="radio"'), "stream chips have role=radio");
-assert.ok(html.includes('aria-checked'), "chips toggle aria-checked via JS");
-assert.ok(html.includes("sfy-many-buttons"), "6+ button groups get reduced shadows (perf)");
-ok("stream picker radio semantics + persistent selection + perf shadow reduction");
+assert.ok(html.includes('role="radio"'), "stream toggles have role=radio");
+assert.ok(html.includes('aria-checked'), "toggles toggle aria-checked via JS");
+ok("stream picker radio semantics + persistent selection");
 
 // Watch view: single header block, player above list, above-modal sidebar,
 // compact source rows.
@@ -94,17 +93,16 @@ assert.ok(html.includes('id="sfy-sidebar"') && html.includes('id="sfy-sidebar-to
   "site-wide sidebar + trigger present on every route");
 assert.ok(/z-index:1150/.test(html) && /z-index:1140/.test(html),
   "sidebar drawer + backdrop stack above the stream modal (z1000)");
-assert.ok(html.includes("grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"),
-  "stream sources render as a responsive card grid (min 150px columns)");
-assert.ok(/\.stream-list\{[^}]*gap:10px/.test(html), "grid gap ~10px between cards");
-assert.ok(html.includes("min-height:74px;padding:12px") && html.includes("border-radius:12px"),
-  "cards are ~74px tall with 12px padding and radius");
-assert.ok(html.includes('esc("Stream " + flatIndex)'), "cards labeled Stream N (flat sequence)");
-assert.ok(!html.includes("stream-chip-tag watch"), "no separate Watch button on cards");
-assert.ok(html.includes(".stream-embed-chip.selected"), "persistent selected state on cards");
-assert.ok(html.includes("sfy-many-buttons .stream-embed-chip{box-shadow:none}"),
-  "6+ card groups drop expensive shadows (perf)");
-ok("watch view: one header, player→list order, reachable sidebar, compact card grid");
+assert.ok(html.includes(".stream-toggle-strip{"),
+  "stream sources render as a horizontal toggle strip");
+assert.ok(html.includes("overscroll-behavior-x:contain"),
+  "the strip is a contained horizontal scroller");
+assert.ok(html.includes(".stream-toggle-tip"),
+  "channel/language/HD detail lives in a hover/focus tooltip");
+assert.ok(html.includes('"Stream " + flatIndex'), "toggles labeled Stream N (flat sequence)");
+assert.ok(!html.includes("stream-embed-chip"), "no legacy card markup remains");
+assert.ok(html.includes(".stream-toggle.selected"), "persistent selected state on toggles");
+ok("watch view: one header, player→list order, reachable sidebar, compact toggle strip");
 
 // Fonts: self-hosted variable DM Sans (preloaded woff2, zero external font CSS).
 assert.ok(html.includes('href="/fonts/dm-sans-latin.woff2"'), "latin woff2 is preloaded");
