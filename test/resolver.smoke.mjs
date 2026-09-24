@@ -484,4 +484,55 @@ console.log("# repeat sync");
 }
 ok("re-sync preserves manual streams, ids and cached summaries");
 
+// ---------------------------------------------------------------------------
+// 5. Same-origin image proxy: only streamed.pk images are re-served.
+// ---------------------------------------------------------------------------
+
+console.log("# image proxy");
+{
+  const imageResponse = (status, type, body) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name) => (name.toLowerCase() === "content-type" ? type : null) },
+    body
+  });
+  const imageFetches = [];
+  fetchHandler = async (url) => {
+    imageFetches.push(String(url));
+    if (String(url).indexOf("https://streamed.pk/api/images/") === 0) {
+      return imageResponse(200, "image/webp", "webp-bytes");
+    }
+    throw new Error("unexpected image fetch: " + url);
+  };
+
+  const offHost = await worker.default.fetch(
+    req("/api/images?url=" + encodeURIComponent("https://evil.example/poster.webp")),
+    env,
+    ctx
+  );
+  assert.equal(offHost.status, 400, "off-host image url rejected");
+
+  const insecure = await worker.default.fetch(
+    req("/api/images?url=" + encodeURIComponent("http://streamed.pk/api/images/x.webp")),
+    env,
+    ctx
+  );
+  assert.equal(insecure.status, 400, "non-https image url rejected");
+
+  const missing = await worker.default.fetch(req("/api/images"), env, ctx);
+  assert.equal(missing.status, 400, "missing url rejected");
+
+  const proxied = await worker.default.fetch(
+    req("/api/images?url=" + encodeURIComponent("https://streamed.pk/api/images/badge/real-madrid.webp")),
+    env,
+    ctx
+  );
+  assert.equal(proxied.status, 200);
+  assert.equal(proxied.headers["Content-Type"], "image/webp");
+  assert.equal(proxied.headers["Access-Control-Allow-Origin"], "*");
+  assert.equal(proxied.body, "webp-bytes");
+  assert.equal(imageFetches.length, 1, "one upstream fetch per proxied image");
+}
+ok("image proxy allows streamed.pk only and re-serves the bytes");
+
 console.log("\nAll " + passed + " assertions groups passed.");

@@ -1120,8 +1120,43 @@
         return "https://streamed.pk/api/images/badge/" + encodeURIComponent(value) + ".webp";
     }
 
+    /*
+     * Poster and crest art is hotlinked from streamed.pk, a third-party host
+     * behind DDoS-Guard. Desktops — where extensions, DNS filters and corporate
+     * networks are in play — commonly block those cross-origin requests, which
+     * left cards with an empty frame and no way back. Every image now gets one
+     * retry through the Worker's same-origin image proxy before it degrades to
+     * the initials fallback. The retry stays harmless while the proxy route is
+     * not deployed yet: it fails and the fallback takes over.
+     */
+    function proxyImageUrl(url) {
+        return PROXY_URL + "/api/images?url=" + encodeURIComponent(String(url || ""));
+    }
+
+    function retryImageViaProxy(img, flag) {
+        const src = img.getAttribute("src") || "";
+        if (img.dataset[flag] === "1" || !src) return false;
+        if (src.indexOf(PROXY_URL + "/api/images") === 0) return false;
+        img.dataset[flag] = "1";
+        img.src = proxyImageUrl(src);
+        return true;
+    }
+
+    function initialsOf(value) {
+        return String(value ?? "")
+            .split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(part => part[0])
+            .join("")
+            .toUpperCase() || "FC";
+    }
+
     function logoError(img, token) {
-        if (!img || img.dataset.logoFallback === "1") return;
+        if (!img) return;
+        // First failure: re-request the crest from the site's own origin.
+        if (retryImageViaProxy(img, "logoRetry")) return;
+        if (img.dataset.logoFallback === "1") return;
         img.dataset.logoFallback = "1";
 
         const wrapper = img.parentElement;
@@ -1130,18 +1165,27 @@
             const fallback = document.createElement("div");
             fallback.className = "sfy-logo-fallback";
             fallback.setAttribute("aria-label", name);
-            fallback.textContent = name
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map(part => part[0])
-                .join("")
-                .toUpperCase() || "FC";
+            fallback.textContent = initialsOf(name);
             img.replaceWith(fallback);
         } else {
             img.removeAttribute("src");
             img.style.display = "none";
         }
+    }
+
+    // A poster that cannot be loaded (blocked host, expired token, offline) must
+    // never leave an empty frame: drop it so the crest fallback rendered
+    // underneath becomes visible.
+    function posterError(img) {
+        if (!img) return;
+        if (retryImageViaProxy(img, "posterRetry")) return;
+        const visual = img.parentElement;
+        if (visual && visual.classList) visual.classList.remove("has-poster");
+        const gradient = img.nextElementSibling;
+        if (gradient && gradient.classList && gradient.classList.contains("sfy-hero-gradient")) {
+            gradient.remove();
+        }
+        img.remove();
     }
 
     function safeDate(value) {
@@ -1240,7 +1284,7 @@
                         const name = team.name || (side === "home" ? "Home" : "Away");
                         return '<div class="sfy-hero-team">' +
                             (logo
-                                ? '<img src="' + esc(logo) + '" alt="' + esc(name) + '" loading="lazy" decoding="async" onerror="logoError(this)">'
+                                ? '<img src="' + esc(logo) + '" alt="' + esc(name) + '" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="logoError(this)">'
                                 : '<div class="sfy-logo-fallback">' + esc(name.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join("").toUpperCase() || "FC") + '</div>') +
                             '<span>' + esc(name) + '</span>' +
                             '</div>';
@@ -1249,7 +1293,7 @@
                     featured.innerHTML =
                         '<section class="sfy-hero" aria-label="Featured match">' +
                             (match.poster
-                                ? '<img class="sfy-hero-bg" src="' + esc(resolveAssetUrl(match.poster)) + '" alt="" aria-hidden="true" decoding="async">' +
+                                ? '<img class="sfy-hero-bg" src="' + esc(resolveAssetUrl(match.poster)) + '" alt="" aria-hidden="true" decoding="async" referrerpolicy="no-referrer" onerror="posterError(this)">' +
                                   '<span class="sfy-hero-gradient" aria-hidden="true"></span>'
                                 : '') +
                             '<div class="sfy-hero-inner">' +
@@ -1424,21 +1468,30 @@
             ? `<span class="sfy-stream-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M2 12h3"/><path d="m8 8 8 8"/><path d="M12 2v3"/><path d="m16 8-8 8"/><path d="M19 12h3"/></svg>${match.streamed.streamCount} stream${match.streamed.streamCount === 1 ? "" : "s"}</span>`
             : "";
 
-        const logo = (url, token, alt) => url
-            ? `<img class="sfy-event-logo" src="${esc(url)}" data-logo-token="${esc(token || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(alt || "Team")}" loading="lazy" decoding="async">`
-            : `<div class="sfy-event-logo placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .13 2.2L16.79 15"/><circle cx="12" cy="17" r="5"/></svg></div>`;
+        // A crest the Streamed feed does not carry (most teams ship an empty
+        // badge) or one that fails to load falls back to the team's initials —
+        // the same language the hero and logoError() use — instead of a generic
+        // placeholder icon that reads as a broken image. Cards that do ship a
+        // poster pre-render only the initials: crests the poster covers would
+        // cost a request per team for nothing, and posterError() drops the
+        // poster to reveal them when it cannot be loaded. `poster` is resolved
+        // before this helper is ever called, so the closure is safe.
+        const logo = (url, token, alt) => (url && !poster)
+            ? `<img class="sfy-event-logo" src="${esc(url)}" data-logo-token="${esc(token || "")}" onerror="logoError(this,this.dataset.logoToken)" alt="${esc(alt || "Team")}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+            : `<div class="sfy-event-logo sfy-logo-fallback" role="img" aria-label="${esc(alt || "Team")}">${esc(initialsOf(alt))}</div>`;
 
         if (isChannel(match)) {
             const poster = resolveAssetUrl(match.poster);
             return `
                 <article class="match-card sfy-match-item sfy-channel-item" data-match-id="${esc(id)}" tabindex="0" role="button" aria-label="Open ${esc(match.title || "Channel")}">
-                    <div class="sfy-event-visual">
+                    <div class="sfy-event-visual ${poster ? "has-poster" : ""}">
                         ${streamChip}
                         <span class="sfy-event-badge">${esc(dateText)}</span>
                         ${match.popular ? '<span class="sfy-event-favorite" aria-hidden="true">★</span>' : ""}
+                        <div class="sfy-event-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" style="width:42%;height:42%;color:#3a4353" aria-hidden="true"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></svg></div>
                         ${poster
-                            ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy" decoding="async">`
-                            : `<div class="sfy-event-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" style="width:42%;height:42%;color:#3a4353" aria-hidden="true"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></svg></div>`}
+                            ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="${esc(match.title || "Channel")}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="posterError(this)">`
+                            : ""}
                     </div>
                     <div class="sfy-event-title">${esc(match.title || "Channel")}</div>
                     <div class="sfy-event-category">${esc(category === "TODAYS MATCHES" ? "Sports" : category)}</div>
@@ -1454,14 +1507,14 @@
                         : `<span class="sfy-event-badge">${esc(dateText)}</span>`}
                     ${streamChip}
                     ${match.popular ? '<span class="sfy-event-favorite" aria-hidden="true">★</span>' : ""}
+                    <div class="sfy-event-fallback">
+                        <div class="sfy-fallback-team">${logo(homeBadge, home.badge, home.name)}</div>
+                        <span class="sfy-fallback-vs">VS</span>
+                        <div class="sfy-fallback-team">${logo(awayBadge, away.badge, away.name)}</div>
+                    </div>
                     ${poster
-                        ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="" loading="lazy" decoding="async">`
-                        : `
-                            <div class="sfy-event-fallback">
-                                <div class="sfy-fallback-team">${logo(homeBadge, home.badge, home.name)}</div>
-                                <span class="sfy-fallback-vs">VS</span>
-                                <div class="sfy-fallback-team">${logo(awayBadge, away.badge, away.name)}</div>
-                            </div>`}
+                        ? `<img class="sfy-event-poster" src="${esc(poster)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="posterError(this)">`
+                        : ""}
                 </div>
                 <div class="sfy-event-title">${esc(match.title || `${home.name || "TBD"} vs ${away.name || "TBD"}`)}</div>
                 <div class="sfy-event-category">${esc(category === "TODAYS MATCHES" ? "Sports" : category)}${timeText ? ` <span>•</span> ${esc(timeText)}` : ""}</div>

@@ -77,6 +77,19 @@ assert.ok(html.includes('role="radio"'), "stream toggles have role=radio");
 assert.ok(html.includes('aria-checked'), "toggles toggle aria-checked via JS");
 ok("stream picker radio semantics + persistent selection");
 
+// Image resilience: crests the Streamed feed does not carry fall back to the
+// team's initials (never a generic placeholder), and every poster/crest gets
+// exactly one retry through the Worker's same-origin image proxy before it
+// degrades — so a blocked third-party host can never leave an empty frame.
+assert.ok(html.includes("function proxyImageUrl(url)"), "same-origin image proxy retry helper present");
+assert.ok(html.includes("function posterError(img)"), "poster error recovery helper present");
+assert.ok(html.includes("api/images?url="), "images retry through the Worker image proxy");
+assert.ok(html.includes("sfy-event-logo sfy-logo-fallback"), "missing crests fall back to team initials");
+assert.ok(!html.includes('<div class="sfy-event-logo placeholder">'), "generic crest placeholder icon removed");
+assert.ok(html.includes('referrerpolicy="no-referrer"'), "third-party images load without a referrer");
+assert.ok(html.includes('onerror="posterError(this)"'), "posters degrade to the crest fallback on error");
+ok("poster/crest fallbacks: initials, proxy retry, no empty frames");
+
 // Watch view: single header block, player above list, above-modal sidebar,
 // compact source rows.
 assert.equal((html.match(/class="stream-topbar"/g) || []).length, 1,
