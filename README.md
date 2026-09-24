@@ -1,5 +1,7 @@
 # Sportzfylive V2
 
+[![Deploy to Cloudflare](https://github.com/svimran46/Sportzfylive-V2/actions/workflows/deploy.yml/badge.svg)](https://github.com/svimran46/Sportzfylive-V2/actions/workflows/deploy.yml)
+
 A modern, responsive web application for streaming live sports matches. The public site is static HTML/JS; the backend is a Cloudflare Worker that syncs matches from the Streamed API, resolves per-source stream metadata, and manages admin content.
 
 ## Features
