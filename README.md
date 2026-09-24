@@ -12,6 +12,8 @@ A modern, responsive web application for streaming live sports matches. The publ
 - 🏷️ **Category Filtering**: Filter matches by sport (FOOTBALL, CRICKET, TENNIS, and more)
 - 🛡️ **Secure**: Playback URLs are resolved server-side only and never exposed to the client; XSS-safe rendering
 - ⚠️ **Error Handling**: Per-source failure isolation — one bad Streamed source never breaks a match list
+- 🎯 **Watch page**: match identity (crests + share) on top, the player, stream chips labelled with language/provider/HD, then a rail of other matches — all rendered from the match list already in memory, so opening a match costs no extra requests
+- 🔗 **Shareable matches**: share buttons emit `#match=<id>` links, and the site opens that match directly on load
 - 📱 **Responsive Design**: Fully responsive grid layout for mobile, tablet, and desktop
 - 🎨 **Modern UI**: Dark theme with smooth animations and transitions
 
@@ -89,6 +91,15 @@ Matches are synced automatically from the Streamed API every 10 minutes. Admins 
 - **Iframe Embeds**: Displayed in a sandboxed iframe
 - **Search**: Type to filter channels by name
 - **Filter**: Click category buttons to filter by genre
+
+### Watch page
+
+Opening a match shows the watch view, top to bottom: match title with live status,
+both teams with crests and their initials as fallback, share controls, the player,
+the stream list (one chip per stream with its language, provider and an HD tag),
+and a rail of related matches. The rail is capped at 8 matches, prefers the same
+sport, reuses the homepage card markup, and is lazily rendered
+(`content-visibility`) so scrolling stays smooth.
 
 ## Technologies Used
 

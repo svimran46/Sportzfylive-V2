@@ -323,6 +323,33 @@ assert.ok(
 );
 ok("playable streams render as one compact toggle per stream");
 
+// The watch page also shows who is playing, how to share it, and what else is
+// on — all rendered from the match map already in memory (no extra fetches).
+const teamsEl = documentStub.getElementById("watch-teams");
+assert.ok(
+  teamsEl.innerHTML.includes("watch-team-crest") && teamsEl.innerHTML.includes("watch-vs"),
+  "watch header renders both crests around a vs separator"
+);
+
+const shareEl = documentStub.getElementById("watch-share");
+assert.ok(
+  shareEl.innerHTML.includes("wa.me") &&
+    shareEl.innerHTML.includes("twitter.com/intent") &&
+    shareEl.innerHTML.includes("facebook.com/sharer") &&
+    shareEl.innerHTML.includes("shareMatch('copy')"),
+  "share controls offer copy + WhatsApp/X/Facebook with escaped targets"
+);
+
+const relatedEl = documentStub.getElementById("watch-related");
+const relatedGrid = documentStub.getElementById("watch-related-grid");
+assert.equal(relatedEl.hidden, false, "related rail is revealed when other matches exist");
+assert.ok(
+  relatedGrid.innerHTML.includes("data-match-id=\"streamed-101\"") &&
+    !relatedGrid.innerHTML.includes("streamed-ppv"),
+  "the rail lists other matches and never the one being watched"
+);
+ok("watch view renders crests, share targets and a related-matches rail");
+
 const wantUrl1 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1";
 const wantUrl2 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/2";
 assert.equal(chips[0].dataset.embedUrl, wantUrl1);

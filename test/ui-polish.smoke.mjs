@@ -118,6 +118,27 @@ assert.ok(!html.includes("stream-embed-chip"), "no legacy card markup remains");
 assert.ok(html.includes(".stream-toggle.selected"), "persistent selected state on toggles");
 ok("watch view: one header, player→list order, reachable sidebar, compact toggle strip");
 
+// Watch page identity (crests + share) and the related-matches rail: match
+// title on top, player, stream list, then other matches already in memory.
+assert.ok(html.includes('id="watch-teams"') && html.includes("renderWatchTeams("),
+  "watch header renders the two teams");
+assert.ok(html.includes('id="watch-share"') && html.includes("shareMatch("),
+  "watch header carries share controls");
+assert.ok(html.includes("watchShareUrl") && html.includes('"#match="'),
+  "shared links deep-link to the match");
+const orderRelated = modalHtml.indexOf('id="watch-related"');
+assert.ok(orderRelated > orderPicker, "related matches sit below the stream list");
+assert.ok(html.includes(".watch-related-grid{") && html.includes('id="watch-related-grid"'),
+  "related matches render as a grid of match cards");
+assert.ok(/WATCH_RELATED_LIMIT = 8/.test(html), "the rail is capped so the page stays light");
+assert.ok(html.includes("content-visibility:auto") && html.includes("contain-intrinsic-size"),
+  "the rail skips off-screen layout work while scrolling");
+assert.ok(html.includes(".stream-toggle-label") && html.includes(".stream-toggle-tag.hd"),
+  "stream chips show language, provider and an HD tag");
+assert.ok(html.includes("const language = String(item.stream.language"),
+  "chips are built from the resolved stream metadata");
+ok("watch page: crests + share on top, richer stream chips, capped related rail");
+
 // Fonts: self-hosted variable DM Sans (preloaded woff2, zero external font CSS).
 assert.ok(html.includes('href="/fonts/dm-sans-latin.woff2"'), "latin woff2 is preloaded");
 assert.ok(html.includes('rel="preload"'), "font preload hint present");
