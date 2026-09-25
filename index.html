@@ -731,10 +731,6 @@
     @media(max-width:640px){
       .stream-page{padding:14px 16px 32px}
     }
-    .stream-page.theater{
-      width:100vw;max-width:none;min-height:100vh;
-      border-radius:0;border:0;padding:12px 18px;
-    }
     .stream-layout-grid{
       display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;
       align-items:start;width:100%;
@@ -744,8 +740,6 @@
     }
     .stream-main-col{min-width:0;display:flex;flex-direction:column}
     .stream-side-col{min-width:0}
-    .stream-page.theater .stream-layout-grid{display:block}
-    .stream-page.theater .stream-side-col{margin-top:24px}
     .stream-topbar{
       flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
       margin-bottom:12px;
@@ -761,11 +755,6 @@
     .back-btn:hover{
       background:var(--surface-hover);border-color:rgba(255,255,255,0.14);color:var(--ink);
       transform:translateX(-2px);
-    }
-    .embed-btn,.theater-btn{
-      display:inline-flex;align-items:center;gap:7px;
-      min-height:38px;padding:0 14px;
-      color:var(--ink);font-size:12.5px;
     }
     .stream-heading{
       display:flex;flex-direction:column;align-items:flex-start;text-align:left;
@@ -972,47 +961,21 @@
     }
     .player-empty:hover svg{transform:scale(1.08)}
     .player-bar{
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      padding:10px 16px;
+      display:flex;align-items:center;justify-content:flex-start;
+      padding:11px 18px;min-height:42px;
       background:#0E1017;border-top:1px solid var(--border);
     }
-    .player-bar-actions{
-      display:inline-flex;align-items:center;gap:8px;flex-shrink:0;
-    }
-    .player-ctrl-btn{
-      height:34px;padding:0 12px;border-radius:8px;
-      display:inline-flex;align-items:center;gap:6px;
-      font-size:12px;font-weight:700;letter-spacing:.02em;
-      background:var(--surface);border:1px solid var(--border);
-      color:var(--ink);cursor:pointer;transition:all .18s ease;
-    }
-    .player-ctrl-btn svg{width:13px;height:13px}
-    .player-ctrl-btn:hover{
-      background:var(--surface-hover);border-color:rgba(255,255,255,0.18);color:var(--ink);
-      transform:translateY(-1px);
-    }
-    .unmute-btn{
-      color:var(--accent-pink);border-color:rgba(217,54,152,0.35);background:rgba(217,54,152,0.12);
-    }
-    .unmute-btn:hover{
-      background:rgba(217,54,152,0.22);border-color:var(--accent-pink);
-      box-shadow:0 0 14px var(--accent-pink-dim);
-    }
     .player-bar-source{
-      flex:1;min-width:0;text-align:right;
-      color:var(--ink-muted);font-size:12.5px;font-weight:600;
+      display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;
+      color:var(--ink-muted);font-size:12.5px;font-weight:600;letter-spacing:.01em;
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     }
     .player-bar-source strong{color:var(--ink);font-weight:800}
-    .stream-page.theater .player-unit{
-      border-radius:0;margin:0;height:calc(100vh - 80px);height:calc(100dvh - 80px);
-      display:flex;flex-direction:column;
+    .player-bar-source .sfy-pulse-dot{
+      width:7px;height:7px;border-radius:50%;background:var(--accent);
+      box-shadow:0 0 8px var(--accent-dim);flex-shrink:0;
+      animation:sfy-live-glow 2s ease-in-out infinite;
     }
-    .stream-page.theater .player-container{
-      flex:1;aspect-ratio:auto;height:auto;
-    }
-    .stream-page.theater .player-container iframe{height:100%}
-    .stream-page.theater .player-bar{flex:0 0 auto}
     .stream-sources-section{margin-top:20px}
     .stream-sources-label{
       margin:0 0 12px;font-size:12.5px;font-weight:800;color:var(--ink-muted);
@@ -1162,9 +1125,7 @@
       .sfy-hero-team{font-size:12px;flex-direction:column;gap:5px}
       .sfy-hero-team img{width:42px;height:42px}
       .stream-title{letter-spacing:-.4px}
-      .player-bar{gap:8px}
-      .theater-btn{padding:0 10px}
-      .stream-page.theater .player-container{height:calc(100vh - 200px);height:calc(100dvh - 200px)}
+      .player-bar{padding:10px 14px}
     }
     @media(max-width:380px){
       .sfy-tile{padding:14px 10px}
@@ -1404,20 +1365,6 @@
         <div class="player-unit">
           <div id="player-container" class="player-container" hidden></div>
           <div class="player-bar">
-            <div class="player-bar-actions">
-              <button class="theater-btn player-ctrl-btn" type="button" onclick="toggleTheaterMode()" aria-label="Theater mode">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                <span>Theater</span>
-              </button>
-              <button class="unmute-btn player-ctrl-btn" type="button" id="unmute-btn" onclick="toggleUnmute()" aria-label="Unmute stream" aria-pressed="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
-                <span>Unmute</span>
-              </button>
-              <button class="player-embed-btn player-ctrl-btn" type="button" onclick="copyEmbedCode()" aria-label="Copy embed code">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="14" x="3" y="5" rx="2"/><polyline points="9 10 7 12 9 14"/><polyline points="15 10 17 12 15 14"/></svg>
-                <span>Embed</span>
-              </button>
-            </div>
             <span class="player-bar-source" id="player-bar-source"></span>
           </div>
         </div>
@@ -2066,11 +2013,9 @@
                 player.appendChild(frame);
                 const barSource = document.getElementById("player-bar-source");
                 if (barSource) {
-                    barSource.innerHTML = "Now playing <strong>" +
-                        esc(chip.dataset.streamLabel || "Stream") + "</strong>";
+                    barSource.innerHTML = '<span class="sfy-pulse-dot" aria-hidden="true"></span>Now playing: <strong>' +
+                        esc(chip.dataset.streamLabel || ("Stream " + chip.dataset.streamNo)) + "</strong>";
                 }
-                const unmuteBtn = document.getElementById("unmute-btn");
-                if (unmuteBtn) unmuteBtn.setAttribute("aria-pressed", "false");
             });
         });
     }
@@ -2264,8 +2209,6 @@
 
         const barSource = document.getElementById("player-bar-source");
         if (barSource) barSource.textContent = "Pick a stream below";
-        const unmuteBtn = document.getElementById("unmute-btn");
-        if (unmuteBtn) unmuteBtn.setAttribute("aria-pressed", "false");
 
         // Watch-page identity and the rail of other matches: rendered from the
         // match map already in memory, so this costs no request.
@@ -2337,18 +2280,6 @@
         }
     });
 
-    function toggleTheaterMode() {
-        document.querySelector(".stream-page")?.classList.toggle("theater");
-    }
-
-    function toggleUnmute() {
-        const btn = document.getElementById("unmute-btn");
-        if (!btn) return;
-        const isPressed = btn.getAttribute("aria-pressed") === "true";
-        btn.setAttribute("aria-pressed", isPressed ? "false" : "true");
-        const span = btn.querySelector("span");
-        if (span) span.textContent = isPressed ? "Unmute" : "Mute";
-    }
 
     async function copyEmbedCode() {
         if (!activeMatch) return;
@@ -2396,7 +2327,6 @@
             player.hidden = true;
             player.replaceChildren();
         }
-        document.querySelector(".stream-page")?.classList.remove("theater");
         document.body.style.overflow = "";
         activeMatch = null;
     }
