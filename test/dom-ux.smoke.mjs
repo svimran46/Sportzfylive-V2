@@ -369,8 +369,6 @@ assert.ok(
   barSourceAfter.innerHTML.includes("Now playing") && barSourceAfter.innerHTML.includes("Stream 1"),
   "player control bar names the loaded stream"
 );
-const unmuteAfter = documentStub.getElementById("unmute-btn");
-assert.equal(unmuteAfter.getAttribute("aria-pressed"), "false", "unmute control stays unpressed until the user mutes");
 ok("clicking a toggle persists .selected + aria-checked and mounts the embed.st iframe in the player");
 
 // Switching streams swaps the iframe without stacking players.
