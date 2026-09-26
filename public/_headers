@@ -10,3 +10,16 @@
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+
+# The admin SPA must never be framed: blocks clickjacking of the token prompt
+# and of authenticated admin actions. Worker-generated /api/admin/* responses
+# set the same headers themselves.
+/admin
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+
+/admin.html
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: no-referrer
