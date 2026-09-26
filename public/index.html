@@ -298,7 +298,7 @@
        radar graphic (replacing harsh pitch stripes). */
     .sfy-hero{
       position:relative;overflow:hidden;
-      margin:16px 0 24px;
+      margin:12px 0 18px;
       border-radius:20px;
       background:
         radial-gradient(900px 340px at 85% -10%,rgba(44,62,232,.15),transparent 62%),
@@ -306,9 +306,9 @@
         linear-gradient(160deg,#14161F 0%,#0E1017 60%,#0A0B10 100%);
       border:1px solid var(--border);
       box-shadow:0 20px 48px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.04);
-      min-height:300px;
+      min-height:220px;
     }
-    @media(min-width:640px){.sfy-hero{min-height:340px;margin-bottom:28px}}
+    @media(min-width:640px){.sfy-hero{min-height:245px;margin-bottom:20px}}
     /* Ambient gradient glow layer */
     .sfy-hero::before{
       content:"";position:absolute;inset:0;
@@ -321,25 +321,25 @@
     .sfy-hero::after{
       content:"";position:absolute;
       top:50%;right:min(4vw,40px);transform:translateY(-50%);
-      width:min(44vw,420px);height:min(44vw,420px);
+      width:min(36vw,260px);height:min(36vw,260px);
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232C3EE8' stop-opacity='0.8'/%3E%3Cstop offset='100%25' stop-color='%23D93698' stop-opacity='0.8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='100%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D93698' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%232C3EE8' stop-opacity='0.6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='none' stroke-width='1.2'%3E%3Cpolygon points='100,15 185,100 100,185 15,100' stroke='url(%23g1)'/%3E%3Cpolygon points='100,38 162,100 100,162 38,100' stroke='url(%23g2)' stroke-dasharray='4,3'/%3E%3Cpolygon points='100,60 140,100 100,140 60,100' stroke='url(%23g1)'/%3E%3Cline x1='100' y1='15' x2='100' y2='185' stroke='url(%23g1)' stroke-dasharray='3,3'/%3E%3Cline x1='15' y1='100' x2='185' y2='100' stroke='url(%23g2)' stroke-dasharray='3,3'/%3E%3Cline x1='100' y1='15' x2='100' y2='60' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='15' y1='100' x2='60' y2='100' stroke='url(%23g1)' stroke-width='2'/%3E%3Cline x1='185' y1='100' x2='140' y2='100' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='100' y1='185' x2='100' y2='140' stroke='url(%23g1)' stroke-width='2'/%3E%3Ccircle cx='100' cy='100' r='5' fill='%232C3EE8'/%3E%3Ccircle cx='100' cy='15' r='3' fill='%23D93698'/%3E%3Ccircle cx='185' cy='100' r='3' fill='%232C3EE8'/%3E%3Ccircle cx='100' cy='185' r='3' fill='%23D93698'/%3E%3Ccircle cx='15' cy='100' r='3' fill='%232C3EE8'/%3E%3C/g%3E%3C/svg%3E");
       background-size:contain;background-repeat:no-repeat;background-position:center;
       opacity:.22;filter:blur(0.5px);
       pointer-events:none;z-index:1;
     }
     @media(max-width:640px){
-      .sfy-hero::after{right:-15%;width:60vw;height:60vw;opacity:.16}
+      .sfy-hero::after{right:-15%;width:50vw;height:50vw;opacity:.14}
     }
     .sfy-hero-inner{
       position:relative;z-index:2;
-      min-height:300px;padding:34px 24px 38px;
+      min-height:220px;padding:24px 20px;
       display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
-      max-width:640px;
+      max-width:680px;
     }
-    @media(min-width:640px){.sfy-hero-inner{min-height:340px;padding:44px}}
+    @media(min-width:640px){.sfy-hero-inner{min-height:245px;padding:26px 36px}}
     .sfy-hero-pill{
       display:inline-flex;align-items:center;gap:6px;
-      padding:5px 12px;margin-bottom:14px;
+      padding:4px 10px;margin-bottom:12px;
       border-radius:var(--radius-pill);
       background:var(--live-dim);color:var(--live);
       border:1px solid rgba(224,41,56,.25);
@@ -356,9 +356,9 @@
       50%{opacity:.6;box-shadow:0 0 2px var(--live)}
     }
     .sfy-hero-title{
-      margin:0 0 14px;
+      margin:0 0 12px;
       font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
-      font-size:clamp(20px,3.8vw,34px);font-weight:700;
+      font-size:clamp(16px,2.8vw,26px);font-weight:700;
       letter-spacing:-0.5px;line-height:1.4;color:var(--ink);
       text-shadow:0 0 6px rgba(231,232,237,.14);
     }
@@ -367,13 +367,13 @@
       text-shadow:0 0 6px rgba(231,232,237,.14);
     }
     .sfy-hero-sub{
-      margin:0 0 18px;max-width:480px;
-      color:var(--ink-muted);font-size:14px;line-height:1.6;
+      margin:0 0 14px;max-width:480px;
+      color:var(--ink-muted);font-size:13.5px;line-height:1.5;
     }
-    @media(min-width:640px){.sfy-hero-sub{font-size:15px}}
+    @media(min-width:640px){.sfy-hero-sub{font-size:14px}}
     .sfy-hero-facts{
       display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
-      margin:0 0 22px;padding:0;list-style:none;
+      margin:0 0 18px;padding:0;list-style:none;
     }
     .sfy-hero-facts li{
       display:inline-flex;align-items:center;gap:8px;
