@@ -23,7 +23,8 @@
   <meta name="twitter:description" content="Watch live sports from around the world. Every match, every sport, one place.">
   <meta name="twitter:image" content="https://sportzfylive.svimranmy.workers.dev/og-card.png">
 
-  <!-- Self-hosted variable DM Sans: one preloaded woff2, zero external CSS -->
+  <!-- Self-hosted variable Inter Tight and DM Sans: preloaded woff2, zero external CSS -->
+  <link rel="preload" href="/fonts/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 
   <!-- Warm connections to the API worker and image host -->
@@ -32,6 +33,22 @@
 
   <!-- ============ CRITICAL CSS: tokens, fonts, reset, header, hero ============ -->
   <style id="sportzfy-critical">
+    @font-face{
+      font-family:"Inter Tight";
+      font-style:normal;
+      font-weight:100 900;
+      font-display:swap;
+      src:url("/fonts/inter-tight-latin.woff2") format("woff2");
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    @font-face{
+      font-family:"Inter Tight";
+      font-style:normal;
+      font-weight:100 900;
+      font-display:swap;
+      src:url("/fonts/inter-tight-latin-ext.woff2") format("woff2");
+      unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+    }
     @font-face{
       font-family:"DM Sans";
       font-style:normal;
@@ -59,9 +76,9 @@
       --surface-focus:#232736;
       --raised:#14161F;
       --raised-hover:#1C1E2A;
-      --ink:#EDF0F3;
-      --ink-muted:#979AA1;
-      --ink-faint:#61636B;
+      --ink:#f5f5f5;
+      --ink-muted:#9c9c9c;
+      --ink-faint:#6b6b6b;
       --accent:#2C3EE8;
       --accent-dim:rgba(44,62,232,.18);
       --accent-pink:#D93698;
@@ -341,7 +358,7 @@
     }
     .sfy-hero-title{
       margin:0 0 14px;
-      font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
+      font-family:'Inter Tight',system-ui,-apple-system,sans-serif;
       font-size:clamp(20px,3.8vw,34px);font-weight:700;
       letter-spacing:-0.5px;line-height:1.4;color:var(--ink);
       text-shadow:0 0 6px rgba(231,232,237,.14);
@@ -461,6 +478,35 @@
     .sfy-event-poster,.sfy-hero-bg{transition:opacity .25s ease}
     .sfy-event-poster:not(.loaded),.sfy-hero-bg:not(.loaded){opacity:0}
     .sfy-event-poster.loaded,.sfy-hero-bg.loaded{opacity:1}
+
+    /* ======================= HERO LIVE GRID ======================= */
+    .sfy-hero-live{
+      margin:0 0 24px;
+    }
+    .sfy-hero-live.show{display:block}
+    .sfy-hero-live-title{
+      margin:0 0 14px;
+      display:flex;align-items:center;gap:9px;
+      font-family:'Inter Tight',system-ui,-apple-system,sans-serif;
+      font-size:clamp(14px,2.2vw,18px);font-weight:700;letter-spacing:-0.02em;line-height:1.4;
+      color:var(--ink);
+    }
+    .sfy-hero-live-title::before{
+      content:"";width:5px;height:18px;border-radius:999px;background:var(--live);flex-shrink:0;
+    }
+    .sfy-hero-live-title .sfy-hero-live-count{
+      color:var(--live);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;margin-left:6px;
+    }
+    .sfy-hero-live-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));
+      gap:16px;
+    }
+    @media(min-width:640px){
+      .sfy-hero-live-grid{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(min-width:1024px){
+      .sfy-hero-live-grid{grid-template-columns:repeat(4,1fr)}
+    }
   </style>
 
   <!-- ============ DESIGN SYSTEM: tiles, chips, carousels, cards, modal, footer ============ -->
@@ -472,7 +518,7 @@
     .sfy-section-title{display:flex;align-items:center;gap:9px;min-width:0}
     .sfy-section-title::before{content:"";width:5px;height:18px;border-radius:999px;background:var(--accent);flex-shrink:0}
     .sfy-section h2{
-      margin:0;font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
+      margin:0;font-family:'Inter Tight',system-ui,-apple-system,sans-serif;
       font-size:clamp(13px,2vw,17px);font-weight:700;letter-spacing:0;line-height:1.45;
       color:var(--ink);text-shadow:0 0 4px rgba(231,232,237,.1);
     }
@@ -574,7 +620,7 @@
     .category-heading-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
     .category-heading-row h2{
       margin:0;display:flex;align-items:center;gap:9px;min-width:0;
-      font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
+      font-family:'Inter Tight',system-ui,-apple-system,sans-serif;
       font-size:clamp(13px,2vw,17px);font-weight:700;letter-spacing:0;color:var(--ink);line-height:1.45;
       text-shadow:0 0 4px rgba(231,232,237,.1);
     }
@@ -776,7 +822,7 @@
     }
     .stream-title{
       margin:0 0 8px;
-      font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
+      font-family:'Inter Tight',system-ui,-apple-system,sans-serif;
       font-size:clamp(16px,2.4vw,22px);font-weight:700;
       letter-spacing:0;line-height:1.35;color:var(--ink);
       overflow-wrap:anywhere;
@@ -1215,6 +1261,17 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         <span>Watch now</span>
       </button>
+    </div>
+  </section>
+
+  <!-- ============================= HERO LIVE MATCHES ============================= -->
+  <section class="sfy-hero-live show" id="sfy-hero-live" aria-label="Live matches">
+    <h2 class="sfy-hero-live-title">Live Now <span class="sfy-hero-live-count" id="sfy-hero-live-count">Live</span></h2>
+    <div class="sfy-hero-live-grid" id="sfy-hero-live-grid">
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
     </div>
   </section>
 
@@ -1789,6 +1846,28 @@
 
         container.innerHTML = output ||
             `<div class="empty-state">No matches available.</div>`;
+
+        // Populate hero live grid
+        const heroLiveSection = document.getElementById('sfy-hero-live');
+        const heroLiveGrid = document.getElementById('sfy-hero-live-grid');
+        const heroLiveCount = document.getElementById('sfy-hero-live-count');
+        const heroLiveTitle = heroLiveSection ? heroLiveSection.querySelector('.sfy-hero-live-title') : null;
+        if (heroLiveSection && heroLiveGrid) {
+            const liveMatches = groups.LIVE || [];
+            const displayMatches = liveMatches.length > 0 ? liveMatches : (groups['TODAYS MATCHES'] || matches);
+            if (displayMatches.length > 0) {
+                heroLiveGrid.innerHTML = displayMatches.slice(0, 8).map(buildMatchCard).join('');
+                if (heroLiveTitle) {
+                    heroLiveTitle.innerHTML = (liveMatches.length > 0 ? 'Live Now' : "Today's Games") +
+                        ' <span class="sfy-hero-live-count" id="sfy-hero-live-count">' +
+                        (liveMatches.length > 0 ? liveMatches.length + (liveMatches.length === 1 ? ' match' : ' matches') : 'Today') +
+                        '</span>';
+                }
+                heroLiveSection.classList.add('show');
+            } else {
+                heroLiveSection.classList.remove('show');
+            }
+        }
 
         // Update ticker track with real matches
         const tickerTrack = document.getElementById("sfy-ticker-track");
@@ -2450,6 +2529,10 @@ function initCategoryCarousels(){
       const title=normalizeNav(section.dataset.category||section.querySelector("h2")?.textContent);
       section.style.display=(wanted==="ALL"||title===wanted)?"":"none";
     });
+    const heroLive=document.getElementById("sfy-hero-live");
+    if(heroLive){
+      heroLive.style.display=(wanted==="ALL"||wanted==="LIVE")?"":"none";
+    }
     document.querySelectorAll("[data-nav]").forEach(btn=>btn.classList.toggle("active",normalizeNav(btn.dataset.nav)===wanted));
     if(wanted!=="ALL"){
       const section=[...document.querySelectorAll(".category-section")].find(s=>normalizeNav(s.dataset.category||s.querySelector("h2")?.textContent)===wanted);
@@ -2464,6 +2547,8 @@ function initCategoryCarousels(){
 
   search?.addEventListener("input",()=>{
     const q=search.value.trim().toLowerCase();
+    const heroLive=document.getElementById("sfy-hero-live");
+    if(heroLive) heroLive.style.display=q?"none":"";
     document.querySelectorAll(".category-section").forEach(section=>{
       let visible=0;
       section.querySelectorAll(".match-card").forEach(card=>{
