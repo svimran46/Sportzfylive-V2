@@ -17,11 +17,39 @@ const SYNC_CURSOR_KEY = "sync:resolve-cursor";   // rotates which matches resolv
 const jsonHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token, X-Admin-Session"
+  "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token, X-Admin-Session",
+  "X-Content-Type-Options": "nosniff"
 };
 
 function json(data, status = 200) {
   return Response.json(data, { status, headers: jsonHeaders });
+}
+
+// Admin responses are never consumed cross-origin: same-origin-only CORS and
+// anti-clickjacking framing protection. The admin SPA is served by this Worker,
+// so fetches from /admin carry no Origin at all; browsers only attach Origin to
+// cross-origin requests, so a cross-site page cannot read these responses.
+const adminJsonHeaders = {
+  ...jsonHeaders,
+  "Access-Control-Allow-Origin": "null",
+  "X-Frame-Options": "DENY",
+  "Content-Security-Policy": "frame-ancestors 'none'"
+};
+
+function adminJson(data, status = 200) {
+  return Response.json(data, { status, headers: adminJsonHeaders });
+}
+
+// Parse a JSON request body defensively. A malformed body (or non-JSON content)
+// previously threw inside route handlers and surfaced as a Worker exception
+// (HTTP 500 + stack details with observability enabled); this turns that into
+// a clean 400 and keeps admin endpoints from being a cheap error oracle.
+async function safeJson(request) {
+  try {
+    return await request.json();
+  } catch (_) {
+    return undefined;
+  }
 }
 
 async function readArray(env, key) {
@@ -95,9 +123,97 @@ async function requireAdmin(request, env) {
   return true;
 }
 
-async function createAdminSession(request, env) {
+//
+// Admin login rate limiting
+//
+// /api/admin/login compares a caller-supplied header against ADMIN_TOKEN. That
+// endpoint used to be unthrottled, so a public Worker was an open oracle for
+// offline guessing of the admin token. Failures are now charged per client IP
+// with a KV sliding window. Only failures count, so the real admin is never
+// locked out; once the window fills, guessing stops until it drains.
+const LOGIN_WINDOW_SECONDS = 15 * 60; // 15-minute sliding window
+const LOGIN_MAX_FAILURES = 10;        // 10 bad tokens per window per IP
+const LOGIN_BLOCK_SECONDS = 30 * 60;  // hardened block once the window fills
+
+function clientIp(request) {
+  return (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    "unknown"
+  );
+}
+
+function loginFailKey(ip) {
+  // Encode the IP to keep the KV key on a safe alphabet.
+  return "login_fail:" + encodeURIComponent(ip);
+}
+
+async function countLoginFailure(env, request, ctx) {
+  const key = loginFailKey(clientIp(request));
+  const now = Date.now();
+  let record = null;
+  try {
+    record = await env.SPORTZFY_DB.get(key, "json");
+  } catch (_) {}
+  if (!record || !Array.isArray(record.failures)) record = { failures: [] };
+
+  // Sliding window: drop failures older than LOGIN_WINDOW_SECONDS.
+  const cutoff = now - LOGIN_WINDOW_SECONDS * 1000;
+  record.failures = record.failures.filter(ts => Number(ts) > cutoff);
+  record.failures.push(now);
+
+  try {
+    await env.SPORTZFY_DB.put(
+      key,
+      JSON.stringify(record),
+      { expirationTtl: LOGIN_BLOCK_SECONDS }
+    );
+  } catch (_) {}
+
+  return record.failures.length;
+}
+
+async function loginThrottled(env, request) {
+  try {
+    const record = await env.SPORTZFY_DB.get(loginFailKey(clientIp(request)), "json");
+    if (!record || !Array.isArray(record.failures)) return false;
+    const cutoff = Date.now() - LOGIN_WINDOW_SECONDS * 1000;
+    const recent = record.failures.filter(ts => Number(ts) > cutoff);
+    return recent.length >= LOGIN_MAX_FAILURES;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Length-independent comparison so a response cannot leak how much of the
+// token prefix matched. PKCS#7-style padding: normalize both sides to 64-byte
+// digests before comparing bytes.
+function timingSafeEqualStr(a, b) {
+  const enc = new TextEncoder();
+  const da = crypto.subtle.digest("SHA-256", enc.encode(String(a ?? "")));
+  const db = crypto.subtle.digest("SHA-256", enc.encode(String(b ?? "")));
+  return Promise.all([da, db]).then(([ba, bb]) => {
+    const va = new Uint8Array(ba);
+    const vb = new Uint8Array(bb);
+    let diff = 0;
+    for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i];
+    return diff === 0;
+  });
+}
+
+async function createAdminSession(request, env, ctx) {
   const supplied = request.headers.get("X-Admin-Token");
-  if (!env.ADMIN_TOKEN || !supplied || supplied !== env.ADMIN_TOKEN) return null;
+
+  // Charge every failed attempt (missing token, no secret configured, wrong
+  // token) before any comparison so throttling cannot be bypassed.
+  if (!env.ADMIN_TOKEN || !supplied) {
+    await countLoginFailure(env, request, ctx);
+    return null;
+  }
+  if (!await timingSafeEqualStr(supplied, env.ADMIN_TOKEN)) {
+    await countLoginFailure(env, request, ctx);
+    return null;
+  }
 
   const session = crypto.randomUUID();
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -596,10 +712,13 @@ async function apiHandler(request, env, ctx) {
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/login") {
-    const result = await createAdminSession(request, env);
+    if (await loginThrottled(env, request)) {
+      return adminJson({ error: "Too many failed attempts. Try again later." }, 429);
+    }
+    const result = await createAdminSession(request, env, ctx);
     return result
-      ? json(result)
-      : json({ error: "Invalid admin token" }, 401);
+      ? adminJson(result)
+      : adminJson({ error: "Invalid admin token" }, 401);
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/logout") {
@@ -611,7 +730,7 @@ async function apiHandler(request, env, ctx) {
         console.error("Admin logout failed:", String(error?.message || error));
       }
     }
-    return json({ success: true });
+    return adminJson({ success: true });
   }
 
   if (request.method === "GET" && url.pathname === "/api/streamed/matches") {
@@ -694,25 +813,26 @@ async function apiHandler(request, env, ctx) {
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/sync-streamed") {
-    if (!await requireAdmin(request, env)) return json({ error: "Admin authentication required" }, 401);
+    if (!await requireAdmin(request, env)) return adminJson({ error: "Admin authentication required" }, 401);
     try {
       const result = await syncStreamedMatches(env);
-      return json(result);
+      return adminJson(result);
     } catch (error) {
       console.error("Admin Streamed sync failed:", error);
-      return json({ error: "Streamed sync failed" }, 502);
+      return adminJson({ error: "Streamed sync failed" }, 502);
     }
   }
 
   if (request.method === "GET" && url.pathname === "/api/admin/matches") {
-    if (!await requireAdmin(request, env)) return json({ error: "Admin authentication required" }, 401);
-    return json(await readArray(env, "matches"));
+    if (!await requireAdmin(request, env)) return adminJson({ error: "Admin authentication required" }, 401);
+    return adminJson(await readArray(env, "matches"));
   }
 
   if (url.pathname === "/api/admin/matches" && request.method === "POST") {
-    if (!await requireAdmin(request, env)) return json({ error: "Admin authentication required" }, 401);
+    if (!await requireAdmin(request, env)) return adminJson({ error: "Admin authentication required" }, 401);
 
-    const body = await request.json();
+    const body = await safeJson(request);
+    if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
     const now = new Date().toISOString();
     const match = {
       id: String(body.id || crypto.randomUUID()),
@@ -750,10 +870,11 @@ async function apiHandler(request, env, ctx) {
     const id = decodeURIComponent(matchPath[1]);
     const matches = await readArray(env, "matches");
     const index = matches.findIndex(match => String(match.id) === id);
-    if (index === -1) return json({ error: "Match not found" }, 404);
+    if (index === -1) return adminJson({ error: "Match not found" }, 404);
 
     if (request.method === "PUT") {
-      const body = await request.json();
+      const body = await safeJson(request);
+      if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
       const current = matches[index];
 
       matches[index] = {
@@ -780,14 +901,14 @@ async function apiHandler(request, env, ctx) {
 
       await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
       await rebuildSnapshots(env, matches);
-      return json({ success: true, match: matches[index] });
+      return adminJson({ success: true, match: matches[index] });
     }
 
     if (request.method === "DELETE") {
       matches.splice(index, 1);
       await env.SPORTZFY_DB.put("matches", JSON.stringify(matches));
       await rebuildSnapshots(env, matches);
-      return json({ success: true });
+      return adminJson({ success: true });
     }
   }
 
@@ -814,7 +935,7 @@ async function apiHandler(request, env, ctx) {
   }
 
   if (url.pathname === "/api/admin/site-content") {
-    if (!await requireAdmin(request, env)) return json({ error: "Admin authentication required" }, 401);
+    if (!await requireAdmin(request, env)) return adminJson({ error: "Admin authentication required" }, 401);
 
     if (request.method === "GET") {
       const [notice, banner, featuredId] = await Promise.all([
@@ -822,7 +943,7 @@ async function apiHandler(request, env, ctx) {
         env.SPORTZFY_DB.get("site_banner", "json"),
         env.SPORTZFY_DB.get("site_featured_match", "text")
       ]);
-      return json({
+      return adminJson({
         notice: notice || { enabled: false, text: "", link: "" },
         banner: banner || { enabled: false, image: "", link: "", alt: "" },
         featuredMatchId: featuredId || ""
@@ -830,7 +951,8 @@ async function apiHandler(request, env, ctx) {
     }
 
     if (request.method === "PUT") {
-      const body = await request.json();
+      const body = await safeJson(request);
+      if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
       const notice = {
         enabled: Boolean(body.notice?.enabled),
         text: String(body.notice?.text || "").slice(0, 500),
@@ -844,7 +966,7 @@ async function apiHandler(request, env, ctx) {
       };
       const featuredId = String(body.featuredMatchId || "");
       if (featuredId && !(await readArray(env, "matches")).some(m => String(m.id) === featuredId)) {
-        return json({ error: "Featured match not found" }, 400);
+        return adminJson({ error: "Featured match not found" }, 400);
       }
 
       await Promise.all([
@@ -854,7 +976,7 @@ async function apiHandler(request, env, ctx) {
       ]);
 
       await rebuildSnapshots(env);
-      return json({ success: true });
+      return adminJson({ success: true });
     }
   }
 

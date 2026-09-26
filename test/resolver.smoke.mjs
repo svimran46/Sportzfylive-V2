@@ -107,8 +107,15 @@ function req(path, options = {}) {
     headers: {
       get: (name) => headers.get(name.toLowerCase()) ?? null
     },
-    json: async () => options.body ?? {}
+    json: async () => {
+      if (options.body === undefined) {
+        throw new SyntaxError("Unexpected end of JSON input");
+      }
+      return options.body;
+    }
   };
+  // NOTE: a request with no JSON body mimics workerd behavior: request.json()
+  // rejects, which safeJson() in the worker must convert into a 400.
 }
 
 let passed = 0;
@@ -552,5 +559,110 @@ console.log("# unknown paths");
   assert.equal(unknownPath.status, 404, "non-asset path is not answered with 200");
 }
 ok("unknown paths return 404 instead of a 200 placeholder");
+
+// ---------------------------------------------------------------------------
+// 9. Admin security hardening: login throttle, timing-safe comparison, clean
+//    400 on malformed bodies, and hardened headers on admin responses.
+// ---------------------------------------------------------------------------
+
+console.log("# admin hardening");
+
+// Login rate limit: the 11th consecutive wrong token from one IP gets 429,
+// and the correct token is also refused while the block is active.
+{
+  const login = async (token) => worker.default.fetch(
+    req("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "X-Admin-Token": token,
+        "cf-connecting-ip": "203.0.113.9"
+      }
+    }),
+    env,
+    ctx
+  );
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const res = await login("wrong-" + attempt);
+    assert.equal(res.status, 401, "failure " + attempt + " is 401 before the limit");
+  }
+  const limited = await login("wrong-again");
+  assert.equal(limited.status, 429, "11th failure is rate limited");
+  const blocked = await login("test-token");
+  assert.equal(blocked.status, 429, "even the correct token is blocked once limited");
+  assert.ok(kv.store.get("login_fail:" + encodeURIComponent("203.0.113.9")));
+
+  // A different IP is unaffected.
+  const other = await worker.default.fetch(
+    req("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "X-Admin-Token": "test-token",
+        "cf-connecting-ip": "198.51.100.7"
+      }
+    }),
+    env,
+    ctx
+  );
+  assert.equal(other.status, 200, "another IP can still log in");
+}
+ok("admin login rate limited per IP after repeated failures");
+
+// Correct token still logs in from an unthrottled IP and admin responses carry
+// the hardened headers.
+{
+  const res = await worker.default.fetch(
+    req("/api/admin/login", {
+      method: "POST",
+      headers: { "X-Admin-Token": "test-token", "cf-connecting-ip": "198.51.100.7" }
+    }),
+    env,
+    ctx
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["X-Frame-Options"], "DENY");
+  assert.equal(res.headers["Content-Security-Policy"], "frame-ancestors 'none'");
+  assert.equal(res.headers["X-Content-Type-Options"], "nosniff");
+}
+ok("admin login response carries hardened headers");
+
+// Malformed JSON body on admin routes: clean 400 instead of an exception 500.
+{
+  const session = (await (
+    await worker.default.fetch(
+      req("/api/admin/login", {
+        method: "POST",
+        headers: { "X-Admin-Token": "test-token", "cf-connecting-ip": "198.51.100.8" }
+      }),
+      env,
+      ctx
+    )
+  ).json()).session;
+
+  for (const [path, method] of [
+    ["/api/admin/matches", "POST"],
+    // PUT targets an existing match: resource-not-found (404) is checked before
+    // body parsing, so a real id is required to reach the malformed-body branch.
+    ["/api/admin/matches/" + encodeURIComponent(globalThis.manualMatchId), "PUT"],
+    ["/api/admin/site-content", "PUT"]
+  ]) {
+    const res = await worker.default.fetch(
+      req(path, {
+        method,
+        headers: {
+          "X-Admin-Session": session,
+          "Content-Type": "application/json",
+          "cf-connecting-ip": "198.51.100.8"
+        },
+        body: undefined
+      }),
+      env,
+      ctx
+    );
+    assert.equal(res.status, 400, path + " with a malformed body is a 400");
+    assert.equal((await res.json()).error, "Invalid JSON body");
+  }
+}
+ok("malformed JSON bodies on admin routes return a clean 400");
 
 console.log("\nAll " + passed + " assertions groups passed.");
