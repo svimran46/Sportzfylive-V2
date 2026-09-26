@@ -1,6 +1,10 @@
 node_modules/
 .wrangler/
 dist/
+
+# Cloudflare & environment secrets
+.dev.vars
+.dev.vars.*
 .env
 .env.local
-.env.*.local
+.env.*
