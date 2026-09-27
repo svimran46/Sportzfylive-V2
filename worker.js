@@ -11,7 +11,7 @@ const STREAMED_FRESH_TTL_MS = 45 * 60 * 1000;    // serve-from-cache window per 
 const STREAMED_STALE_TTL_SECONDS = 6 * 60 * 60;  // KV retention (stale ceiling) per source
 const STREAMED_EMPTY_TTL_SECONDS = 15 * 60;      // empty results re-check quickly (lineups appear near go-live)
 const STREAMED_SOURCE_TIMEOUT_MS = 8000;         // per-source fetch timeout
-const MAX_SYNC_RESOLVE_OPS = 40;                 // subrequest budget for source resolution per sync
+const MAX_SYNC_RESOLVE_OPS = 6;                  // subrequest budget for source resolution per sync (stays within 1k/day KV free quota)
 const SYNC_CURSOR_KEY = "sync:resolve-cursor";   // rotates which matches resolve first
 
 const jsonHeaders = {
@@ -110,15 +110,62 @@ async function migrateLegacyChannelSystem(env) {
   await env.SPORTZFY_DB.put(MIGRATION_KEY, new Date().toISOString());
 }
 
+async function generateHmacSession(expiresAt, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(String(secret).trim()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const data = enc.encode("admin_session:" + expiresAt);
+  const sig = await crypto.subtle.sign("HMAC", key, data);
+  const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return expiresAt + "." + sigHex;
+}
+
+async function verifyHmacSession(sessionStr, secret) {
+  if (!sessionStr || typeof sessionStr !== "string" || !secret) return false;
+  const dotIndex = sessionStr.indexOf(".");
+  if (dotIndex === -1) return false;
+  const expiresAtStr = sessionStr.slice(0, dotIndex);
+  const sigHex = sessionStr.slice(dotIndex + 1);
+  const expiresAt = Number(expiresAtStr);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return false;
+  if (!/^[0-9a-f]{64}$/i.test(sigHex)) return false;
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(String(secret).trim()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  const sigBytes = new Uint8Array(sigHex.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+  const data = enc.encode("admin_session:" + expiresAt);
+  return await crypto.subtle.verify("HMAC", key, sigBytes, data);
+}
+
 async function requireAdmin(request, env) {
   const session = request.headers.get("X-Admin-Session");
   if (!session) return false;
 
-  const record = await env.SPORTZFY_DB.get("admin_session:" + session, "json");
-  if (!record) return false;
-  if (record.expiresAt <= Date.now()) return false;
+  // 1. Stateless HMAC session verification (zero KV operations, immune to quota exhaustion)
+  try {
+    if (env.ADMIN_TOKEN && await verifyHmacSession(session, env.ADMIN_TOKEN)) {
+      return true;
+    }
+  } catch (_) {}
 
-  return true;
+  // 2. Fallback to KV session check for existing / legacy sessions
+  try {
+    const record = await env.SPORTZFY_DB.get("admin_session:" + session, "json");
+    if (record && record.expiresAt > Date.now()) return true;
+  } catch (_) {}
+
+  return false;
 }
 
 //
@@ -208,19 +255,24 @@ async function createAdminSession(request, env, ctx) {
     await countLoginFailure(env, request, ctx);
     return null;
   }
-  if (!await timingSafeEqualStr(supplied, env.ADMIN_TOKEN)) {
+  if (!await timingSafeEqualStr(supplied.trim(), String(env.ADMIN_TOKEN).trim())) {
     await countLoginFailure(env, request, ctx);
     return null;
   }
 
-  const session = crypto.randomUUID();
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  const session = await generateHmacSession(expiresAt, env.ADMIN_TOKEN);
 
-  await env.SPORTZFY_DB.put(
-    "admin_session:" + session,
-    JSON.stringify({ expiresAt }),
-    { expirationTtl: 24 * 60 * 60 }
-  );
+  // Best-effort KV write; if KV write quota is exceeded on free tier, session remains 100% valid via HMAC.
+  try {
+    await env.SPORTZFY_DB.put(
+      "admin_session:" + session,
+      JSON.stringify({ expiresAt }),
+      { expirationTtl: 24 * 60 * 60 }
+    );
+  } catch (err) {
+    console.warn("KV admin session write skipped (stateless HMAC active):", String(err?.message || err));
+  }
 
   return { session, expiresAt };
 }
@@ -690,8 +742,12 @@ async function syncStreamedMatches(env) {
   );
 
   const finalMatches = [...manual, ...fresh];
-  await env.SPORTZFY_DB.put("matches", JSON.stringify(finalMatches));
-  await rebuildSnapshots(env, finalMatches);
+  try {
+    await env.SPORTZFY_DB.put("matches", JSON.stringify(finalMatches));
+    await rebuildSnapshots(env, finalMatches);
+  } catch (err) {
+    console.warn("Matches sync KV write skipped (quota or transient error):", String(err?.message || err));
+  }
 
   return {
     success: true,
@@ -994,20 +1050,31 @@ async function apiHandler(request, env, ctx) {
 
 export default {
   async fetch(request, env, ctx) {
-    const response = await apiHandler(request, env, ctx);
+    try {
+      const response = await apiHandler(request, env, ctx);
 
-    if (
-      request.method !== "GET" &&
-      request.method !== "HEAD" &&
-      request.method !== "OPTIONS" &&
-      response.status < 300 &&
-      !new URL(request.url).pathname.startsWith("/api/admin/login") &&
-      !new URL(request.url).pathname.startsWith("/api/admin/logout")
-    ) {
-      ctx.waitUntil(rebuildSnapshots(env).catch(error => console.error("Snapshot refresh failed:", error)));
+      if (
+        response &&
+        request.method !== "GET" &&
+        request.method !== "HEAD" &&
+        request.method !== "OPTIONS" &&
+        response.status < 300 &&
+        !new URL(request.url).pathname.startsWith("/api/admin/login") &&
+        !new URL(request.url).pathname.startsWith("/api/admin/logout")
+      ) {
+        ctx.waitUntil(rebuildSnapshots(env).catch(error => console.error("Snapshot refresh failed:", error)));
+      }
+
+      return response;
+    } catch (err) {
+      console.error("Worker unhandled exception:", err?.stack || err?.message || err);
+      const isKvQuota = String(err?.message || "").includes("free usage limit") || String(err?.message || "").includes("10048");
+      return adminJson({
+        error: isKvQuota
+          ? "Cloudflare KV daily write limit reached (1,000 writes/day free tier). Resets at 00:00 UTC."
+          : (err?.message || "Internal server error")
+      }, isKvQuota ? 429 : 500);
     }
-
-    return response;
   },
 
   async scheduled(controller, env) {
