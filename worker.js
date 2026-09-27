@@ -25,13 +25,11 @@ function json(data, status = 200) {
   return Response.json(data, { status, headers: jsonHeaders });
 }
 
-// Admin responses are never consumed cross-origin: same-origin-only CORS and
-// anti-clickjacking framing protection. The admin SPA is served by this Worker,
-// so fetches from /admin carry no Origin at all; browsers only attach Origin to
-// cross-origin requests, so a cross-site page cannot read these responses.
+// Admin responses: anti-clickjacking framing protection and CORS.
+// Uses standard jsonHeaders CORS so modern browser fetch/Origin requests
+// are not blocked by null-origin / privacy shield restrictions.
 const adminJsonHeaders = {
   ...jsonHeaders,
-  "Access-Control-Allow-Origin": "null",
   "X-Frame-Options": "DENY",
   "Content-Security-Policy": "frame-ancestors 'none'"
 };
