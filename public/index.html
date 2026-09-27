@@ -75,8 +75,8 @@
       --raised:#12151D;
       --raised-hover:#1A1F2B;
       --ink:#F8FAFC;
-      --ink-muted:#94A3B8;
-      --ink-faint:#64748B;
+      --ink-muted:#A8B3CF;
+      --ink-faint:#8A99AD;
       --accent:#83FF00;
       --accent-dim:rgba(131,255,0,.15);
       --accent-pink:#D7FF44;
@@ -84,8 +84,8 @@
       --live:#FF2A3B;
       --live-dim:rgba(255,42,59,.16);
       --brand-ink:#08090C;
-      --border:rgba(255,255,255,.07);
-      --border-strong:rgba(255,255,255,.12);
+      --border:rgba(255,255,255,.09);
+      --border-strong:rgba(255,255,255,.14);
       --radius-pill:999px;
       --radius-card:16px;
       --shadow-card:0 18px 40px -18px rgba(0,0,0,.6);
@@ -189,7 +189,8 @@
       width:100%;height:36px;padding:0 14px 0 34px;
       background:var(--surface-2);border:1px solid var(--border-strong);
       border-radius:var(--radius-pill);color:var(--ink);
-      font-size:12px;font-family:inherit;outline:none;
+      font-size:13px;font-family:inherit;outline:none;
+      text-overflow:ellipsis;overflow:hidden;white-space:nowrap;
       transition:background .15s ease,border-color .15s ease;
     }
     @media(min-width:640px){.sfy-search input{height:40px;font-size:14px;padding-right:44px}}
@@ -214,17 +215,34 @@
     .sfy-nav a svg{width:16px;height:16px}
     .sfy-nav a:hover,.sfy-nav a.active{color:var(--accent);font-weight:700}
 
-    .sfy-header-actions{display:flex;align-items:center;gap:4px;margin-left:auto}
+    .sfy-header-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
     .sfy-icon-btn{
-      width:38px;height:38px;padding:0;display:grid;place-items:center;
+      width:44px;height:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;
       border-radius:1.1em;background:var(--raised);border:1px solid var(--border);color:var(--ink-muted);
       box-shadow:var(--btn-shadow-sm);
       transition:box-shadow ease-in-out .25s,color .15s ease,border-color .15s ease;
     }
     .sfy-icon-btn:hover{background:var(--raised-hover);border-color:rgba(255,255,255,.14);color:var(--ink);box-shadow:var(--hover-shadows)}
-    .sfy-icon-btn svg{width:17px;height:17px}
+    .sfy-icon-btn svg{width:18px;height:18px}
     .sfy-mobile-toggle{display:grid}
     @media(min-width:1024px){.sfy-mobile-toggle{display:none}}
+
+    .sfy-header-sports{
+      display:flex;align-items:center;gap:6px;
+      padding:2px 0 10px;overflow-x:auto;scrollbar-width:none;
+    }
+    .sfy-header-sports::-webkit-scrollbar{display:none}
+    @media(min-width:1024px){.sfy-header-sports{display:none}}
+    .sfy-header-sport-chip{
+      flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+      height:30px;padding:0 12px;border-radius:var(--radius-pill);
+      background:var(--raised);border:1px solid var(--border);color:var(--ink-muted);
+      font-size:11.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;cursor:pointer;
+      transition:all .15s ease;
+    }
+    .sfy-header-sport-chip:hover,.sfy-header-sport-chip.active{
+      background:var(--accent);color:var(--brand-ink);border-color:var(--accent);
+    }
 
     .sfy-mobile-nav{
       display:none;flex-direction:column;gap:2px;
@@ -705,15 +723,15 @@
     .sfy-fallback-vs{color:var(--ink-faint);font-size:12px;font-weight:800;letter-spacing:.6px}
     .sfy-event-badge,.sfy-event-live{
       position:absolute;z-index:3;top:10px;left:10px;
-      display:inline-flex;align-items:center;gap:5px;
-      padding:5px 10px;border-radius:var(--radius-pill);
-      font-size:11px;line-height:1;font-weight:700;
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 10px;border-radius:var(--radius-pill);
+      font-size:11px;line-height:1;font-weight:800;letter-spacing:.04em;
       backdrop-filter:blur(8px);
     }
     .sfy-event-badge{background:rgba(14,16,23,.88);border:1px solid var(--border);color:var(--ink)}
-    .sfy-event-live{background:var(--live);color:var(--ink);letter-spacing:.5px;box-shadow:0 0 10px var(--live-dim)}
-    .sfy-event-live::before{
-      content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);
+    .sfy-event-live{background:var(--live);color:var(--ink);box-shadow:0 0 12px var(--live-dim)}
+    .sfy-event-live .live-dot{
+      width:6px;height:6px;border-radius:50%;background:var(--ink);flex-shrink:0;
       box-shadow:0 0 6px var(--ink);
       animation:sfy-live-glow 2s ease-in-out infinite;
     }
@@ -737,7 +755,7 @@
       font-size:14px;font-weight:700;letter-spacing:-.2px;line-height:1.35;
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
-    .sfy-event-category{margin-top:3px;color:var(--ink-faint);font-size:12.5px;font-weight:500}
+    .sfy-event-category{margin-top:3px;color:var(--ink-muted);font-size:12.5px;font-weight:600}
     .sfy-event-category span{margin:0 4px;color:var(--ink-faint)}
     .sfy-match-item:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 
@@ -810,12 +828,12 @@
     .stream-eyebrow{display:none}
     .stream-status{
       margin:0 0 8px;display:inline-flex;align-items:center;justify-content:flex-start;gap:6px;
-      padding:3px 9px;border-radius:6px;
-      font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
-      background:var(--live);color:var(--ink);border:none;
+      padding:4px 10px;border-radius:var(--radius-pill);
+      font-size:11px;font-weight:800;letter-spacing:.04em;
+      background:var(--live);color:var(--ink);box-shadow:0 0 12px var(--live-dim);border:none;
     }
     .stream-status:not(:has(.live-dot)){
-      background:var(--surface);color:var(--ink-faint);border:1px solid var(--border);
+      background:var(--surface);color:var(--ink-muted);border:1px solid var(--border);box-shadow:none;
     }
     .stream-status .live-dot{
       width:6px;height:6px;border-radius:50%;background:var(--ink);flex-shrink:0;
@@ -993,7 +1011,7 @@
       position:relative;width:100%;max-width:100%;aspect-ratio:16/9;
       background:#08090D;overflow:hidden;display:block;
     }
-    .player-container iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+    .player-container iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;z-index:1}
     .player-empty{
       position:absolute;inset:0;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
@@ -1007,6 +1025,46 @@
       cursor:pointer;transition:transform .18s ease;
     }
     .player-empty:hover svg{transform:scale(1.08)}
+    .player-loader{
+      position:absolute;top:0;left:0;right:0;bottom:42px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+      background:rgba(8,9,13,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      z-index:10;pointer-events:none;transition:opacity 0.25s ease;
+    }
+    .player-loader[hidden]{display:none!important}
+    .player-loader-spinner{
+      width:38px;height:38px;border-radius:50%;
+      border:3px solid rgba(255,255,255,0.12);
+      border-top-color:var(--accent);
+      animation:sfy-spin 0.8s linear infinite;
+    }
+    @keyframes sfy-spin{to{transform:rotate(360deg)}}
+    .player-loader-text{
+      font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:0.02em;
+    }
+    .player-idle{
+      position:absolute;top:0;left:0;right:0;bottom:42px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:radial-gradient(circle at center,#161a25 0%,#08090D 80%);
+      z-index:5;transition:opacity 0.25s ease;
+    }
+    .player-idle[hidden]{display:none!important}
+    .player-idle-content{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+      text-align:center;padding:24px;z-index:2;
+    }
+    .player-idle-play{
+      width:60px;height:60px;border-radius:50%;
+      background:var(--accent);color:var(--brand-ink);border:none;
+      display:grid;place-items:center;cursor:pointer;
+      box-shadow:0 0 24px var(--accent-dim),var(--btn-shadow);
+      transition:transform 0.18s ease,box-shadow 0.18s ease;
+    }
+    .player-idle-play:hover{transform:scale(1.08);box-shadow:0 0 32px var(--accent-dim)}
+    .player-idle-play svg{width:24px;height:24px;margin-left:3px}
+    .player-idle-prompt{
+      margin:0;font-size:14px;font-weight:700;color:var(--ink);letter-spacing:0.01em;
+    }
     .player-bar{
       display:flex;align-items:center;justify-content:flex-start;
       padding:11px 18px;min-height:42px;
@@ -1053,14 +1111,19 @@
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     }
     .stream-toggle-label b{font-size:11.5px;font-weight:700;color:var(--ink)}
-    .stream-toggle-label span{font-size:11px;font-weight:500;color:var(--ink-faint)}
+    .stream-toggle-label span{font-size:11px;font-weight:500;color:var(--ink-muted)}
     .stream-toggle-tags{display:inline-flex;align-items:center;gap:4px}
     .stream-toggle-tag{
-      padding:2px 6px;border-radius:4px;font-style:normal;
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:2px 7px;border-radius:6px;font-style:normal;
       font-size:9.5px;font-weight:800;letter-spacing:.05em;
-      background:rgba(234,179,8,0.15);color:#facc15;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06);color:var(--ink-muted);
     }
-    .stream-toggle-tag.hd{background:var(--accent-dim);color:var(--accent)}
+    .stream-toggle-tag.hd{
+      background:rgba(131,255,0,0.12);color:var(--accent);
+      border:1px solid rgba(131,255,0,0.28);
+    }
     .stream-toggle-tip{display:none}
 
     /* ACTIVE STREAM CHIP - ELECTRIC VOLT WITH HIGH CONTRAST */
@@ -1071,7 +1134,14 @@
     .stream-toggle.selected .stream-toggle-num,
     .stream-toggle.selected b,
     .stream-toggle.selected span{color:var(--brand-ink)!important}
-    .stream-toggle.selected .stream-toggle-tag{background:rgba(0,0,0,0.18)!important;color:var(--brand-ink)!important}
+    .stream-toggle.selected .stream-toggle-tag{
+      background:rgba(0,0,0,0.22)!important;color:var(--brand-ink)!important;
+      border:1px solid rgba(0,0,0,0.35)!important;
+    }
+    .stream-toggle.selected .stream-toggle-tag.hd{
+      background:rgba(0,0,0,0.28)!important;color:var(--brand-ink)!important;
+      border:1px solid rgba(0,0,0,0.45)!important;
+    }
 
     /* SINGLE CHANNEL: No animation, no color change */
     .stream-toggle:not([data-multi-feed="true"]):not(.selected):hover{
@@ -1201,7 +1271,7 @@
 
       <div class="sfy-search" role="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="sfy-search-input" type="search" autocomplete="off" placeholder="Search matches, teams, leagues..." aria-label="Search matches, teams, leagues">
+        <input id="sfy-search-input" type="search" autocomplete="off" placeholder="Search" aria-label="Search matches, teams, leagues">
         <span class="sfy-shortcut" aria-hidden="true">⌘K</span>
       </div>
 
@@ -1214,13 +1284,22 @@
       </nav>
 
       <div class="sfy-header-actions">
-        <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh matches">
+        <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh matches" title="Refresh matches">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         </button>
-        <button class="sfy-icon-btn" type="button" id="sfy-sidebar-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="sfy-sidebar">
+        <button class="sfy-icon-btn" type="button" id="sfy-sidebar-toggle" aria-label="Menu" title="Menu" aria-expanded="false" aria-controls="sfy-sidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
       </div>
+    </div>
+    <div class="sfy-header-sports scrollbar-hide" aria-label="Quick sports">
+      <button class="sfy-header-sport-chip active" type="button" data-nav="ALL">All</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="LIVE">Live</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="FOOTBALL">Football</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="CRICKET">Cricket</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="BASKETBALL">Basketball</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="BASEBALL">Baseball</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="TENNIS">Tennis</button>
     </div>
   </div>
 
@@ -1422,6 +1501,18 @@
       <div class="stream-main-col">
         <div class="player-unit">
           <div id="player-container" class="player-container" hidden></div>
+          <div id="player-idle" class="player-idle" hidden>
+            <div class="player-idle-content">
+              <button type="button" class="player-idle-play" id="player-idle-play-btn" aria-label="Start stream">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="8 5 19 12 8 19"/></svg>
+              </button>
+              <p class="player-idle-prompt">Tap a stream below to start watching</p>
+            </div>
+          </div>
+          <div id="player-loader" class="player-loader" hidden aria-live="polite">
+            <div class="player-loader-spinner" aria-hidden="true"></div>
+            <span class="player-loader-text" id="player-loader-text">Loading stream...</span>
+          </div>
           <div class="player-bar">
             <span class="player-bar-source" id="player-bar-source"></span>
           </div>
@@ -1943,7 +2034,7 @@
             <article class="match-card sfy-match-item" data-match-id="${esc(id)}" tabindex="0" role="button" aria-label="Open ${esc(match.title || "Match")}">
                 <div class="sfy-event-visual ${poster ? "has-poster sfy-skeleton" : ""}">
                     ${live
-                        ? '<span class="sfy-event-live">LIVE</span>'
+                        ? '<span class="sfy-event-live"><span class="live-dot" aria-hidden="true"></span>Live now</span>'
                         : `<span class="sfy-event-badge">${esc(dateText)}</span>`}
                     ${streamChip}
                     ${match.popular ? '<span class="sfy-event-favorite" aria-hidden="true">★</span>' : ""}
@@ -2027,21 +2118,28 @@
         return playable.map(function (item) {
             flatIndex += 1;
             const url = streamEmbedUrl(item.group, item.stream.streamNo);
-            const label = "Stream " + flatIndex + " • " +
-                (item.stream.language || "Default");
+            const language = String(item.stream.language || "Default");
+            const rawProvider = String(item.group.source || "Streamed");
+            const networkClean = (function() {
+                const p = rawProvider.trim().toLowerCase();
+                if (p === "admin") return "Feed " + (item.stream.streamNo || flatIndex);
+                if (p === "streamed") return "Official";
+                if (p === "yes") return "YES Network";
+                if (p === "masn") return "MASN";
+                return rawProvider;
+            })();
+            const label = "Stream " + flatIndex + " (" + language + (networkClean ? " – " + networkClean : "") + ")";
             const tip = "Stream " + flatIndex +
                 (item.stream.hd ? " · HD" : "") +
-                " · " + (item.stream.language || "Default") +
-                " · " + item.group.source;
-            const language = String(item.stream.language || "Default");
-            const provider = String(item.group.source || "Streamed");
+                " · " + language +
+                (networkClean ? " · " + networkClean : "");
             const chKey = String(item.stream.source || item.group.source || "Streamed").trim().toLowerCase();
             const isMulti = channelCounts[chKey] > 1;
 
             const multiAttr = isMulti ? ' data-multi-feed="true"' : '';
             const multiTooltip = isMulti
                 ? '<div class="tooltip-content" aria-hidden="true">' +
-                    '<span class="tooltip-feed-title">' + esc(provider) + '</span>' +
+                    '<span class="tooltip-feed-title">' + esc(networkClean) + '</span>' +
                     '<span class="tooltip-feed-sub">Feed ' + esc(String(item.stream.streamNo || flatIndex)) + ' · ' + esc(language) + (item.stream.hd ? ' · HD' : '') + '</span>' +
                   '</div>'
                 : '';
@@ -2059,7 +2157,7 @@
                 '</div>' +
                 '<span class="stream-toggle-label" aria-hidden="true">' +
                     '<b>' + esc(language) + '</b>' +
-                    '<span> • ' + esc(provider) + '</span>' +
+                    (networkClean ? '<span> • ' + esc(networkClean) + '</span>' : '') +
                 '</span>' +
                 '<span class="stream-toggle-tip" aria-hidden="true">' + esc(tip) + '</span>' +
                 multiTooltip +
@@ -2082,6 +2180,19 @@
                 });
                 chip.classList.add("selected");
                 chip.setAttribute("aria-checked", "true");
+
+                const playerIdle = document.getElementById("player-idle");
+                if (playerIdle) playerIdle.hidden = true;
+
+                const streamLabel = chip.dataset.streamLabel || "Stream";
+                const playerLoader = document.getElementById("player-loader");
+                const loaderText = document.getElementById("player-loader-text");
+                if (playerLoader) {
+                    if (loaderText) loaderText.textContent = "Loading " + streamLabel + "...";
+                    playerLoader.hidden = false;
+                    playerLoader.style.opacity = "1";
+                }
+
                 player.hidden = false;
                 player.replaceChildren();
                 const frame = document.createElement("iframe");
@@ -2090,6 +2201,20 @@
                 frame.allowFullscreen = true;
                 frame.referrerPolicy = "no-referrer";
                 frame.title = chip.dataset.streamLabel || "Match stream";
+
+                frame.onload = function() {
+                    if (playerLoader) {
+                        playerLoader.style.opacity = "0";
+                        setTimeout(function() { playerLoader.hidden = true; }, 300);
+                    }
+                };
+                setTimeout(function() {
+                    if (playerLoader && !playerLoader.hidden) {
+                        playerLoader.style.opacity = "0";
+                        setTimeout(function() { playerLoader.hidden = true; }, 300);
+                    }
+                }, 4000);
+
                 player.appendChild(frame);
                 const barSource = document.getElementById("player-bar-source");
                 if (barSource) {
@@ -2298,10 +2423,27 @@
         const shareNote = document.getElementById("watch-share-note");
         if (shareNote) shareNote.textContent = "";
 
+        const playerIdle = document.getElementById("player-idle");
+        const playerLoader = document.getElementById("player-loader");
+        if (playerLoader) playerLoader.hidden = true;
+
         if (playable.length > 0) {
             player.hidden = false;
             player.replaceChildren();
+            if (playerIdle) {
+                playerIdle.hidden = false;
+                const idleBtn = document.getElementById("player-idle-play-btn");
+                if (idleBtn) {
+                    idleBtn.onclick = function() {
+                        const firstToggle = (picker.querySelectorAll ? picker.querySelectorAll(".stream-toggle")[0] : null) || picker.querySelector?.(".stream-toggle");
+                        if (firstToggle && typeof firstToggle.click === "function") {
+                            firstToggle.click();
+                        }
+                    };
+                }
+            }
         } else {
+            if (playerIdle) playerIdle.hidden = true;
             player.hidden = false;
             player.replaceChildren();
             const standby = document.createElement("div");
@@ -2322,7 +2464,7 @@
                   '</div>';
 
         picker.innerHTML =
-            '<p class="stream-sources-label">Available streams <em>· pick one to load it above</em></p>' +
+            '<p class="stream-sources-label">Available streams</p>' +
             '<div class="stream-toggle-strip" role="radiogroup" aria-label="Stream sources">' + streamRows + '</div>';
 
         attachStreamPicker();
