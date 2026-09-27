@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0A0B10">
+  <meta name="theme-color" content="#08090C">
   <title>Sportzfylive - Live Sports</title>
   <meta name="description" content="Watch live sports from around the world. Football, basketball, cricket, tennis and more — live and upcoming matches, all in one place.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23D93698'/%3E%3Cpath d='M12 5.25 14.35 8.1l.65 3.65-3 1.75-3-1.75.65-3.65L12 5.25Z' fill='%230A0B10'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%2383FF00'/%3E%3Cpath d='M12 5.25 14.35 8.1l.65 3.65-3 1.75-3-1.75.65-3.65L12 5.25Z' fill='%2308090C'/%3E%3C/svg%3E">
 
   <!-- Social share cards (image generated in the site's own design language) -->
   <meta property="og:type" content="website">
@@ -65,27 +65,27 @@
     }
 
     :root{
-      /* Low-glare dark theme tokens */
-      --canvas:#0A0B10;
-      --header-bg:rgba(10,11,16,.88);
-      --surface:#14161F;
-      --surface-2:#14161F;
-      --surface-hover:#1C1E2A;
-      --surface-focus:#232736;
-      --raised:#14161F;
-      --raised-hover:#1C1E2A;
-      --ink:#f5f5f5;
-      --ink-muted:#9c9c9c;
-      --ink-faint:#6b6b6b;
-      --accent:#2C3EE8;
-      --accent-dim:rgba(44,62,232,.18);
-      --accent-pink:#D93698;
-      --accent-pink-dim:rgba(217,54,152,.18);
-      --live:#E02938;
-      --live-dim:rgba(224,41,56,.18);
-      --brand-ink:#0A0B10;
-      --border:rgba(255,255,255,.06);
-      --border-strong:rgba(255,255,255,.1);
+      /* Electric Volt & Carbon Black design tokens */
+      --canvas:#08090C;
+      --header-bg:rgba(8,9,12,.88);
+      --surface:#12151D;
+      --surface-2:#12151D;
+      --surface-hover:#1A1F2B;
+      --surface-focus:#222938;
+      --raised:#12151D;
+      --raised-hover:#1A1F2B;
+      --ink:#F8FAFC;
+      --ink-muted:#94A3B8;
+      --ink-faint:#64748B;
+      --accent:#83FF00;
+      --accent-dim:rgba(131,255,0,.15);
+      --accent-pink:#D7FF44;
+      --accent-pink-dim:rgba(215,255,68,.15);
+      --live:#FF2A3B;
+      --live-dim:rgba(255,42,59,.16);
+      --brand-ink:#08090C;
+      --border:rgba(255,255,255,.07);
+      --border-strong:rgba(255,255,255,.12);
       --radius-pill:999px;
       --radius-card:16px;
       --shadow-card:0 18px 40px -18px rgba(0,0,0,.6);
@@ -141,6 +141,7 @@
     button:active{
       box-shadow:var(--hover-shadows),var(--accent-dim) 0 0 24px 4px;
       background-color:var(--accent);
+      color:var(--brand-ink);
       transform:scale(.97);
     }
     button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
@@ -228,7 +229,7 @@
     .sfy-mobile-nav{
       display:none;flex-direction:column;gap:2px;
       padding:10px 16px 14px;border-top:1px solid var(--border);
-      background:#0A0B10;
+      background:var(--canvas);
     }
     .sfy-mobile-nav.open{display:flex}
     .sfy-mobile-nav a{
@@ -301,9 +302,9 @@
       margin:12px 0 18px;
       border-radius:20px;
       background:
-        radial-gradient(900px 340px at 85% -10%,rgba(44,62,232,.15),transparent 62%),
-        radial-gradient(520px 260px at -8% 110%,rgba(217,54,152,.12),transparent 60%),
-        linear-gradient(160deg,#14161F 0%,#0E1017 60%,#0A0B10 100%);
+        radial-gradient(900px 340px at 85% -10%,rgba(131,255,0,.14),transparent 62%),
+        radial-gradient(520px 260px at -8% 110%,rgba(215,255,68,.10),transparent 60%),
+        linear-gradient(160deg,#12151D 0%,#0C0E14 60%,#08090C 100%);
       border:1px solid var(--border);
       box-shadow:0 20px 48px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.04);
       min-height:220px;
@@ -313,16 +314,16 @@
     .sfy-hero::before{
       content:"";position:absolute;inset:0;
       background:
-        radial-gradient(ellipse 65% 55% at 75% 45%,rgba(44,62,232,.16),transparent 70%),
-        radial-gradient(ellipse 50% 50% at 90% 70%,rgba(217,54,152,.14),transparent 60%);
+        radial-gradient(ellipse 65% 55% at 75% 45%,rgba(131,255,0,.15),transparent 70%),
+        radial-gradient(ellipse 50% 50% at 90% 70%,rgba(215,255,68,.12),transparent 60%);
       pointer-events:none;z-index:0;
     }
-    /* Blue->pink wireframe diamond radar graphic */
+    /* Volt cyber wireframe diamond radar graphic */
     .sfy-hero::after{
       content:"";position:absolute;
       top:50%;right:min(4vw,40px);transform:translateY(-50%);
       width:min(36vw,260px);height:min(36vw,260px);
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232C3EE8' stop-opacity='0.8'/%3E%3Cstop offset='100%25' stop-color='%23D93698' stop-opacity='0.8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='100%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D93698' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%232C3EE8' stop-opacity='0.6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='none' stroke-width='1.2'%3E%3Cpolygon points='100,15 185,100 100,185 15,100' stroke='url(%23g1)'/%3E%3Cpolygon points='100,38 162,100 100,162 38,100' stroke='url(%23g2)' stroke-dasharray='4,3'/%3E%3Cpolygon points='100,60 140,100 100,140 60,100' stroke='url(%23g1)'/%3E%3Cline x1='100' y1='15' x2='100' y2='185' stroke='url(%23g1)' stroke-dasharray='3,3'/%3E%3Cline x1='15' y1='100' x2='185' y2='100' stroke='url(%23g2)' stroke-dasharray='3,3'/%3E%3Cline x1='100' y1='15' x2='100' y2='60' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='15' y1='100' x2='60' y2='100' stroke='url(%23g1)' stroke-width='2'/%3E%3Cline x1='185' y1='100' x2='140' y2='100' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='100' y1='185' x2='100' y2='140' stroke='url(%23g1)' stroke-width='2'/%3E%3Ccircle cx='100' cy='100' r='5' fill='%232C3EE8'/%3E%3Ccircle cx='100' cy='15' r='3' fill='%23D93698'/%3E%3Ccircle cx='185' cy='100' r='3' fill='%232C3EE8'/%3E%3Ccircle cx='100' cy='185' r='3' fill='%23D93698'/%3E%3Ccircle cx='15' cy='100' r='3' fill='%232C3EE8'/%3E%3C/g%3E%3C/svg%3E");
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2383FF00' stop-opacity='0.8'/%3E%3Cstop offset='100%25' stop-color='%23D7FF44' stop-opacity='0.8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='100%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D7FF44' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%2383FF00' stop-opacity='0.6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='none' stroke-width='1.2'%3E%3Cpolygon points='100,15 185,100 100,185 15,100' stroke='url(%23g1)'/%3E%3Cpolygon points='100,38 162,100 100,162 38,100' stroke='url(%23g2)' stroke-dasharray='4,3'/%3E%3Cpolygon points='100,60 140,100 100,140 60,100' stroke='url(%23g1)'/%3E%3Cline x1='100' y1='15' x2='100' y2='185' stroke='url(%23g1)' stroke-dasharray='3,3'/%3E%3Cline x1='15' y1='100' x2='185' y2='100' stroke='url(%23g2)' stroke-dasharray='3,3'/%3E%3Cline x1='100' y1='15' x2='100' y2='60' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='15' y1='100' x2='60' y2='100' stroke='url(%23g1)' stroke-width='2'/%3E%3Cline x1='185' y1='100' x2='140' y2='100' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='100' y1='185' x2='100' y2='140' stroke='url(%23g1)' stroke-width='2'/%3E%3Ccircle cx='100' cy='100' r='5' fill='%2383FF00'/%3E%3Ccircle cx='100' cy='15' r='3' fill='%23D7FF44'/%3E%3Ccircle cx='185' cy='100' r='3' fill='%2383FF00'/%3E%3Ccircle cx='100' cy='185' r='3' fill='%23D7FF44'/%3E%3Ccircle cx='15' cy='100' r='3' fill='%2383FF00'/%3E%3C/g%3E%3C/svg%3E");
       background-size:contain;background-repeat:no-repeat;background-position:center;
       opacity:.22;filter:blur(0.5px);
       pointer-events:none;z-index:1;
@@ -407,18 +408,19 @@
     .sfy-hero-btn{
       display:inline-flex;align-items:center;gap:8px;
       min-height:46px;padding:0.9em 2em;
-      color:var(--ink);
-      background:linear-gradient(135deg,#2334D0 0%,#2C3EE8 50%,#3648EE 100%);
-      border:1px solid rgba(255,255,255,0.12);
-      box-shadow:var(--btn-shadow),0 0 20px rgba(44,62,232,0.3);
+      color:var(--brand-ink);
+      font-weight:700;
+      background:linear-gradient(135deg,#73E600 0%,#83FF00 50%,#94FF1A 100%);
+      border:1px solid rgba(131,255,0,0.4);
+      box-shadow:var(--btn-shadow),0 0 20px rgba(131,255,0,0.3);
     }
     .sfy-hero-btn:hover{
-      color:var(--ink);
-      background:linear-gradient(135deg,#283AE0 0%,#3648EE 50%,#4355F5 100%);
-      box-shadow:var(--hover-shadows),0 0 28px rgba(44,62,232,0.45);
-      border-color:rgba(255,255,255,0.2);
+      color:var(--brand-ink);
+      background:linear-gradient(135deg,#83FF00 0%,#94FF1A 50%,#A5FF33 100%);
+      box-shadow:var(--hover-shadows),0 0 28px rgba(131,255,0,0.45);
+      border-color:rgba(255,255,255,0.3);
     }
-    .sfy-hero-btn:active{transform:scale(.96);color:var(--ink)}
+    .sfy-hero-btn:active{transform:scale(.96);color:var(--brand-ink)}
     .sfy-hero-btn svg{width:14px;height:14px;fill:currentColor}
 
     .sfy-sheen{position:relative;overflow:hidden}
@@ -447,7 +449,7 @@
     .sfy-featured .sfy-hero-inner{align-items:flex-start;text-align:left}
     .sfy-featured .sfy-hero-gradient{
       content:"";position:absolute;inset:0;z-index:1;
-      background:linear-gradient(90deg,rgba(10,11,16,.92),rgba(14,16,23,.6) 55%,rgba(10,11,16,.95));
+      background:linear-gradient(90deg,rgba(8,9,12,.92),rgba(14,17,23,.6) 55%,rgba(8,9,12,.95));
     }
 
     .sfy-site-notice{
@@ -470,7 +472,7 @@
       100%{background-position:200% 0}
     }
     .sfy-skeleton{
-      background:linear-gradient(90deg,#14161F 25%,#1E2230 50%,#14161F 75%)!important;
+      background:linear-gradient(90deg,#12151D 25%,#1A1F2B 50%,#12151D 75%)!important;
       background-size:200% 100%!important;
       animation:sfy-shimmer 1.8s infinite ease-in-out!important;
     }
@@ -612,7 +614,7 @@
       box-shadow:var(--btn-shadow-sm);
     }
     .sfy-chip:hover{color:var(--ink);border-color:rgba(255,255,255,.14);box-shadow:var(--hover-shadows)}
-    .sfy-chip.active{background:var(--accent);color:var(--ink);border-color:rgba(255,255,255,.2);box-shadow:0 0 20px var(--accent-dim)}
+    .sfy-chip.active{background:var(--accent);color:var(--brand-ink);font-weight:700;border-color:var(--accent);box-shadow:0 0 20px var(--accent-dim)}
 
     /* ======================= MATCH CAROUSELS ======================= */
     .category-section{position:relative;margin-bottom:30px}
@@ -750,8 +752,8 @@
     .loading-state p{margin:10px 0 0;font-size:14px}
     .sfy-skeletons{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin:24px 0}
     .sfy-skeleton{border-radius:14px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--btn-shadow-sm);overflow:hidden}
-    .sfy-skeleton::before{content:"";display:block;aspect-ratio:16/9;background:linear-gradient(100deg,#14161F 40%,#1E2230 50%,#14161F 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
-    .sfy-skeleton::after{content:"";display:block;height:11px;width:72%;margin:14px 12px 0;border-radius:6px;background:linear-gradient(100deg,#14161F 40%,#1E2230 50%,#14161F 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
+    .sfy-skeleton::before{content:"";display:block;aspect-ratio:16/9;background:linear-gradient(100deg,#12151D 40%,#1A1F2B 50%,#12151D 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
+    .sfy-skeleton::after{content:"";display:block;height:11px;width:72%;margin:14px 12px 0;border-radius:6px;background:linear-gradient(100deg,#12151D 40%,#1A1F2B 50%,#12151D 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
     @keyframes sfy-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     .error-state h3{margin:0 0 6px;color:var(--ink);font-size:18px}
     .error-state p{margin:0;font-size:14px}
@@ -914,19 +916,19 @@
     .watch-share-btn.sfy-social-item.copy:hover,
     .watch-share-btn.sfy-social-item.copy:hover .sfy-social-tooltip,
     .watch-share-btn.sfy-social-item.copy:hover .sfy-social-tooltip::before{
-      background:var(--accent);color:var(--ink);border-color:var(--accent);
+      background:var(--accent);color:var(--brand-ink);border-color:var(--accent);
     }
     .watch-share-btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
     .watch-related{
       margin-top:0;padding:16px;
-      background:#0E1017;border:1px solid var(--border);border-radius:16px;
+      background:#0C0E14;border:1px solid var(--border);border-radius:16px;
       content-visibility:auto;contain-intrinsic-size:auto 460px;
     }
     .watch-related-title{margin:0 0 12px;font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--ink-muted);text-transform:uppercase}
     .watch-related-grid{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow-y:auto;scrollbar-width:thin}
     .watch-related-grid::-webkit-scrollbar{width:4px}
-    .watch-related-grid::-webkit-scrollbar-thumb{background:#232736;border-radius:999px}
+    .watch-related-grid::-webkit-scrollbar-thumb{background:#1A1F2B;border-radius:999px}
     .watch-related-grid .sfy-card{
       display:flex;flex-direction:row;align-items:center;gap:12px;
       padding:10px;border-radius:12px;
@@ -935,12 +937,12 @@
       width:100%;text-align:left;box-shadow:none;
     }
     .watch-related-grid .sfy-card:hover{
-      background:var(--surface-hover);border-color:rgba(44,62,232,0.4);
+      background:var(--surface-hover);border-color:rgba(131,255,0,0.35);
       transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,0.5);
     }
     .watch-related-grid .sfy-card-poster{
       width:80px;height:50px;flex-shrink:0;border-radius:8px;overflow:hidden;
-      position:relative;background:#0A0B10;
+      position:relative;background:var(--canvas);
     }
     .watch-related-grid .sfy-card-poster .sfy-event-banner{width:100%;height:100%}
     .watch-related-grid .sfy-card-poster .sfy-event-logo{width:22px;height:22px}
@@ -1061,26 +1063,26 @@
     .stream-toggle-tag.hd{background:var(--accent-dim);color:var(--accent)}
     .stream-toggle-tip{display:none}
 
-    /* ACTIVE STREAM CHIP - DEEP ACCENT BLUE WITH SOFT GLOW */
+    /* ACTIVE STREAM CHIP - ELECTRIC VOLT WITH HIGH CONTRAST */
     .stream-toggle.selected{
       background:var(--accent)!important;border-color:var(--accent)!important;
-      color:var(--ink)!important;box-shadow:0 0 20px var(--accent-dim)!important;
+      color:var(--brand-ink)!important;box-shadow:0 0 20px var(--accent-dim)!important;
     }
     .stream-toggle.selected .stream-toggle-num,
     .stream-toggle.selected b,
-    .stream-toggle.selected span{color:var(--ink)!important}
-    .stream-toggle.selected .stream-toggle-tag{background:rgba(255,255,255,0.18)!important;color:var(--ink)!important}
+    .stream-toggle.selected span{color:var(--brand-ink)!important}
+    .stream-toggle.selected .stream-toggle-tag{background:rgba(0,0,0,0.18)!important;color:var(--brand-ink)!important}
 
     /* SINGLE CHANNEL: No animation, no color change */
     .stream-toggle:not([data-multi-feed="true"]):not(.selected):hover{
-      transform:none;color:var(--ink);border-color:rgba(44,62,232,0.3);background:var(--surface-hover);
+      transform:none;color:var(--ink);border-color:rgba(131,255,0,0.3);background:var(--surface-hover);
       box-shadow:var(--btn-shadow-sm);
     }
 
     /* MINIMALIST STREAM TOOLTIP & MULTI-FEED */
     .stream-toggle[data-multi-feed="true"]{overflow:visible}
     .stream-toggle[data-multi-feed="true"]:not(.selected):hover{
-      border-color:rgba(44,62,232,0.5);color:var(--ink);
+      border-color:rgba(131,255,0,0.5);color:var(--ink);
       box-shadow:0 4px 14px rgba(0,0,0,0.5),0 0 12px var(--accent-dim);
       transform:translateY(-1px);
     }
