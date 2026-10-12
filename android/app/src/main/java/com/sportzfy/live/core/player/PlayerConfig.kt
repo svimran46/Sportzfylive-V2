@@ -13,8 +13,8 @@ data class PlayerConfig(
      * channel's own host, so direct mode can open that channel's page.
      */
     val trustedHosts: Set<String> = emptySet(),
-    /** See [PlayerUrlPolicy]'s allowAnyTopLevel: on for Live TV channels only. */
-    val allowAnyTopLevel: Boolean = false,
+    /** Browser-like navigation (see [PlayerUrlPolicy] openWeb): on for every stream. */
+    val openWeb: Boolean = true,
     /** Referer sent when the page is loaded directly; null sends none. */
     val referer: String? = StreamedEndpoints.REFERER,
 ) {

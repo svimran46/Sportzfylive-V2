@@ -11,8 +11,11 @@ data class AppConfig(
     val featuredMatchId: String? = null,
     /** Sports removed from the catalog entirely. */
     val hiddenCategories: Set<SportCategory> = emptySet(),
-    /** Built-in ad-network blocking in the player. */
-    val adBlocking: Boolean = true,
+    /**
+     * Built-in ad-network blocking in the player. Off by default: the stream
+     * sites are paid for by their ads and won't play while they're blocked.
+     */
+    val adBlocking: Boolean = false,
     /** Extra hosts the player refuses, on top of (or instead of) the built-in list. */
     val extraBlockedHosts: Set<String> = emptySet(),
     val playerMode: PlayerMode = PlayerMode.IFRAME,

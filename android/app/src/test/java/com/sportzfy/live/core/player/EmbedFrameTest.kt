@@ -27,10 +27,12 @@ class EmbedFrameTest {
 
     @Test
     fun `player config follows the remote config`() {
-        assertEquals(PlayerConfig(PlayerMode.IFRAME, AdHosts.DEFAULT), PlayerConfig.from(AppConfig.Default))
+        // Ads play by default: the stream sites need them to serve the stream.
+        assertEquals(PlayerConfig(PlayerMode.IFRAME, emptySet()), PlayerConfig.from(AppConfig.Default))
+        assertTrue(PlayerConfig.from(AppConfig(adBlocking = true)).blockedHosts.containsAll(AdHosts.DEFAULT))
         val noAds = PlayerConfig.from(AppConfig(adBlocking = false, extraBlockedHosts = setOf("bad.com"), playerMode = PlayerMode.DIRECT))
         assertEquals(PlayerMode.DIRECT, noAds.mode)
         assertEquals(setOf("bad.com"), noAds.blockedHosts)
-        assertTrue(PlayerConfig.from(AppConfig(extraBlockedHosts = setOf("bad.com"))).blockedHosts.containsAll(AdHosts.DEFAULT + "bad.com"))
+        assertTrue(PlayerConfig.from(AppConfig(adBlocking = true, extraBlockedHosts = setOf("bad.com"))).blockedHosts.containsAll(AdHosts.DEFAULT + "bad.com"))
     }
 }

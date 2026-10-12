@@ -5,7 +5,7 @@
   },
   "featuredMatchId": "",
   "hiddenCategories": [],
-  "adBlocking": true,
+  "adBlocking": false,
   "extraBlockedHosts": [],
   "playerMode": "iframe",
   "minVersionCode": 0,

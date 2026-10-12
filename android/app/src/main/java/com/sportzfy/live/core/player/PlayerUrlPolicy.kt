@@ -20,25 +20,39 @@ class PlayerUrlPolicy(
     private val trustedHosts: Set<String> = setOf(EmbedUrl.HOST),
     private val blockedHosts: Set<String> = AdHosts.DEFAULT,
     /**
-     * Lets the page itself move to any https host that isn't blocked. Live TV
-     * channel pages hand off to their real player on another site, so they
-     * need this; pop-up windows stay blocked either way.
+     * Browser-like mode, used by the app: stream sites are paid for by ads
+     * and only play once the viewer has been sent to them. The page may go
+     * anywhere on the web (http or https, except [blockedHosts]); links for
+     * other apps (`intent:`, `market:` and the like) are handed to Android.
      */
-    private val allowAnyTopLevel: Boolean = false,
+    private val openWeb: Boolean = false,
 ) {
 
-    enum class Decision { ALLOW, BLOCK }
+    /** [EXTERNAL]: open with another app (browser, Play Store) instead of the player. */
+    enum class Decision { ALLOW, BLOCK, EXTERNAL }
 
     fun navigation(url: String, isMainFrame: Boolean, isRedirect: Boolean = false): Decision {
         val parsed = parse(url) ?: return Decision.BLOCK
         if (parsed.scheme == "about") {
             return if (parsed.rest == "blank" || parsed.rest == "srcdoc") Decision.ALLOW else Decision.BLOCK
         }
+        if (openWeb) return openNavigation(parsed, isMainFrame)
         val host = parsed.host
         if (parsed.scheme != "https" || host == null) return Decision.BLOCK
         if (host.matchesAny(blockedHosts)) return Decision.BLOCK
-        if (!isMainFrame || isRedirect || allowAnyTopLevel) return Decision.ALLOW
+        if (!isMainFrame || isRedirect) return Decision.ALLOW
         return if (host.matchesAny(trustedHosts)) Decision.ALLOW else Decision.BLOCK
+    }
+
+    private fun openNavigation(parsed: ParsedUrl, isMainFrame: Boolean): Decision = when (parsed.scheme) {
+        "http", "https" -> {
+            val host = parsed.host
+            if (host == null || host.matchesAny(blockedHosts)) Decision.BLOCK else Decision.ALLOW
+        }
+        "data", "blob" -> if (isMainFrame) Decision.BLOCK else Decision.ALLOW
+        // Files and app-internal schemes never enter the player.
+        "file", "content", "javascript" -> Decision.BLOCK
+        else -> if (isMainFrame) Decision.EXTERNAL else Decision.BLOCK
     }
 
     fun resource(url: String): Decision {

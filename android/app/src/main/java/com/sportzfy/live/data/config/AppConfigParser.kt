@@ -48,7 +48,7 @@ object AppConfigParser {
                 .filter { (category, key) -> category != SportCategory.OTHER || key.trim().equals("other", ignoreCase = true) }
                 .map { it.first }
                 .toSet(),
-            adBlocking = dto.adBlocking ?: true,
+            adBlocking = dto.adBlocking ?: false,
             extraBlockedHosts = dto.extraBlockedHosts.orEmpty()
                 .map { it.trim().lowercase().removePrefix("*.").trimEnd('.') }
                 .filter { it.isNotEmpty() && it.none(Char::isWhitespace) && '/' !in it }

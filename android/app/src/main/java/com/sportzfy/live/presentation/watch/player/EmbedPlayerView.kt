@@ -42,11 +42,11 @@ internal fun EmbedPlayerView(
     modifier: Modifier = Modifier,
     config: PlayerConfig = PlayerConfig(),
 ) {
-    val policy = remember(config.blockedHosts, config.trustedHosts, config.allowAnyTopLevel) {
+    val policy = remember(config.blockedHosts, config.trustedHosts, config.openWeb) {
         PlayerUrlPolicy(
             trustedHosts = setOf(EmbedUrl.HOST) + config.trustedHosts,
             blockedHosts = config.blockedHosts,
-            allowAnyTopLevel = config.allowAnyTopLevel,
+            openWeb = config.openWeb,
         )
     }
     val currentPolicy by rememberUpdatedState(policy)

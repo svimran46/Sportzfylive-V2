@@ -2,6 +2,7 @@ package com.sportzfy.live.core.player
 
 import com.sportzfy.live.core.player.PlayerUrlPolicy.Decision.ALLOW
 import com.sportzfy.live.core.player.PlayerUrlPolicy.Decision.BLOCK
+import com.sportzfy.live.core.player.PlayerUrlPolicy.Decision.EXTERNAL
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -78,14 +79,17 @@ class PlayerUrlPolicyTest {
     }
 
     @Test
-    fun `channel pages may hand off to another site, but never to an ad host`() {
-        val channel = PlayerUrlPolicy(trustedHosts = setOf("exmxbxe.cfd"), allowAnyTopLevel = true)
-        assertEquals(ALLOW, channel.navigation("https://player.example/live/1", isMainFrame = true))
-        assertEquals(BLOCK, channel.navigation("https://popads.net/x", isMainFrame = true))
-        assertEquals(BLOCK, channel.navigation("intent://evil#Intent;end", isMainFrame = true))
-        assertEquals(BLOCK, channel.navigation("http://player.example/live/1", isMainFrame = true))
-        // Matches keep the strict rule.
-        assertEquals(BLOCK, policy.navigation("https://player.example/live/1", isMainFrame = true))
+    fun `open web mode browses like a browser so the sites' ads work`() {
+        val open = PlayerUrlPolicy(blockedHosts = emptySet(), openWeb = true)
+        assertEquals(ALLOW, open.navigation("https://ads.example/landing", isMainFrame = true))
+        assertEquals(ALLOW, open.navigation("http://player.example/live/1", isMainFrame = true))
+        assertEquals(EXTERNAL, open.navigation("intent://app#Intent;package=x;end", isMainFrame = true))
+        assertEquals(EXTERNAL, open.navigation("market://details?id=x", isMainFrame = true))
+        assertEquals(BLOCK, open.navigation("file:///sdcard/x", isMainFrame = true))
+        assertEquals(BLOCK, open.navigation("javascript:alert(1)", isMainFrame = true))
+        // A host the owner blocks remotely stays blocked.
+        val ownerBlocked = PlayerUrlPolicy(blockedHosts = setOf("bad.example"), openWeb = true)
+        assertEquals(BLOCK, ownerBlocked.navigation("https://bad.example/x", isMainFrame = true))
     }
 
     @Test

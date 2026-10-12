@@ -8,7 +8,6 @@ import android.os.Message
 import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
-import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
@@ -34,12 +33,12 @@ internal interface SandboxListener {
 }
 
 /**
- * Creates the player WebView for third-party embeds:
- * - pop-up windows are refused (`onCreateWindow` returns false);
- * - no file or content access, mixed content, downloads, geolocation or
- *   permission grants;
- * - top-level navigation restricted by [PlayerUrlPolicy], and blocked hosts
- *   answered with an empty response.
+ * Creates the player WebView for third-party embeds. It behaves like a
+ * browser tab, because the stream sites are paid for by their ads:
+ * - pop-up windows (the ads) open in the phone's browser, the stream stays here;
+ * - navigation follows [PlayerUrlPolicy]; app links open in their app, and
+ *   hosts the owner blocks remotely get an empty response;
+ * - still no file or content access, downloads, geolocation or permission grants.
  *
  * [policy] is read on every request, so remote config changes apply to a
  * live player without rebuilding it.
@@ -55,13 +54,15 @@ internal fun createSandboxedWebView(
         domStorageEnabled = true
         mediaPlaybackRequiresUserGesture = false
         // Multiple windows stay "supported" so window.open reaches
-        // onCreateWindow and is dropped there. With support turned off,
-        // WebView would load the pop-up into the player itself instead.
+        // onCreateWindow, which opens the ad in the browser. With support
+        // turned off, WebView would load the pop-up over the stream instead.
         setSupportMultipleWindows(true)
-        javaScriptCanOpenWindowsAutomatically = false
+        // The sites open their ad pop-ups from script, as browsers allow.
+        javaScriptCanOpenWindowsAutomatically = true
         allowFileAccess = false
         allowContentAccess = false
-        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        // Browser default: an https stream page may still pull http media.
+        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         setGeolocationEnabled(false)
         setSupportZoom(false)
         builtInZoomControls = false
@@ -118,12 +119,18 @@ private class SandboxedWebViewClient(
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url.toString()
-        val decision = policy().navigation(url, isMainFrame = request.isForMainFrame, isRedirect = request.isRedirect)
-        if (decision == PlayerUrlPolicy.Decision.BLOCK) {
-            listener.onNavigationBlocked(url)
-            return true
+        return when (policy().navigation(url, isMainFrame = request.isForMainFrame, isRedirect = request.isRedirect)) {
+            PlayerUrlPolicy.Decision.ALLOW -> false
+            PlayerUrlPolicy.Decision.BLOCK -> {
+                listener.onNavigationBlocked(url)
+                true
+            }
+            // App links from ads (Play Store, intent:) open in their app.
+            PlayerUrlPolicy.Decision.EXTERNAL -> {
+                view.context.openExternally(url)
+                true
+            }
         }
-        return false
     }
 
     // Runs on a WebView background thread; must not touch UI state.
@@ -157,10 +164,37 @@ private class SandboxedChromeClient(
     private val listener: SandboxListener,
 ) : WebChromeClient() {
 
-    // Every pop-up window (window.open, target=_blank) ends here and is dropped.
+    /**
+     * Pop-ups (window.open, target=_blank) are how the stream sites show
+     * their ads, and the stream only plays once the viewer has been sent
+     * there. Each one opens in the phone's browser like a new tab, while the
+     * stream stays loaded here: a throwaway WebView catches the pop-up's
+     * first URL and hands it over.
+     */
     override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
-        listener.onNavigationBlocked("window.open")
-        return false
+        val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+        val popup = WebView(view.context)
+        var handedOff = false
+        fun handOff(target: WebView, url: String?) {
+            if (handedOff || url.isNullOrBlank() || url == "about:blank") return
+            handedOff = true
+            view.context.openExternally(url)
+            target.stopLoading()
+            target.post { target.destroy() }
+        }
+        popup.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
+                handOff(v, request.url.toString())
+                return true
+            }
+
+            override fun onPageStarted(v: WebView, url: String?, favicon: Bitmap?) {
+                handOff(v, url)
+            }
+        }
+        transport.webView = popup
+        resultMsg.sendToTarget()
+        return true
     }
 
     override fun onShowCustomView(view: View, callback: CustomViewCallback) {
@@ -171,27 +205,8 @@ private class SandboxedChromeClient(
         listener.onExitFullscreen()
     }
 
-    // Ad scripts use dialogs to trap the user; silently dismiss all of them.
-    override fun onJsAlert(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
-        result.cancel()
-        return true
-    }
-
-    override fun onJsConfirm(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
-        result.cancel()
-        return true
-    }
-
-    override fun onJsPrompt(
-        view: WebView,
-        url: String?,
-        message: String?,
-        defaultValue: String?,
-        result: JsPromptResult,
-    ): Boolean {
-        result.cancel()
-        return true
-    }
+    // alert/confirm/prompt keep WebView's default dialogs, as in a browser:
+    // some sites gate the stream behind one.
 
     override fun onJsBeforeUnload(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
         result.confirm()
