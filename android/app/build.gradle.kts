@@ -13,8 +13,15 @@ android {
         applicationId = "com.sportzfy.live"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
+
+        // Owner-editable remote config (see README "Remote control").
+        buildConfigField(
+            "String",
+            "REMOTE_CONFIG_URL",
+            "\"https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/android/remote-config.json\"",
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

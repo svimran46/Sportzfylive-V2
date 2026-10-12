@@ -58,14 +58,16 @@ Requires JDK 17+ and the Android SDK (platform 36).
 
 ## Playback
 
-`StreamPlayer(url)` chooses an engine from the URL. `.m3u8` links play in Media3 ExoPlayer, which fetches segments through the app's OkHttp client. Everything else, which means the `embed.st` pages, plays in a locked-down WebView:
+`StreamPlayer(url)` chooses an engine from the URL. `.m3u8` links play in Media3 ExoPlayer, which fetches segments through the app's OkHttp client. Everything else, which means the `embed.st` pages, plays in a WebView.
 
-- **Pop-ups:** `setSupportMultipleWindows(false)`, `javaScriptCanOpenWindowsAutomatically = false`, and `onCreateWindow` returns `false`.
+By default (`playerMode: "iframe"`), the embed runs inside a **plain iframe with no `sandbox` attribute**, the same way the website plays it. The iframe has `allow="autoplay; fullscreen; encrypted-media; picture-in-picture"`, `allowfullscreen` and `referrerpolicy="no-referrer"`. Embeds that expect to be framed, or that redirect themselves in script, play normally, while the app still owns the outer page. With `playerMode: "direct"`, the embed page is loaded as the WebView's own page instead.
+
+- **Pop-ups:** `setSupportMultipleWindows(true)` together with `onCreateWindow` returning `false`, so every `window.open` or `target=_blank` is dropped instead of loading over the player. `javaScriptCanOpenWindowsAutomatically` is `false`.
 - **Navigation:** handled by `PlayerUrlPolicy`.
-  - The main frame can only go to `embed.st`, or follow an HTTP redirect from a page that was already allowed.
+  - The outer page can only go to `embed.st`, or follow an HTTP redirect from a page that was already allowed. This stops `top.location` hijacks.
   - Subframes can load any https page except known ad networks.
   - Every scheme other than https is refused, including `intent:` and `market:`.
-- **Ad networks:** requests to hosts in `AdHosts` get an empty response.
+- **Ad networks:** requests to hosts in `AdHosts` (plus any `extraBlockedHosts`) get an empty response. You can switch the built-in list off remotely with `adBlocking: false`.
 - **Dialogs and permissions:** JavaScript dialogs, permission requests, downloads, file access and long-press menus are all disabled.
 - **Fullscreen:** `onShowCustomView` and `onHideCustomView` move the video into a fullscreen landscape view with the system bars hidden. Back exits fullscreen.
 - **Renderer crashes:** if the renderer dies, the player rebuilds its WebView instead of crashing the app.
@@ -93,6 +95,23 @@ Requires JDK 17+ and the Android SDK (platform 36).
   - The app appears in the TV launcher (`LEANBACK_LAUNCHER`) with its own banner, and neither touch nor leanback support is required to install it.
   - Anything you can select gets a 2dp rose border and a slight scale-up when the D-pad focuses it (`Modifier.tvFocus`).
   - Inside the player, Up/Down always move focus out of the WebView, so the remote can't get stuck in the page.
+
+## Remote control
+
+Every installed app reads [`android/remote-config.json`](remote-config.json) from this repo's `main` branch when it starts, and again every 5 minutes while it is open. To change the app, edit that file on GitHub (the website or the GitHub mobile app both work) and commit. Installed apps pick the change up within a few minutes, with no new APK needed. The last good config is saved on each device, so settings like maintenance mode still apply when the user is offline. If a broken edit leaves the file as invalid JSON, apps ignore it and keep the previous config.
+
+| Field | Effect |
+|---|---|
+| `announcement.message` | A banner at the top of the catalog. Leave it `""` to hide the banner. |
+| `announcement.url` | Optional https link that opens when the banner is tapped. |
+| `featuredMatchId` | Pins this match into the spotlight while it's in today's feed. Match IDs are in the Streamed API (`/api/matches/all-today`). |
+| `hiddenCategories` | Sports to hide completely, e.g. `["fight", "motor-sports"]`. Uses the Streamed category keys. |
+| `adBlocking` | `false` turns off the built-in ad-network blocking in the player. Pop-up windows stay blocked either way. |
+| `extraBlockedHosts` | More hosts for the player to refuse, e.g. `["newads.example"]`. Subdomains are included. |
+| `playerMode` | `"iframe"` (the default; an unsandboxed iframe, like the website) or `"direct"` (the embed page is the WebView itself). |
+| `minVersionCode` | Builds with a lower `versionCode` (in `app/build.gradle.kts`) show an "Update required" screen. |
+| `updateUrl` | Where that screen's button sends the user (https only). |
+| `maintenance.enabled` / `maintenance.message` | `true` replaces the whole app with a maintenance screen showing the message. |
 
 ## Testing
 

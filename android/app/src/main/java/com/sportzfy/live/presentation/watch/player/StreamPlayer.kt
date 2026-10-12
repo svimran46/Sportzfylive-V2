@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sportzfy.live.core.player.PlaybackSource
+import com.sportzfy.live.core.player.PlayerConfig
 
 /**
  * Dual-engine player: Media3 for `.m3u8` URLs, the sandboxed WebView for
@@ -30,6 +31,7 @@ fun StreamPlayer(
     url: String?,
     modifier: Modifier = Modifier,
     state: StreamPlayerState = rememberStreamPlayerState(),
+    config: PlayerConfig = PlayerConfig(),
 ) {
     val source = remember(url) { url?.let(PlaybackSource::from) }
 
@@ -40,7 +42,7 @@ fun StreamPlayer(
     Box(modifier = modifier.background(Color.Black)) {
         when (source) {
             is PlaybackSource.Hls -> HlsPlayerView(source.url, state, Modifier.fillMaxSize())
-            is PlaybackSource.Embed -> EmbedPlayerView(source.url, state, Modifier.fillMaxSize())
+            is PlaybackSource.Embed -> EmbedPlayerView(source.url, state, Modifier.fillMaxSize(), config)
             null -> PlayerMessage(
                 text = if (url == null) "Pick a stream to start watching" else "This stream can't be played",
                 modifier = Modifier.align(Alignment.Center),

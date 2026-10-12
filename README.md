@@ -88,7 +88,7 @@ Matches are synced automatically from the Streamed API every 10 minutes. Admins 
 ### Playback
 
 - **HLS Streams (.m3u8)**: Automatically played via hls.js
-- **Iframe Embeds**: Displayed in a sandboxed iframe
+- **Iframe Embeds**: Displayed in a regular iframe (no `sandbox` attribute, which embed players refuse to run under)
 - **Search**: Type to filter channels by name
 - **Filter**: Click category buttons to filter by genre
 
@@ -136,7 +136,7 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 ## Security
 
 - **XSS Prevention**: All user data is sanitized and rendered safely using DOM methods
-- **Sandboxed Embeds**: Iframe embeds are sandboxed with limited permissions
+- **Embeds**: Iframe embeds are not sandboxed (embed players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need
 - **Input Validation**: All data is validated before rendering
 
 ## Browser Support

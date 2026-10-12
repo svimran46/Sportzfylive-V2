@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -19,21 +20,30 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sportzfy.live.core.network.StreamedEndpoints
+import com.sportzfy.live.core.player.EmbedFrame
+import com.sportzfy.live.core.player.PlayerConfig
 import com.sportzfy.live.core.player.PlayerUrlPolicy
+import com.sportzfy.live.domain.model.PlayerMode
 
 /**
- * Plays an `embed.st` page in a sandboxed WebView. The WebView is created
- * once and reused: a new [url] or [StreamPlayerState.retry] reloads the same
- * instance, so switching streams never rebuilds the surrounding layout. A
- * fresh WebView is created only after its renderer process dies.
+ * Plays an `embed.st` page. In [PlayerMode.IFRAME] (the default) the embed
+ * runs in a plain iframe inside a wrapper page, exactly like the website; in
+ * [PlayerMode.DIRECT] it is the WebView's page itself.
+ *
+ * The WebView is created once and reused: a new [url], mode or
+ * [StreamPlayerState.retry] reloads the same instance, so switching streams
+ * never rebuilds the surrounding layout. A fresh WebView is created only
+ * after its renderer process dies.
  */
 @Composable
 internal fun EmbedPlayerView(
     url: String,
     state: StreamPlayerState,
     modifier: Modifier = Modifier,
-    policy: PlayerUrlPolicy = remember { PlayerUrlPolicy() },
+    config: PlayerConfig = PlayerConfig(),
 ) {
+    val policy = remember(config.blockedHosts) { PlayerUrlPolicy(blockedHosts = config.blockedHosts) }
+    val currentPolicy by rememberUpdatedState(policy)
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var generation by remember { mutableIntStateOf(0) }
@@ -103,7 +113,7 @@ internal fun EmbedPlayerView(
             modifier = modifier,
             factory = { ctx ->
                 try {
-                    createSandboxedWebView(ctx, policy, listener).also { holder.webView = it }
+                    createSandboxedWebView(ctx, { currentPolicy }, listener).also { holder.webView = it }
                 } catch (e: Exception) {
                     // Thrown when the device has no (or a broken) WebView provider.
                     state.isLoading = false
@@ -113,10 +123,19 @@ internal fun EmbedPlayerView(
             },
             update = { view ->
                 val webView = view as? WebView ?: return@AndroidView
-                val request = LoadRequest(url, state.reloadToken)
+                val request = LoadRequest(url, state.reloadToken, config.mode)
                 if (webView.tag != request) {
                     webView.tag = request
-                    webView.loadUrl(url, mapOf("Referer" to StreamedEndpoints.REFERER))
+                    when (config.mode) {
+                        PlayerMode.IFRAME -> webView.loadDataWithBaseURL(
+                            EmbedFrame.BASE_URL,
+                            EmbedFrame.html(url),
+                            "text/html",
+                            "utf-8",
+                            null,
+                        )
+                        PlayerMode.DIRECT -> webView.loadUrl(url, mapOf("Referer" to StreamedEndpoints.REFERER))
+                    }
                 }
             },
             onRelease = { view ->
@@ -136,4 +155,4 @@ private class WebViewHolder {
     var deadWebView: WebView? = null
 }
 
-private data class LoadRequest(val url: String, val reloadToken: Int)
+private data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode)

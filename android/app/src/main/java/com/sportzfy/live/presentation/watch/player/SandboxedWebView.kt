@@ -34,24 +34,30 @@ internal interface SandboxListener {
 }
 
 /**
- * Creates a WebView locked down for third-party embeds:
- * - no new windows, so `window.open` cannot create pop-ups;
+ * Creates the player WebView for third-party embeds:
+ * - pop-up windows are refused (`onCreateWindow` returns false);
  * - no file or content access, mixed content, downloads, geolocation or
  *   permission grants;
- * - top-level navigation restricted by [PlayerUrlPolicy], and ad hosts
+ * - top-level navigation restricted by [PlayerUrlPolicy], and blocked hosts
  *   answered with an empty response.
+ *
+ * [policy] is read on every request, so remote config changes apply to a
+ * live player without rebuilding it.
  */
 @SuppressLint("SetJavaScriptEnabled")
 internal fun createSandboxedWebView(
     context: Context,
-    policy: PlayerUrlPolicy,
+    policy: () -> PlayerUrlPolicy,
     listener: SandboxListener,
 ): WebView = WebView(context).apply {
     settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = true
         mediaPlaybackRequiresUserGesture = false
-        setSupportMultipleWindows(false)
+        // Multiple windows stay "supported" so window.open reaches
+        // onCreateWindow and is dropped there. With support turned off,
+        // WebView would load the pop-up into the player itself instead.
+        setSupportMultipleWindows(true)
         javaScriptCanOpenWindowsAutomatically = false
         allowFileAccess = false
         allowContentAccess = false
@@ -106,13 +112,13 @@ internal fun WebView.release(rendererGone: Boolean) {
 }
 
 private class SandboxedWebViewClient(
-    private val policy: PlayerUrlPolicy,
+    private val policy: () -> PlayerUrlPolicy,
     private val listener: SandboxListener,
 ) : WebViewClient() {
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url.toString()
-        val decision = policy.navigation(url, isMainFrame = request.isForMainFrame, isRedirect = request.isRedirect)
+        val decision = policy().navigation(url, isMainFrame = request.isForMainFrame, isRedirect = request.isRedirect)
         if (decision == PlayerUrlPolicy.Decision.BLOCK) {
             listener.onNavigationBlocked(url)
             return true
@@ -122,7 +128,7 @@ private class SandboxedWebViewClient(
 
     // Runs on a WebView background thread; must not touch UI state.
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-        if (policy.resource(request.url.toString()) == PlayerUrlPolicy.Decision.BLOCK) {
+        if (policy().resource(request.url.toString()) == PlayerUrlPolicy.Decision.BLOCK) {
             return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
         }
         return null
@@ -151,7 +157,7 @@ private class SandboxedChromeClient(
     private val listener: SandboxListener,
 ) : WebChromeClient() {
 
-    // Second line of defence behind setSupportMultipleWindows(false).
+    // Every pop-up window (window.open, target=_blank) ends here and is dropped.
     override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
         listener.onNavigationBlocked("window.open")
         return false

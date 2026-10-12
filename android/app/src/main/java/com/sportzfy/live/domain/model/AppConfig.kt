@@ -1,0 +1,40 @@
+package com.sportzfy.live.domain.model
+
+/**
+ * Settings the owner controls remotely by editing `android/remote-config.json`
+ * on GitHub. Every installed app picks changes up without an update.
+ */
+data class AppConfig(
+    /** Banner shown above the catalog; null hides it. */
+    val announcement: Announcement? = null,
+    /** Match pinned into the spotlight while it is in today's feed. */
+    val featuredMatchId: String? = null,
+    /** Sports removed from the catalog entirely. */
+    val hiddenCategories: Set<SportCategory> = emptySet(),
+    /** Built-in ad-network blocking in the player. */
+    val adBlocking: Boolean = true,
+    /** Extra hosts the player refuses, on top of (or instead of) the built-in list. */
+    val extraBlockedHosts: Set<String> = emptySet(),
+    val playerMode: PlayerMode = PlayerMode.IFRAME,
+    /** Builds older than this show an "update required" screen. */
+    val minVersionCode: Int = 0,
+    val updateUrl: String? = null,
+    /** Non-null switches the whole app to a maintenance screen with this message. */
+    val maintenanceMessage: String? = null,
+) {
+    fun requiresUpdate(versionCode: Int): Boolean = versionCode < minVersionCode
+
+    companion object {
+        val Default = AppConfig()
+    }
+}
+
+data class Announcement(val message: String, val linkUrl: String?)
+
+enum class PlayerMode {
+    /** The embed runs inside a plain, unsandboxed iframe, like the website. */
+    IFRAME,
+
+    /** The embed page is loaded directly as the WebView's page. */
+    DIRECT,
+}

@@ -11,9 +11,13 @@ import com.sportzfy.live.core.network.HttpClientFactory
 import com.sportzfy.live.core.network.NetworkJson
 import com.sportzfy.live.core.network.StreamedApiService
 import com.sportzfy.live.core.time.Clock
+import com.sportzfy.live.data.config.AppConfigRepositoryImpl
+import com.sportzfy.live.data.config.DataStoreConfigCache
+import com.sportzfy.live.data.config.HttpConfigSource
 import com.sportzfy.live.data.repository.FavoritesRepositoryImpl
 import com.sportzfy.live.data.repository.MatchRepositoryImpl
 import com.sportzfy.live.data.repository.StreamRepositoryImpl
+import com.sportzfy.live.domain.repository.AppConfigRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
@@ -30,6 +34,7 @@ import retrofit2.Retrofit
 import retrofit2.create
 
 private val Context.favoritesDataStore: DataStore<Preferences> by preferencesDataStore(name = "favorites")
+private val Context.appConfigDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_config")
 
 val networkModule = module {
     single<Json> { NetworkJson }
@@ -43,6 +48,14 @@ val dataModule = module {
     single<MatchRepository> { MatchRepositoryImpl(get(), get(), get()) }
     single<StreamRepository> { StreamRepositoryImpl(get(), get(), get()) }
     single<FavoritesRepository> { FavoritesRepositoryImpl(androidContext().favoritesDataStore) }
+    single<AppConfigRepository> {
+        AppConfigRepositoryImpl(
+            source = HttpConfigSource(get(), BuildConfig.REMOTE_CONFIG_URL, get()),
+            cache = DataStoreConfigCache(androidContext().appConfigDataStore),
+            json = get(),
+            clock = get(),
+        )
+    }
 }
 
 val presentationModule = module {

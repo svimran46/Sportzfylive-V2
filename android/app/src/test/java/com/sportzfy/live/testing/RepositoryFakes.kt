@@ -1,10 +1,12 @@
 package com.sportzfy.live.testing
 
+import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.MatchFeed
 import com.sportzfy.live.domain.model.StreamItem
 import com.sportzfy.live.domain.model.StreamResolution
 import com.sportzfy.live.domain.model.StreamSource
+import com.sportzfy.live.domain.repository.AppConfigRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
@@ -56,4 +58,15 @@ class FakeFavoritesRepository(initial: Set<String> = emptySet()) : FavoritesRepo
     override suspend fun toggle(matchId: String) {
         ids.value = if (matchId in ids.value) ids.value - matchId else ids.value + matchId
     }
+}
+
+class FakeAppConfigRepository(initial: AppConfig = AppConfig.Default) : AppConfigRepository {
+    private val state = MutableStateFlow(initial)
+    override val config: StateFlow<AppConfig> = state
+
+    fun emit(config: AppConfig) {
+        state.value = config
+    }
+
+    override suspend fun refresh(force: Boolean) = Unit
 }

@@ -1,5 +1,7 @@
 package com.sportzfy.live.presentation.model
 
+import com.sportzfy.live.domain.model.Announcement
+import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.DataError
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.MatchFeed
@@ -37,6 +39,8 @@ data class CatalogUiState(
     val query: String = "",
     val hero: Match? = null,
     val sections: List<MatchSection> = emptyList(),
+    /** Owner's message from the remote config. */
+    val announcement: Announcement? = null,
 ) {
     val isEmpty: Boolean
         get() = hero == null && sections.isEmpty()
@@ -48,12 +52,15 @@ data class CatalogUiState(
             query: String,
             favoriteIds: Set<String> = emptySet(),
             favoritesOnly: Boolean = false,
+            config: AppConfig = AppConfig.Default,
         ): CatalogUiState {
-            val all = feed.matches
+            val all = feed.matches.filter { it.category !in config.hiddenCategories }
             val counts = all.groupingBy { it.category }.eachCount()
             val categories = buildList {
                 add(CategoryOption(null, all.size))
-                SportCategory.featured.forEach { add(CategoryOption(it, counts[it] ?: 0)) }
+                SportCategory.featured
+                    .filter { it !in config.hiddenCategories }
+                    .forEach { add(CategoryOption(it, counts[it] ?: 0)) }
                 counts.entries
                     .filter { it.key !in SportCategory.featured }
                     .sortedByDescending { it.value }
@@ -63,7 +70,13 @@ data class CatalogUiState(
             val filtered = CatalogFilter.apply(all, category, query, onlyIds = favoriteIds.takeIf { favoritesOnly })
             // The banner is for browsing; while searching or viewing saved
             // matches every hit stays in the list.
-            val hero = if (query.isBlank() && !favoritesOnly) CatalogFilter.spotlight(filtered) else null
+            val hero = if (query.isBlank() && !favoritesOnly) {
+                // A match pinned in the remote config wins while it is in the feed.
+                config.featuredMatchId?.let { id -> filtered.firstOrNull { it.id == id } }
+                    ?: CatalogFilter.spotlight(filtered)
+            } else {
+                null
+            }
             val rest = if (hero == null) filtered else filtered.filter { it.id != hero.id }
             val sections = SectionKind.entries.mapNotNull { kind ->
                 rest.filter { it.status == kind.status }
@@ -76,7 +89,7 @@ data class CatalogUiState(
                 isRefreshing = feed.isLoading,
                 error = feed.error,
                 hasData = feed.updatedAtMillis != null,
-                liveCount = feed.liveCount,
+                liveCount = all.count { it.isLive },
                 categories = categories,
                 selectedCategory = category,
                 favoritesOnly = favoritesOnly,
@@ -85,6 +98,7 @@ data class CatalogUiState(
                 query = query,
                 hero = hero,
                 sections = sections,
+                announcement = config.announcement,
             )
         }
     }

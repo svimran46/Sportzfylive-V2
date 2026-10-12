@@ -6,6 +6,9 @@ import com.sportzfy.live.domain.model.MatchStatus.UPCOMING
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.model.CatalogUiState
 import com.sportzfy.live.presentation.model.testMatch
+import com.sportzfy.live.domain.model.Announcement
+import com.sportzfy.live.domain.model.AppConfig
+import com.sportzfy.live.testing.FakeAppConfigRepository
 import com.sportzfy.live.testing.FakeFavoritesRepository
 import com.sportzfy.live.testing.FakeMatchRepository
 import kotlinx.coroutines.Dispatchers
@@ -31,12 +34,13 @@ class CatalogViewModelTest {
     )
     private val matchRepository = FakeMatchRepository(matches)
     private val favorites = FakeFavoritesRepository()
+    private val config = FakeAppConfigRepository()
     private lateinit var viewModel: CatalogViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        viewModel = CatalogViewModel(matchRepository, favorites)
+        viewModel = CatalogViewModel(matchRepository, favorites, config)
     }
 
     @After
@@ -87,6 +91,23 @@ class CatalogViewModelTest {
         collectState()
         matchRepository.emit(MatchFeed(matches.take(1), updatedAtMillis = 2L, isLoading = false, error = null))
         assertEquals(listOf("madrid"), viewModel.uiState.value.ids())
+    }
+
+    @Test
+    fun `remote config changes apply live`() = runTest {
+        collectState()
+        config.emit(
+            AppConfig(
+                hiddenCategories = setOf(SportCategory.CRICKET),
+                featuredMatchId = "arsenal",
+                announcement = Announcement("Big match tonight", null),
+            )
+        )
+
+        val state = viewModel.uiState.value
+        assertEquals("arsenal", state.hero?.id)
+        assertEquals(setOf("madrid", "arsenal"), state.ids().toSet())
+        assertEquals("Big match tonight", state.announcement?.message)
     }
 
     @Test

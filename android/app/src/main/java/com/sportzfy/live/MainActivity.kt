@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.sportzfy.live.core.theme.SportzfyTheme
+import com.sportzfy.live.presentation.config.AppConfigGate
 import com.sportzfy.live.presentation.navigation.SportzfyNavHost
 
 class MainActivity : ComponentActivity() {
@@ -18,7 +19,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             SportzfyTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    SportzfyNavHost()
+                    AppConfigGate(versionCode = BuildConfig.VERSION_CODE) {
+                        SportzfyNavHost()
+                    }
                 }
             }
         }

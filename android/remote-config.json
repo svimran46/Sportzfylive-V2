@@ -1,0 +1,17 @@
+{
+  "announcement": {
+    "message": "",
+    "url": ""
+  },
+  "featuredMatchId": "",
+  "hiddenCategories": [],
+  "adBlocking": true,
+  "extraBlockedHosts": [],
+  "playerMode": "iframe",
+  "minVersionCode": 0,
+  "updateUrl": "",
+  "maintenance": {
+    "enabled": false,
+    "message": ""
+  }
+}

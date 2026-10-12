@@ -46,11 +46,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sportzfy.live.core.player.PlayerConfig
 import com.sportzfy.live.core.theme.SportzfyColors
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.Team
 import com.sportzfy.live.presentation.catalog.rememberMatchTimeFormatter
 import com.sportzfy.live.presentation.catalog.rememberNow
+import com.sportzfy.live.presentation.config.LocalAppConfig
 import com.sportzfy.live.presentation.components.FavoriteButton
 import com.sportzfy.live.presentation.components.MatchCard
 import com.sportzfy.live.presentation.components.MatchRailCard
@@ -100,7 +102,12 @@ fun WatchStudioContent(
     // layouts (e.g. on rotation), so the stream does not restart.
     val player = remember(playerState) {
         movableContentOf { url: String?, modifier: Modifier ->
-            StreamPlayer(url = url, modifier = modifier, state = playerState)
+            StreamPlayer(
+                url = url,
+                modifier = modifier,
+                state = playerState,
+                config = PlayerConfig.from(LocalAppConfig.current),
+            )
         }
     }
     val playerUrl = state.selectedStream?.embedUrl

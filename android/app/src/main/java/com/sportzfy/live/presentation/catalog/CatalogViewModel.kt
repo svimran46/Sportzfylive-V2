@@ -3,6 +3,7 @@ package com.sportzfy.live.presentation.catalog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sportzfy.live.domain.model.SportCategory
+import com.sportzfy.live.domain.repository.AppConfigRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.presentation.model.CatalogUiState
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 class CatalogViewModel(
     private val matchRepository: MatchRepository,
     private val favoritesRepository: FavoritesRepository,
+    private val configRepository: AppConfigRepository,
 ) : ViewModel() {
 
     private data class Filters(
@@ -37,12 +39,13 @@ class CatalogViewModel(
             matchRepository.feed,
             filters,
             favoritesRepository.favoriteIds.onStart { emit(emptySet()) },
-        ) { feed, f, favorites ->
-            CatalogUiState.from(feed, f.category, f.query, favorites, f.favoritesOnly)
+            configRepository.config,
+        ) { feed, f, favorites, config ->
+            CatalogUiState.from(feed, f.category, f.query, favorites, f.favoritesOnly, config)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = CatalogUiState.from(matchRepository.feed.value, null, ""),
+            initialValue = CatalogUiState.from(matchRepository.feed.value, null, "", config = configRepository.config.value),
         )
 
     /** Cheap to call often: the repository serves from its 60s cache. */

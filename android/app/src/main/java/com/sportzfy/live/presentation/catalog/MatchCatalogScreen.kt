@@ -60,6 +60,7 @@ import com.sportzfy.live.core.theme.SportzfyColors
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.components.CategoryPills
 import com.sportzfy.live.presentation.components.HeroSpotlight
+import com.sportzfy.live.presentation.components.AnnouncementBanner
 import com.sportzfy.live.presentation.components.InlineBanner
 import com.sportzfy.live.presentation.components.LoadingState
 import com.sportzfy.live.presentation.components.MatchCard
@@ -172,6 +173,11 @@ private fun LazyGridScope.catalogItems(
 ) {
     val fullSpan: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
 
+    state.announcement?.let { announcement ->
+        item(key = "announcement", span = fullSpan) {
+            AnnouncementBanner(announcement)
+        }
+    }
     state.error?.let { error ->
         item(key = "banner", span = fullSpan) {
             InlineBanner("${error.userMessage()} Showing the last fixtures loaded.")

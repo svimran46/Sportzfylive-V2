@@ -9,6 +9,7 @@ import com.sportzfy.live.core.theme.SportzfyTheme
 import com.sportzfy.live.domain.model.MatchStatus.LIVE
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.model.testMatch
+import com.sportzfy.live.testing.FakeAppConfigRepository
 import com.sportzfy.live.testing.FakeFavoritesRepository
 import com.sportzfy.live.testing.FakeMatchRepository
 import org.junit.Rule
@@ -41,6 +42,7 @@ class CatalogScreenTest {
             )
         ),
         FakeFavoritesRepository(),
+        FakeAppConfigRepository(),
     )
 
     @Test
