@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -38,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -117,7 +120,7 @@ fun SettingsContent(
                     SettingsRow(
                         icon = SportzfyIcons.Language,
                         title = "Preferred stream language",
-                        value = language ?: ANY_LANGUAGE,
+                        subtitle = language ?: ANY_LANGUAGE,
                         onClick = { showLanguageDialog = true },
                     )
                     Text(
@@ -216,7 +219,7 @@ fun SettingsContent(
                     },
                     modifier = Modifier.tvFocus(RoundedCornerShape(20.dp)),
                 ) {
-                    Text("Clear", color = SportzfyColors.Rose, fontWeight = FontWeight.SemiBold)
+                    Text("Clear", color = SportzfyColors.RoseText, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -298,7 +301,7 @@ private fun ScreenTopBar(title: String, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .padding(end = 16.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -321,7 +324,7 @@ private fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold),
-        color = SportzfyColors.Rose.copy(alpha = 0.9f),
+        color = SportzfyColors.RoseText,
         modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 2.dp),
     )
 }
@@ -331,6 +334,7 @@ private fun SettingsCard(content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(CardShape)
             .background(SportzfyColors.SlateRaised, CardShape),
     ) {
         content()

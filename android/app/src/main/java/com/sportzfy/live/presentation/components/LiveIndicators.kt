@@ -73,20 +73,21 @@ fun LiveBadge(modifier: Modifier = Modifier) {
         Spacer(Modifier.width(6.dp))
         Text(
             text = "LIVE",
-            color = SportzfyColors.Rose,
+            color = SportzfyColors.RoseText,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
         )
     }
 }
 
 @Composable
-fun HdTag(modifier: Modifier = Modifier) {
+fun HdTag(modifier: Modifier = Modifier, onAccent: Boolean = false) {
+    val background = if (onAccent) SportzfyColors.Charcoal.copy(alpha = 0.3f) else SportzfyColors.Emerald.copy(alpha = 0.18f)
     Text(
         text = "HD",
         modifier = modifier
-            .background(SportzfyColors.Emerald.copy(alpha = 0.18f), RoundedCornerShape(4.dp))
+            .background(background, RoundedCornerShape(4.dp))
             .padding(horizontal = 5.dp, vertical = 1.dp),
-        color = SportzfyColors.Emerald,
+        color = if (onAccent) SportzfyColors.TextPrimary else SportzfyColors.Emerald,
         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
     )
 }

@@ -3,20 +3,25 @@ package com.sportzfy.live.presentation.livetv
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +45,7 @@ import com.sportzfy.live.core.theme.SportzfyIcon
 import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.Channel
 import com.sportzfy.live.presentation.components.ChannelCard
-import com.sportzfy.live.presentation.components.MessageState
+import com.sportzfy.live.presentation.components.EmptyState
 import com.sportzfy.live.presentation.components.tvFocus
 import com.sportzfy.live.presentation.config.LocalAppConfig
 import com.sportzfy.live.presentation.watch.player.StreamPlayer
@@ -66,17 +71,19 @@ fun ChannelPlayerScreen(
         topBar = { ChannelTopBar(channel, onBack) },
     ) { padding ->
         when {
-            state.isMissing && state.isLoadFailed -> MessageState(
+            state.isMissing && state.isLoadFailed -> EmptyState(
+                icon = SportzfyIcons.Offline,
+                title = "Couldn't load channels",
                 message = "Couldn't load the channel list. Check your connection and try again.",
-                actionLabel = "Retry",
-                onAction = viewModel::retry,
-                modifier = Modifier.padding(padding),
+                primaryAction = "Retry" to viewModel::retry,
+                modifier = Modifier.padding(padding).fillMaxSize().wrapContentSize(),
             )
-            state.isMissing -> MessageState(
+            state.isMissing -> EmptyState(
+                icon = SportzfyIcons.Alert,
+                title = "Channel unavailable",
                 message = "This channel is no longer available.",
-                actionLabel = "Back to Live TV",
-                onAction = onBack,
-                modifier = Modifier.padding(padding),
+                primaryAction = "Back to Live TV" to onBack,
+                modifier = Modifier.padding(padding).fillMaxSize().wrapContentSize(),
             )
             channel == null -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = SportzfyColors.Rose)
@@ -86,36 +93,46 @@ fun ChannelPlayerScreen(
                 // player may open; every other rule stays as it is for matches.
                 val base = PlayerConfig.from(LocalAppConfig.current)
                 val config = base.copy(trustedHosts = base.trustedHosts + channel.sourceHost)
-                Column(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    StreamPlayer(
-                        url = channel.streamUrl,
-                        modifier = Modifier.widthIn(max = 960.dp).fillMaxWidth().aspectRatio(16f / 9f),
-                        state = playerState,
-                        config = config,
-                    )
-                    ChannelInfo(channel, playerState.blockedCount)
-                    if (state.related.isNotEmpty()) {
-                        Text(
-                            text = "More ${channel.category.label}",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
+                    // Measured outside the scroll so the player can be capped to
+                    // the viewport: on TV/landscape a full-width 16:9 player would
+                    // be taller than the screen.
+                    val playerMaxHeight = maxHeight * 0.7f
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        StreamPlayer(
+                            url = channel.streamUrl,
+                            // No fillMaxWidth: it would force the full width and
+                            // break the ratio once the height cap applies.
+                            modifier = Modifier
+                                .widthIn(max = 960.dp)
+                                .heightIn(max = playerMaxHeight)
+                                .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
+                            state = playerState,
+                            config = config,
                         )
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            items(state.related, key = { it.id }) { other ->
-                                ChannelCard(other, onClick = { viewModel.selectChannel(other.id) }, modifier = Modifier.width(280.dp))
+                        ChannelInfo(channel, playerState.blockedCount)
+                        if (state.related.isNotEmpty()) {
+                            Text(
+                                text = "More ${channel.category.label}",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                items(state.related, key = { it.id }) { other ->
+                                    ChannelCard(other, onClick = { viewModel.selectChannel(other.id) }, modifier = Modifier.width(280.dp))
+                                }
                             }
+                            Spacer(Modifier.height(24.dp))
                         }
-                        Spacer(Modifier.height(24.dp))
                     }
                 }
             }
@@ -129,7 +146,7 @@ private fun ChannelTopBar(channel: Channel?, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .padding(end = 16.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -140,7 +157,7 @@ private fun ChannelTopBar(channel: Channel?, onBack: () -> Unit) {
             Text(
                 text = "LIVE TV" + (channel?.let { " · ${it.category.label.uppercase()}" } ?: ""),
                 style = MaterialTheme.typography.labelMedium,
-                color = SportzfyColors.Rose,
+                color = SportzfyColors.RoseText,
             )
             Text(
                 text = channel?.name ?: "Loading…",

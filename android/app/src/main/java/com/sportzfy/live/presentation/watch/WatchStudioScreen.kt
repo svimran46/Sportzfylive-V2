@@ -9,15 +9,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -54,7 +58,7 @@ import com.sportzfy.live.presentation.config.LocalAppConfig
 import com.sportzfy.live.presentation.components.FavoriteButton
 import com.sportzfy.live.presentation.components.MatchCard
 import com.sportzfy.live.presentation.components.MatchRailCard
-import com.sportzfy.live.presentation.components.MessageState
+import com.sportzfy.live.presentation.components.EmptyState
 import com.sportzfy.live.presentation.components.StatusTag
 import com.sportzfy.live.presentation.components.StreamChip
 import com.sportzfy.live.presentation.components.TeamCrest
@@ -117,18 +121,20 @@ fun WatchStudioContent(
         if (state.isMatchMissing) {
             // Offline or rate-limited: offer Retry instead of claiming the match is gone.
             if (state.isLoadFailed) {
-                MessageState(
+                EmptyState(
+                    icon = SportzfyIcons.Offline,
+                    title = "Couldn't load this match",
                     message = "Couldn't load this match. Check your connection and try again.",
-                    actionLabel = "Retry",
-                    onAction = onRetryStreams,
-                    modifier = Modifier.padding(padding),
+                    primaryAction = "Retry" to onRetryStreams,
+                    modifier = Modifier.padding(padding).fillMaxSize().wrapContentSize(),
                 )
             } else {
-                MessageState(
+                EmptyState(
+                    icon = SportzfyIcons.Alert,
+                    title = "Match unavailable",
                     message = "This match is no longer available.",
-                    actionLabel = "Back to matches",
-                    onAction = onBack,
-                    modifier = Modifier.padding(padding),
+                    primaryAction = "Back to matches" to onBack,
+                    modifier = Modifier.padding(padding).fillMaxSize().wrapContentSize(),
                 )
             }
             return@Scaffold
@@ -140,7 +146,9 @@ fun WatchStudioContent(
                 StreamSelector(state, playerState, onSelectStream, onRetryStreams)
             }
 
-            if (maxWidth >= WideLayoutMinWidth) {
+            // Landscape phones (e.g. 640x360dp) also go side by side: a pinned
+            // full-width 16:9 player would leave no room for the stream picker.
+            if (maxWidth >= WideLayoutMinWidth || maxWidth > maxHeight) {
                 Row(Modifier.fillMaxSize()) {
                     Column(
                         Modifier
@@ -160,8 +168,15 @@ fun WatchStudioContent(
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
-                    // The player stays pinned while the details scroll beneath it.
-                    player(playerUrl, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                    // The player stays pinned while the details scroll beneath it,
+                    // capped so the picker below always stays reachable.
+                    player(
+                        playerUrl,
+                        Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .heightIn(max = maxHeight * 0.55f)
+                            .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
+                    )
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         details()
                         RelatedRail(state.related, now, formatter, onSelectMatch)
@@ -179,7 +194,7 @@ private fun WatchTopBar(match: Match?, isFavorite: Boolean, onBack: () -> Unit, 
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .padding(end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -190,7 +205,7 @@ private fun WatchTopBar(match: Match?, isFavorite: Boolean, onBack: () -> Unit, 
             Text(
                 text = match?.category?.displayName?.uppercase() ?: "",
                 style = MaterialTheme.typography.labelMedium,
-                color = SportzfyColors.Rose,
+                color = SportzfyColors.RoseText,
             )
             Text(
                 text = match?.title ?: "Loading…",
@@ -269,18 +284,19 @@ private fun StreamSelector(
                 Spacer(Modifier.width(10.dp))
                 Text("Finding streams…", style = MaterialTheme.typography.bodyMedium, color = SportzfyColors.TextSecondary)
             }
-            state.streams.isEmpty() -> MessageState(
+            state.streams.isEmpty() -> EmptyState(
+                icon = if (state.failedSourceCount > 0) SportzfyIcons.Offline else SportzfyIcons.LiveTv,
+                title = if (state.failedSourceCount > 0) "Sources not responding" else "No streams yet",
                 message = if (state.failedSourceCount > 0) {
                     "Stream sources aren't responding right now."
                 } else {
                     "No streams yet. They usually appear shortly before kick-off."
                 },
-                actionLabel = "Try again",
-                onAction = onRetryStreams,
+                primaryAction = "Try again" to onRetryStreams,
             )
             else -> {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     itemsIndexed(state.streams, key = { _, stream -> stream.key }) { index, stream ->
@@ -337,7 +353,7 @@ private fun RelatedRail(
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
     )
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(matches, key = { it.id }) { match ->

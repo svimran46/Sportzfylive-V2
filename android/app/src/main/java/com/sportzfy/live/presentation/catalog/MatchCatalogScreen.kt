@@ -1,5 +1,10 @@
 package com.sportzfy.live.presentation.catalog
 
+import androidx.compose.ui.draw.clip
+import com.sportzfy.live.presentation.components.bleedHorizontally
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -74,7 +79,6 @@ import com.sportzfy.live.presentation.components.HeroSpotlight
 import com.sportzfy.live.presentation.components.AnnouncementBanner
 import com.sportzfy.live.presentation.components.InlineBanner
 import com.sportzfy.live.presentation.components.MatchCard
-import com.sportzfy.live.presentation.components.MessageState
 import com.sportzfy.live.presentation.components.PulsingDot
 import com.sportzfy.live.presentation.components.SportzfyWordmark
 import com.sportzfy.live.presentation.components.tvFocus
@@ -189,10 +193,11 @@ fun MatchCatalogContent(
             when {
                 // A Retry after a failed first load shows the skeleton while it runs.
                 state.isInitialLoading || (!state.hasData && state.isRefreshing) -> MatchListSkeleton()
-                !state.hasData && state.error != null -> MessageState(
+                !state.hasData && state.error != null -> EmptyState(
+                    icon = SportzfyIcons.Offline,
+                    title = "Couldn't load matches",
                     message = state.error.userMessage(),
-                    actionLabel = "Retry",
-                    onAction = requestRefresh,
+                    primaryAction = "Retry" to requestRefresh,
                     modifier = Modifier.align(Alignment.Center),
                 )
                 else -> LazyVerticalGrid(
@@ -277,6 +282,9 @@ private fun LazyGridScope.catalogItems(
             savedSelected = state.favoritesOnly,
             onSelectSaved = onSelectSaved,
             otherSportsSelected = state.otherSports,
+            // Edge to edge, so chips scroll off the screen edge instead of mid-air.
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            modifier = Modifier.bleedHorizontally(16.dp),
         )
     }
     val homeView = state.homeView
@@ -302,15 +310,33 @@ private fun LazyGridScope.catalogItems(
         }
     } else if (state.isEmpty) {
         item(key = "empty", span = fullSpan) {
-            MessageState(
-                when {
-                    state.query.isNotBlank() -> "No matches for \"${state.query.trim()}\"."
-                    state.favoritesOnly -> "No saved matches here. Tap the star on a match to save it."
-                    state.scope == DayScope.TOMORROW -> "No fixtures announced for tomorrow yet."
-                    state.scope == DayScope.ALL -> "No fixtures available right now."
-                    else -> "No fixtures in this category right now."
-                }
-            )
+            when {
+                state.query.isNotBlank() -> EmptyState(
+                    icon = SportzfyIcons.Search,
+                    title = "No results",
+                    message = "No matches for \"${state.query.trim()}\".",
+                )
+                state.favoritesOnly -> EmptyState(
+                    icon = SportzfyIcons.Saved,
+                    title = "Nothing saved here",
+                    message = "No saved matches here. Tap the star on a match to save it.",
+                )
+                state.scope == DayScope.TOMORROW -> EmptyState(
+                    icon = SportzfyIcons.Tomorrow,
+                    title = "No fixtures yet",
+                    message = "No fixtures announced for tomorrow yet.",
+                )
+                state.scope == DayScope.ALL -> EmptyState(
+                    icon = SportzfyIcons.AllMatches,
+                    title = "No fixtures",
+                    message = "No fixtures available right now.",
+                )
+                else -> EmptyState(
+                    icon = SportzfyIcons.Football,
+                    title = "Nothing here",
+                    message = "No fixtures in this category right now.",
+                )
+            }
         }
     }
     state.sections.forEach { section ->
@@ -346,7 +372,8 @@ private fun CatalogHeader(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            // Clear of the status bar, and of side nav bars and cutouts in landscape.
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .padding(start = if (onOpenMenu != null) 4.dp else 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
             .height(56.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -357,7 +384,7 @@ private fun CatalogHeader(
                 value = query,
                 onValueChange = onQueryChange,
                 placeholder = { Text("Search teams, leagues or sports") },
-                leadingIcon = { SportzfyIcon(SportzfyIcons.Search, contentDescription = null, size = 20.dp) },
+                leadingIcon = { SportzfyIcon(SportzfyIcons.Search, contentDescription = null, size = 22.dp) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.colors(
@@ -385,7 +412,8 @@ private fun CatalogHeader(
             SportzfyWordmark()
             if (liveCount != null) {
                 Spacer(Modifier.width(12.dp))
-                LiveCounter(liveCount)
+                // Gives way first on 320dp screens so Search never gets squeezed.
+                LiveCounter(liveCount, Modifier.weight(1f, fill = false))
             }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onOpenSearch, modifier = Modifier.tvFocus(CircleShape)) {
@@ -396,9 +424,9 @@ private fun CatalogHeader(
 }
 
 @Composable
-private fun LiveCounter(count: Int) {
+private fun LiveCounter(count: Int, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .background(SportzfyColors.SlateRaised, RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -408,6 +436,7 @@ private fun LiveCounter(count: Int) {
         Text(
             text = "$count LIVE",
             style = ScoreTextStyle,
+            maxLines = 1,
             color = if (count > 0) SportzfyColors.TextPrimary else SportzfyColors.TextMuted,
         )
     }
@@ -429,7 +458,9 @@ private fun ScreenTitle(title: String, dateLabel: String?) {
         Text(
             text = title,
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.testTag("screen-title"),
+            modifier = Modifier
+                .testTag("screen-title")
+                .semantics { heading() },
         )
         if (dateLabel != null) {
             Spacer(Modifier.width(10.dp))
@@ -503,7 +534,8 @@ private fun HomeControls(
             modifier = Modifier
                 .size(48.dp)
                 .tvFocus(shape)
-                .background(SportzfyColors.SlateRaised, shape)
+                .clip(shape)
+                .background(SportzfyColors.SlateRaised)
                 // Disabled while a refresh runs, so taps can't stack requests.
                 .clickable(enabled = !refreshing, role = Role.Button, onClick = onRefresh)
                 .semantics { contentDescription = if (refreshing) "Refreshing" else "Refresh" },
@@ -512,7 +544,7 @@ private fun HomeControls(
             if (refreshing) {
                 CircularProgressIndicator(Modifier.size(20.dp), color = SportzfyColors.Rose, strokeWidth = 2.dp)
             } else {
-                SportzfyIcon(SportzfyIcons.Refresh, contentDescription = null, size = 20.dp)
+                SportzfyIcon(SportzfyIcons.Refresh, contentDescription = null, size = 22.dp)
             }
         }
     }
@@ -586,7 +618,7 @@ private fun SectionHeader(title: String, count: Int) {
         modifier = Modifier.padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.width(8.dp))
         Text("$count", style = ScoreTextStyle, color = SportzfyColors.TextMuted)
     }

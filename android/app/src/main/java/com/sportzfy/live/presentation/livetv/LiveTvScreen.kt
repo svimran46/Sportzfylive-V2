@@ -1,5 +1,9 @@
 package com.sportzfy.live.presentation.livetv
 
+import com.sportzfy.live.presentation.components.bleedHorizontally
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -168,7 +172,7 @@ private fun LiveTvHeader(onOpenMenu: (() -> Unit)?) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .padding(start = if (onOpenMenu != null) 4.dp else 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
             .height(56.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -205,11 +209,11 @@ private fun ChannelSearchField(query: String, onQueryChange: (String) -> Unit) {
         value = query,
         onValueChange = onQueryChange,
         placeholder = { Text("Search channels") },
-        leadingIcon = { SportzfyIcon(SportzfyIcons.Search, contentDescription = null, size = 20.dp) },
+        leadingIcon = { SportzfyIcon(SportzfyIcons.Search, contentDescription = null, size = 22.dp) },
         trailingIcon = if (query.isNotEmpty()) {
             {
                 IconButton(onClick = { onQueryChange("") }, modifier = Modifier.tvFocus(CircleShape)) {
-                    SportzfyIcon(SportzfyIcons.Close, contentDescription = "Clear search", size = 20.dp)
+                    SportzfyIcon(SportzfyIcons.Close, contentDescription = "Clear search", size = 22.dp)
                 }
             }
         } else {
@@ -232,7 +236,11 @@ private fun ChannelSearchField(query: String, onQueryChange: (String) -> Unit) {
 
 @Composable
 private fun CategoryChips(state: ChannelsUiState, onSelect: (ChannelCategory?) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        modifier = Modifier.bleedHorizontally(16.dp),
+    ) {
         items(state.categories, key = { it.category?.name ?: "all" }) { option ->
             SportzfyChip(
                 label = "${option.label}  ${option.count}",

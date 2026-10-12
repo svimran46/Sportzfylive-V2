@@ -23,10 +23,17 @@ object SportzfyColors {
     val Rose = Color(0xFFF01E4F)
     val RoseDim = Color(0xFFA3123A)
 
+    /** Filled accent surfaces under white text (buttons, selected chips): 5.1:1 with white. */
+    val RoseFill = Color(0xFFD91442)
+
+    /** Accent-coloured text on dark surfaces: 5.2:1 or better on every dark token. */
+    val RoseText = Color(0xFFFF4D73)
+
     /** HD tags. */
     val Emerald = Color(0xFF10B981)
 
     val TextPrimary = Color(0xFFFFFFFF)
     val TextSecondary = Color(0xFFAAB7CC)
-    val TextMuted = Color(0xFF6E7C93)
+    /** Tertiary text; 5.2:1 or better on every dark surface (WCAG AA). */
+    val TextMuted = Color(0xFF8391A8)
 }

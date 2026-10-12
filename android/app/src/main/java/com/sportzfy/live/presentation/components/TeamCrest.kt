@@ -43,7 +43,8 @@ fun TeamCrest(
         if (url != null && !failed) {
             AsyncImage(
                 model = url,
-                contentDescription = team?.name,
+                // The name is always shown beside the crest; don't read it twice.
+                contentDescription = null,
                 contentScale = ContentScale.Fit,
                 onError = { failed = true },
                 modifier = Modifier.fillMaxSize().padding(size / 8),

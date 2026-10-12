@@ -18,7 +18,8 @@ import com.sportzfy.live.core.theme.SportzfyColors
 
 /**
  * D-pad focus treatment for Android TV and keyboards: a 2dp rose border and
- * a slight scale-up while the element (or anything inside it) has focus.
+ * a slight scale-up while the element itself has focus. A focused child
+ * (e.g. the star on a card) highlights alone, never together with its parent.
  *
  * Apply it to the `modifier` of a clickable component (Card, chip, button).
  * Those are already focus targets, so no extra `focusable()` is added; that
@@ -31,7 +32,7 @@ fun Modifier.tvFocus(
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) focusedScale else 1f, label = "focusScale")
     this
-        .onFocusChanged { focused = it.hasFocus }
+        .onFocusChanged { focused = it.isFocused }
         .graphicsLayer {
             scaleX = scale
             scaleY = scale

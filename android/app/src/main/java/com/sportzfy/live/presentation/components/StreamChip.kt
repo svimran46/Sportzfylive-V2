@@ -37,9 +37,9 @@ fun StreamChip(
             .tvFocus(RoundedCornerShape(10.dp))
             .semantics { contentDescription = WatchLogic.streamLabel(index, stream) },
         shape = RoundedCornerShape(10.dp),
-        color = if (selected) SportzfyColors.Rose else SportzfyColors.SlateRaised,
+        color = if (selected) SportzfyColors.RoseFill else SportzfyColors.SlateRaised,
         contentColor = SportzfyColors.TextPrimary,
-        border = BorderStroke(1.dp, if (selected) SportzfyColors.Rose else SportzfyColors.Outline),
+        border = BorderStroke(1.dp, if (selected) SportzfyColors.RoseFill else SportzfyColors.Outline),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -49,7 +49,7 @@ fun StreamChip(
                 )
                 if (stream.isHd) {
                     Spacer(Modifier.width(6.dp))
-                    HdTag()
+                    HdTag(onAccent = selected)
                 }
                 if (stream.language.isNotBlank()) {
                     Text(
@@ -62,7 +62,7 @@ fun StreamChip(
             Text(
                 text = stream.source,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (selected) SportzfyColors.TextPrimary.copy(alpha = 0.8f) else SportzfyColors.TextMuted,
+                color = if (selected) SportzfyColors.TextPrimary else SportzfyColors.TextMuted,
             )
         }
     }

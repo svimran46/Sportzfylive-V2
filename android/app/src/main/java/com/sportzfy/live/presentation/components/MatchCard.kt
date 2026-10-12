@@ -1,5 +1,8 @@
 package com.sportzfy.live.presentation.components
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,22 +47,25 @@ fun MatchCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.tvFocus(MaterialTheme.shapes.medium),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = SportzfyColors.SlateRaised),
+        modifier = modifier.tvFocus(MaterialTheme.shapes.large),
+        shape = MaterialTheme.shapes.large,
+        // Explicit content colour: titles and team names are white, not the grey M3 default.
+        colors = CardDefaults.cardColors(containerColor = SportzfyColors.SlateRaised, contentColor = SportzfyColors.TextPrimary),
     ) {
-        Column(Modifier.padding(if (compact) 12.dp else 14.dp)) {
+        Column(Modifier.padding(if (compact) 12.dp else 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = match.category.displayName.uppercase(),
                     style = MaterialTheme.typography.labelMedium,
                     color = SportzfyColors.TextMuted,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 StatusTag(match, nowMillis, formatter)
                 if (onToggleFavorite != null) {
-                    FavoriteButton(isFavorite, onToggleFavorite, Modifier.size(32.dp))
+                    // 40dp visual with a 48dp touch target; nudged right to keep the row compact.
+                    FavoriteButton(isFavorite, onToggleFavorite, Modifier.size(40.dp).offset(x = 8.dp))
                 }
             }
             Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
@@ -89,13 +95,18 @@ fun MatchCard(
 
 @Composable
 fun FavoriteButton(isFavorite: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    IconButton(onClick = onToggle, modifier = modifier.tvFocus(CircleShape)) {
+    IconButton(
+        onClick = onToggle,
+        modifier = modifier
+            .tvFocus(CircleShape)
+            .semantics { stateDescription = if (isFavorite) "Saved" else "Not saved" },
+    ) {
         // Lucide is outline-only: the saved state is the accent colour.
         SportzfyIcon(
             SportzfyIcons.Saved,
             contentDescription = if (isFavorite) "Remove from saved" else "Save match",
             tint = if (isFavorite) SportzfyColors.Rose else SportzfyColors.TextMuted,
-            size = 20.dp,
+            size = 22.dp,
         )
     }
 }

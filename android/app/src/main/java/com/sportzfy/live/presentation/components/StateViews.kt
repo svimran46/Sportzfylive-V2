@@ -1,5 +1,11 @@
 package com.sportzfy.live.presentation.components
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -102,7 +108,11 @@ fun MessageState(
             textAlign = TextAlign.Center,
         )
         if (actionLabel != null) {
-            OutlinedButton(onClick = onAction, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text(actionLabel) }
+            OutlinedButton(
+                onClick = onAction,
+                border = BorderStroke(1.dp, SportzfyColors.TextMuted),
+                modifier = Modifier.tvFocus(RoundedCornerShape(50)),
+            ) { Text(actionLabel) }
         }
     }
 }
@@ -116,9 +126,10 @@ fun AnnouncementBanner(announcement: Announcement, modifier: Modifier = Modifier
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .then(
                 if (link != null) {
-                    Modifier.tvFocus(shape).clickable { runCatching { uriHandler.openUri(link) } }
+                    Modifier.tvFocus(shape).clip(shape).clickable(role = Role.Button) { runCatching { uriHandler.openUri(link) } }
                 } else {
                     Modifier
                 }
@@ -161,6 +172,7 @@ fun InlineBanner(message: String, modifier: Modifier = Modifier) {
  * Designed empty or error state: an icon, a title, a short message and up to
  * two actions (e.g. "Browse Today" / "See upcoming").
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EmptyState(
     @androidx.annotation.DrawableRes icon: Int,
@@ -171,7 +183,7 @@ fun EmptyState(
     secondaryAction: Pair<String, () -> Unit>? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -184,16 +196,25 @@ fun EmptyState(
         Text(title, style = MaterialTheme.typography.titleMedium, color = SportzfyColors.TextPrimary, textAlign = TextAlign.Center)
         Text(message, style = MaterialTheme.typography.bodyMedium, color = SportzfyColors.TextSecondary, textAlign = TextAlign.Center)
         if (primaryAction != null || secondaryAction != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 6.dp)) {
+            // Wraps to a second line instead of overflowing on 320dp screens.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 6.dp),
+            ) {
                 primaryAction?.let { (label, action) ->
                     androidx.compose.material3.Button(
                         onClick = action,
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = SportzfyColors.Rose),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = SportzfyColors.RoseFill),
                         modifier = Modifier.tvFocus(RoundedCornerShape(50)),
                     ) { Text(label) }
                 }
                 secondaryAction?.let { (label, action) ->
-                    OutlinedButton(onClick = action, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text(label) }
+                    OutlinedButton(
+                        onClick = action,
+                        border = BorderStroke(1.dp, SportzfyColors.TextMuted),
+                        modifier = Modifier.tvFocus(RoundedCornerShape(50)),
+                    ) { Text(label) }
                 }
             }
         }

@@ -1,5 +1,9 @@
 package com.sportzfy.live.presentation.components
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -95,10 +99,12 @@ private fun BottomNavItem(
         SportzfyIcon(item.icon, contentDescription = null, tint = color, size = 22.dp)
         Text(
             text = item.label,
-            color = color,
+            // Pink text uses the lighter text shade for contrast; the icon keeps Rose.
+            color = if (selected) SportzfyColors.RoseText else SportzfyColors.TextSecondary,
             fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -121,7 +127,8 @@ fun DrawerRow(
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .tvFocus(shape, focusedScale = 1f)
-            .background(if (selected) SportzfyColors.SelectedSurface else Color.Transparent, shape)
+            .clip(shape)
+            .background(if (selected) SportzfyColors.SelectedSurface else Color.Transparent)
             .drawBehind {
                 if (selected) {
                     val barHeight = size.height * 0.5f
@@ -160,7 +167,9 @@ fun DrawerSectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold),
-        color = SportzfyColors.Rose.copy(alpha = 0.9f),
-        modifier = modifier.padding(start = 14.dp, top = 8.dp, bottom = 4.dp),
+        color = SportzfyColors.RoseText,
+        modifier = modifier
+            .padding(start = 14.dp, top = 8.dp, bottom = 4.dp)
+            .semantics { heading() },
     )
 }

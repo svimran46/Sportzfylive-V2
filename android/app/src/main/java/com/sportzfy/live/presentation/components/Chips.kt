@@ -2,6 +2,9 @@ package com.sportzfy.live.presentation.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,13 +44,14 @@ fun SportzfyChip(
         onClick = onClick,
         modifier = modifier.tvFocus(shape),
         shape = shape,
-        color = if (selected) SportzfyColors.Rose else SportzfyColors.SlateRaised,
+        color = if (selected) SportzfyColors.RoseFill else SportzfyColors.SlateRaised,
         contentColor = if (selected) SportzfyColors.TextPrimary else SportzfyColors.TextSecondary,
-        border = BorderStroke(1.dp, if (selected) SportzfyColors.Rose else SportzfyColors.Outline),
+        border = BorderStroke(1.dp, if (selected) SportzfyColors.RoseFill else SportzfyColors.Outline),
     ) {
         Row(
+            // 48dp like the touch target M3 reserves, so the focus ring hugs the chip.
             modifier = Modifier
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -78,7 +82,8 @@ fun SegmentedControl(
     Row(
         modifier = modifier
             .background(SportzfyColors.SlateRaised, outer)
-            .padding(4.dp),
+            .padding(4.dp)
+            .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEachIndexed { index, option ->
@@ -86,9 +91,10 @@ fun SegmentedControl(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = 44.dp)
                     .tvFocus(inner, focusedScale = 1f)
-                    .background(if (selected) SportzfyColors.Outline else Color.Transparent, inner)
+                    .clip(inner)
+                    .background(if (selected) SportzfyColors.Outline else Color.Transparent)
                     .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(index) }),
                 contentAlignment = Alignment.Center,
             ) {
@@ -98,7 +104,11 @@ fun SegmentedControl(
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     ),
                     color = if (selected) SportzfyColors.TextPrimary else SportzfyColors.TextSecondary,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    // One line even at 320dp or large font sizes.
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }

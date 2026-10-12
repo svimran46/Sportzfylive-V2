@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +85,7 @@ private fun GateScreen(
     val uriHandler = LocalUriHandler.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -96,7 +99,7 @@ private fun GateScreen(
             if (actionLabel != null && actionUrl != null) {
                 Button(
                     onClick = { runCatching { uriHandler.openUri(actionUrl) } },
-                    colors = ButtonDefaults.buttonColors(containerColor = SportzfyColors.Rose),
+                    colors = ButtonDefaults.buttonColors(containerColor = SportzfyColors.RoseFill),
                     modifier = Modifier.tvFocus(RoundedCornerShape(50)),
                 ) { Text(actionLabel) }
             }

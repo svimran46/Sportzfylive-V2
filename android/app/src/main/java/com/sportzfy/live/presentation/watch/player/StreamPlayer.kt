@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sportzfy.live.core.player.PlaybackSource
 import com.sportzfy.live.core.player.PlayerConfig
+import com.sportzfy.live.presentation.components.tvFocus
 
 /**
  * Dual-engine player: Media3 for `.m3u8` URLs, the sandboxed WebView for
@@ -91,7 +93,7 @@ private fun PlayerMessage(
             textAlign = TextAlign.Center,
         )
         if (actionLabel != null) {
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            TextButton(onClick = onAction, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text(actionLabel) }
         }
     }
 }

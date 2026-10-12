@@ -45,7 +45,8 @@ fun CategoryPills(
         }
         if (otherSportsSelected) {
             item(key = "OTHER_SPORTS") {
-                Pill(label = "Other sports", selected = true, onClick = {})
+                // Tapping it clears the filter, like "All".
+                Pill(label = "Other sports", selected = true, onClick = { onSelect(null) })
             }
         }
         items(options, key = { it.category?.name ?: "ALL" }) { option ->

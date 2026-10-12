@@ -47,13 +47,13 @@ fun HeroSpotlight(
         onClick = onWatch,
         modifier = modifier.fillMaxWidth().height(220.dp).tvFocus(MaterialTheme.shapes.large, focusedScale = 1.01f),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = SportzfyColors.SlateRaised),
+        colors = CardDefaults.cardColors(containerColor = SportzfyColors.SlateRaised, contentColor = SportzfyColors.TextPrimary),
     ) {
         Box(Modifier.fillMaxSize()) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Brush.linearGradient(listOf(SportzfyColors.RoseDim, SportzfyColors.Slate)))
+                    .background(Brush.linearGradient(listOf(SportzfyColors.SlateRaised, SportzfyColors.Slate)))
             )
             if (match.posterUrl != null) {
                 AsyncImage(
@@ -88,6 +88,9 @@ fun HeroSpotlight(
                         text = match.category.displayName.uppercase(),
                         style = MaterialTheme.typography.labelMedium,
                         color = SportzfyColors.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -108,7 +111,7 @@ fun HeroSpotlight(
                 Button(
                     onClick = onWatch,
                     modifier = Modifier.tvFocus(RoundedCornerShape(50)),
-                    colors = ButtonDefaults.buttonColors(containerColor = SportzfyColors.Rose),
+                    colors = ButtonDefaults.buttonColors(containerColor = SportzfyColors.RoseFill),
                 ) {
                     SportzfyIcon(SportzfyIcons.Play, contentDescription = null, size = 18.dp)
                     Spacer(Modifier.width(6.dp))
