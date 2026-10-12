@@ -21,6 +21,7 @@ class MatchTimeFormatter(
 
     fun status(match: Match, nowMillis: Long): String = when (match.status) {
         MatchStatus.LIVE -> "LIVE"
+        MatchStatus.STARTED -> "Started"
         MatchStatus.ENDED -> "Ended"
         MatchStatus.UPCOMING -> kickoff(match.startTimeMillis, nowMillis)
     }

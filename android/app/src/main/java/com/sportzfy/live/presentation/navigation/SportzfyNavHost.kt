@@ -48,7 +48,13 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
         exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
     ) {
         composable<TodayRoute> {
-            MatchCatalogScreen(DayScope.TODAY, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.TODAY) })
+            MatchCatalogScreen(
+                DayScope.TODAY,
+                openMatch,
+                viewModel = catalogViewModel,
+                bottomBar = { bottomBar(MainTab.TODAY) },
+                onBrowseTomorrow = { navController.navigateToTab(MainTab.TOMORROW) },
+            )
         }
         composable<TomorrowRoute> {
             MatchCatalogScreen(DayScope.TOMORROW, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.TOMORROW) })

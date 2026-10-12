@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MatchRepositoryImplTest {
@@ -67,16 +68,45 @@ class MatchRepositoryImplTest {
     }
 
     @Test
-    fun `live failure falls back to kick-off time`() = runTest {
+    fun `live failure never marks a match live`() = runTest {
         api.today = { json("""[${match("recent", -hour)}, ${match("old", -5 * hour)}]""") }
         api.live = { throw httpError(503) }
 
         repository.refresh()
 
-        val byId = repository.feed.value.matches.associateBy { it.id }
-        assertEquals(MatchStatus.LIVE, byId.getValue("recent").status)
-        assertEquals(MatchStatus.ENDED, byId.getValue("old").status)
-        assertNull(repository.feed.value.error)
+        val feed = repository.feed.value
+        val byId = feed.matches.associateBy { it.id }
+        assertEquals(MatchStatus.STARTED, byId.getValue("recent").status)
+        assertEquals(MatchStatus.STARTED, byId.getValue("old").status)
+        assertEquals(0, feed.liveCount)
+        assertFalse(feed.liveStatusKnown)
+        assertNull(feed.error)
+    }
+
+    @Test
+    fun `a recent live payload stands in for a failed live feed`() = runTest {
+        api.today = { json("""[${match("a", -hour)}]""") }
+        api.live = { json("""[${match("a", -hour)}]""") }
+        repository.refresh()
+
+        api.live = { throw httpError(503) }
+        clock.advance(61_000)
+        repository.refresh()
+        assertEquals(MatchStatus.LIVE, repository.feed.value.matches.single().status)
+        assertTrue(repository.feed.value.liveStatusKnown)
+
+        clock.advance(MatchRepositoryImpl.LIVE_REUSE_MILLIS)
+        repository.refresh()
+        assertEquals(MatchStatus.STARTED, repository.feed.value.matches.single().status)
+        assertFalse(repository.feed.value.liveStatusKnown)
+    }
+
+    @Test
+    fun `forced refreshes that queue behind a running one are dropped`() = runTest {
+        repository.refresh()
+        List(3) { async { repository.refresh(force = true) } }.awaitAll()
+        assertEquals(2, api.todayCalls)
+        assertEquals(2, api.liveCalls)
     }
 
     @Test

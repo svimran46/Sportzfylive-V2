@@ -16,6 +16,7 @@ data class CategoryOption(val category: SportCategory?, val count: Int) {
 
 enum class SectionKind(val title: String, val status: MatchStatus) {
     LIVE("Live now", MatchStatus.LIVE),
+    STARTED("Started", MatchStatus.STARTED),
     UPCOMING("Upcoming", MatchStatus.UPCOMING),
     ENDED("Earlier today", MatchStatus.ENDED),
 }
@@ -34,8 +35,8 @@ data class CatalogUiState(
     val isRefreshing: Boolean = false,
     val error: DataError? = null,
     val hasData: Boolean = false,
-    /** Live matches across all categories, for the header counter. */
-    val liveCount: Int = 0,
+    /** Live matches across all categories; null when the live feed is unavailable. */
+    val liveCount: Int? = 0,
     val categories: List<CategoryOption> = listOf(CategoryOption(null, 0)),
     val selectedCategory: SportCategory? = null,
     /** "Saved" pill: only matches the user bookmarked. */
@@ -52,6 +53,12 @@ data class CatalogUiState(
     val scope: DayScope? = null,
     /** "Tue 13 Oct" for the scope's day (Today/Tomorrow), when known. */
     val dateLabel: String? = null,
+    /** The Home switch position; null on screens other than Home. */
+    val homeView: HomeView? = null,
+    /** False when the live feed couldn't be loaded, so nothing is marked live. */
+    val liveStatusKnown: Boolean = true,
+    /** Matches in the list, spotlight included, after every filter. */
+    val listCount: Int = 0,
 ) {
     val isEmpty: Boolean
         get() = hero == null && sections.isEmpty()
@@ -67,11 +74,15 @@ data class CatalogUiState(
             scope: DayScope? = null,
             window: DayWindow? = null,
             locale: Locale = Locale.getDefault(),
+            homeView: HomeView? = null,
         ): CatalogUiState {
             val visible = feed.matches.filter { it.category !in config.hiddenCategories }
-            // Pills, counts and the list all describe the scope's day; the header
-            // live counter stays global.
-            val all = if (scope != null && window != null) MatchDays.inScope(visible, scope, window) else visible
+            // The Live | Upcoming | All switch only exists on Home (Today).
+            val view = homeView?.takeIf { scope == DayScope.TODAY }
+            // Pills, counts and the list all describe the scope's day (and Home's
+            // view); the header live counter stays global.
+            val inScope = if (scope != null && window != null) MatchDays.inScope(visible, scope, window) else visible
+            val all = if (view == null) inScope else inScope.filter(view::includes)
             val counts = all.groupingBy { it.category }.eachCount()
             val categories = buildList {
                 add(CategoryOption(null, all.size))
@@ -98,6 +109,9 @@ data class CatalogUiState(
             val rest = if (hero == null) filtered else filtered.filter { it.id != hero.id }
             val sections = if (scope == DayScope.ALL && window != null) {
                 MatchDays.sectionsByDay(rest, window, locale)
+            } else if (view == HomeView.LIVE || view == HomeView.UPCOMING) {
+                // One status only: the Home heading already names it.
+                listOfNotNull(rest.takeIf { it.isNotEmpty() }?.let { MatchSection(null, it, key = "home-${view.name}") })
             } else {
                 SectionKind.entries.mapNotNull { kind ->
                     rest.filter { it.status == kind.status }
@@ -118,7 +132,7 @@ data class CatalogUiState(
                 isRefreshing = feed.isLoading,
                 error = feed.error,
                 hasData = feed.updatedAtMillis != null,
-                liveCount = visible.count { it.isLive },
+                liveCount = visible.count { it.isLive }.takeIf { feed.liveStatusKnown },
                 categories = categories,
                 selectedCategory = category,
                 favoritesOnly = favoritesOnly,
@@ -130,6 +144,9 @@ data class CatalogUiState(
                 announcement = config.announcement,
                 scope = scope,
                 dateLabel = dateLabel,
+                homeView = view,
+                liveStatusKnown = feed.liveStatusKnown,
+                listCount = filtered.size,
             )
         }
     }

@@ -7,6 +7,7 @@ import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.core.time.ZoneProvider
 import com.sportzfy.live.presentation.model.CatalogUiState
 import com.sportzfy.live.presentation.model.DayScope
+import com.sportzfy.live.presentation.model.HomeView
 import com.sportzfy.live.presentation.model.testMatch
 import com.sportzfy.live.domain.model.Announcement
 import com.sportzfy.live.domain.model.AppConfig
@@ -54,6 +55,9 @@ class CatalogViewModelTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         viewModel = CatalogViewModel(matchRepository, favorites, config, clock, utc)
+        // These tests cover filters and days over all of today; Home's
+        // Live | Upcoming | All switch has its own tests below.
+        viewModel.setHomeView(HomeView.ALL)
     }
 
     @After
@@ -157,6 +161,37 @@ class CatalogViewModelTest {
 
         assertTrue(viewModel.state(DayScope.TOMORROW).value.isEmpty)
         assertTrue("night" in today.ids())
+    }
+
+    @Test
+    fun `home opens on source-confirmed live matches only`() = runTest {
+        viewModel = CatalogViewModel(matchRepository, favorites, config, clock, utc)
+        collectState()
+
+        assertEquals(HomeView.LIVE, today.homeView)
+        assertEquals(setOf("madrid", "india"), today.ids().toSet())
+        assertEquals(2, today.listCount)
+    }
+
+    @Test
+    fun `home switch slices today and leaves other tabs alone`() = runTest {
+        collectState(DayScope.TODAY)
+        collectState(DayScope.TOMORROW)
+
+        viewModel.setHomeView(HomeView.UPCOMING)
+        assertEquals(listOf("arsenal"), today.ids())
+        assertEquals(listOf("night"), viewModel.state(DayScope.TOMORROW).value.ids())
+        assertEquals(null, viewModel.state(DayScope.TOMORROW).value.homeView)
+
+        viewModel.setHomeView(HomeView.LIVE)
+        assertEquals(setOf("madrid", "india"), today.ids().toSet())
+    }
+
+    @Test
+    fun `a forced refresh is dropped while one is running`() = runTest {
+        matchRepository.emit(MatchFeed(matches, updatedAtMillis = 1L, isLoading = true, error = null))
+        viewModel.refresh(force = true)
+        assertEquals(0, matchRepository.forcedRefreshCalls)
     }
 
     @Test

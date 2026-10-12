@@ -1,12 +1,16 @@
 package com.sportzfy.live.presentation.catalog
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.sportzfy.live.core.theme.SportzfyTheme
 import com.sportzfy.live.domain.model.MatchStatus.LIVE
+import com.sportzfy.live.domain.model.MatchStatus.UPCOMING
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.model.testMatch
 import com.sportzfy.live.core.time.ZoneProvider
@@ -67,6 +71,38 @@ class CatalogScreenTest {
         compose.onAllNodesWithText("Arsenal", substring = true).assertCountEquals(0)
         compose.onAllNodesWithText("Real Madrid", substring = true).assertCountEquals(0)
         compose.onAllNodesWithText("India", substring = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun homeWithoutLiveMatchesOffersUpcomingAndAll() {
+        val upcomingOnly = CatalogViewModel(
+            FakeMatchRepository(listOf(testMatch("arsenal", UPCOMING, home = "Arsenal", away = "Chelsea"))),
+            FakeFavoritesRepository(),
+            FakeAppConfigRepository(),
+            FakeClock(),
+            ZoneProvider { java.util.TimeZone.getTimeZone("UTC") },
+        )
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            SportzfyTheme { MatchCatalogScreen(scope = DayScope.TODAY, onOpenMatch = {}, viewModel = upcomingOnly) }
+        }
+        settle()
+
+        // Live is the default view and never borrows upcoming matches.
+        compose.onNode(hasText("Live") and isSelectable()).assertIsSelected()
+        compose.onNodeWithText("No live matches right now").assertExists()
+        compose.onAllNodesWithText("Arsenal", substring = true).assertCountEquals(0)
+
+        compose.onNode(hasText("Upcoming") and isSelectable()).performClick()
+        settle()
+        compose.onAllNodesWithText("Arsenal", substring = true).assertCountEquals(1)
+
+        compose.onNode(hasText("Live") and isSelectable()).performClick()
+        settle()
+        compose.onNodeWithText("All today").performClick()
+        settle()
+        compose.onNode(hasText("All") and isSelectable()).assertIsSelected()
+        compose.onAllNodesWithText("Arsenal", substring = true).assertCountEquals(1)
     }
 
     @Test

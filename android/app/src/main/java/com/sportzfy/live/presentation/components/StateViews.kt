@@ -1,5 +1,10 @@
 package com.sportzfy.live.presentation.components
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,9 +22,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sportzfy.live.core.theme.SportzfyColors
@@ -30,6 +40,42 @@ import com.sportzfy.live.domain.model.Announcement
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(color = SportzfyColors.Rose)
+    }
+}
+
+/** Placeholder cards that gently pulse while the first load runs. */
+@Composable
+fun MatchListSkeleton(modifier: Modifier = Modifier, count: Int = 4) {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val pulse by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "skeleton-alpha",
+    )
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .semantics { contentDescription = "Loading matches" },
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(0.5f)
+                .height(28.dp)
+                .graphicsLayer { alpha = pulse }
+                .background(SportzfyColors.SlateRaised, RoundedCornerShape(8.dp))
+        )
+        repeat(count) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(116.dp)
+                    .graphicsLayer { alpha = pulse }
+                    .background(SportzfyColors.SlateRaised, RoundedCornerShape(16.dp))
+            )
+        }
     }
 }
 

@@ -2,7 +2,9 @@ package com.sportzfy.live.presentation.catalog
 
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -21,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +47,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -58,10 +66,12 @@ import com.sportzfy.live.core.theme.SportzfyIcon
 import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.components.CategoryPills
+import com.sportzfy.live.presentation.components.EmptyState
+import com.sportzfy.live.presentation.components.MatchListSkeleton
+import com.sportzfy.live.presentation.components.SegmentedControl
 import com.sportzfy.live.presentation.components.HeroSpotlight
 import com.sportzfy.live.presentation.components.AnnouncementBanner
 import com.sportzfy.live.presentation.components.InlineBanner
-import com.sportzfy.live.presentation.components.LoadingState
 import com.sportzfy.live.presentation.components.MatchCard
 import com.sportzfy.live.presentation.components.MessageState
 import com.sportzfy.live.presentation.components.PulsingDot
@@ -69,6 +79,7 @@ import com.sportzfy.live.presentation.components.SportzfyWordmark
 import com.sportzfy.live.presentation.components.tvFocus
 import com.sportzfy.live.presentation.model.CatalogUiState
 import com.sportzfy.live.presentation.model.DayScope
+import com.sportzfy.live.presentation.model.HomeView
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
 import com.sportzfy.live.presentation.model.userMessage
 import kotlinx.coroutines.delay
@@ -86,6 +97,7 @@ fun MatchCatalogScreen(
     onOpenMatch: (String) -> Unit,
     viewModel: CatalogViewModel = koinViewModel(),
     bottomBar: @Composable () -> Unit = {},
+    onBrowseTomorrow: () -> Unit = {},
 ) {
     val state by viewModel.state(scope).collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -109,6 +121,8 @@ fun MatchCatalogScreen(
         onQueryChange = viewModel::setQuery,
         onRefresh = { viewModel.refresh(force = true) },
         bottomBar = bottomBar,
+        onSelectHomeView = viewModel::setHomeView,
+        onBrowseTomorrow = onBrowseTomorrow,
     )
 }
 
@@ -123,6 +137,8 @@ fun MatchCatalogContent(
     onQueryChange: (String) -> Unit,
     onRefresh: () -> Unit,
     bottomBar: @Composable () -> Unit = {},
+    onSelectHomeView: (HomeView) -> Unit = {},
+    onBrowseTomorrow: () -> Unit = {},
 ) {
     var searchOpen by rememberSaveable { mutableStateOf(state.query.isNotEmpty()) }
     val formatter = rememberMatchTimeFormatter()
@@ -132,7 +148,8 @@ fun MatchCatalogContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CatalogHeader(
-                liveCount = state.liveCount,
+                // Home has its own live heading, so the counter would repeat it.
+                liveCount = state.liveCount.takeIf { state.homeView == null },
                 searchOpen = searchOpen,
                 query = state.query,
                 onQueryChange = onQueryChange,
@@ -151,7 +168,7 @@ fun MatchCatalogContent(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             when {
-                state.isInitialLoading -> LoadingState()
+                state.isInitialLoading -> MatchListSkeleton()
                 !state.hasData && state.error != null -> MessageState(
                     message = state.error.userMessage(),
                     actionLabel = "Retry",
@@ -165,7 +182,10 @@ fun MatchCatalogContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    catalogItems(state, now, formatter, onOpenMatch, onSelectCategory, onSelectSaved, onToggleFavorite)
+                    catalogItems(
+                        state, now, formatter, onOpenMatch, onSelectCategory, onSelectSaved, onToggleFavorite,
+                        onRefresh, onSelectHomeView, onBrowseTomorrow,
+                    )
                 }
             }
         }
@@ -180,6 +200,9 @@ private fun LazyGridScope.catalogItems(
     onSelectCategory: (SportCategory?) -> Unit,
     onSelectSaved: () -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onSelectHomeView: (HomeView) -> Unit,
+    onBrowseTomorrow: () -> Unit,
 ) {
     val fullSpan: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
 
@@ -203,6 +226,21 @@ private fun LazyGridScope.catalogItems(
             InlineBanner("${error.userMessage()} Showing the last fixtures loaded.")
         }
     }
+    // An empty Live view says this itself, with a Retry button.
+    val liveEmptyExplains = state.homeView == HomeView.LIVE && state.isEmpty
+    if (!state.liveStatusKnown && state.error == null && !liveEmptyExplains) {
+        item(key = "live-unknown", span = fullSpan) {
+            InlineBanner("Couldn't check which matches are live, so none are marked LIVE. Refresh to try again.")
+        }
+    }
+    state.homeView?.let { view ->
+        item(key = "home-heading", span = fullSpan) {
+            HomeHeading(view, state.listCount, countKnown = view != HomeView.LIVE || state.liveStatusKnown, state.dateLabel)
+        }
+        item(key = "home-controls", span = fullSpan) {
+            HomeControls(view, state.isRefreshing, onSelectHomeView, onRefresh)
+        }
+    }
     state.hero?.let { hero ->
         item(key = "hero", span = fullSpan) {
             HeroSpotlight(hero, now, formatter, onWatch = { onOpenMatch(hero.id) })
@@ -218,7 +256,12 @@ private fun LazyGridScope.catalogItems(
             onSelectSaved = onSelectSaved,
         )
     }
-    if (state.isEmpty) {
+    val homeView = state.homeView
+    if (state.isEmpty && homeView != null && state.query.isBlank() && !state.favoritesOnly) {
+        item(key = "empty", span = fullSpan) {
+            HomeEmptyState(state, homeView, onSelectHomeView, onSelectCategory, onBrowseTomorrow, onRefresh)
+        }
+    } else if (state.isEmpty) {
         item(key = "empty", span = fullSpan) {
             MessageState(
                 when {
@@ -232,8 +275,10 @@ private fun LazyGridScope.catalogItems(
         }
     }
     state.sections.forEach { section ->
-        item(key = "section-${section.key}", span = fullSpan) {
-            SectionHeader(section.title, section.matches.size)
+        if (section.title.isNotEmpty()) {
+            item(key = "section-${section.key}", span = fullSpan) {
+                SectionHeader(section.title, section.matches.size)
+            }
         }
         items(section.matches, key = { "match-${it.id}" }) { match ->
             MatchCard(
@@ -250,7 +295,7 @@ private fun LazyGridScope.catalogItems(
 
 @Composable
 private fun CatalogHeader(
-    liveCount: Int,
+    liveCount: Int?,
     searchOpen: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
@@ -290,8 +335,10 @@ private fun CatalogHeader(
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
         } else {
             SportzfyWordmark()
-            Spacer(Modifier.width(12.dp))
-            LiveCounter(liveCount)
+            if (liveCount != null) {
+                Spacer(Modifier.width(12.dp))
+                LiveCounter(liveCount)
+            }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onOpenSearch, modifier = Modifier.tvFocus(CircleShape)) {
                 SportzfyIcon(SportzfyIcons.Search, contentDescription = "Search")
@@ -345,6 +392,133 @@ private fun ScreenTitle(title: String, dateLabel: String?) {
                 modifier = Modifier.padding(bottom = 3.dp),
             )
         }
+    }
+}
+
+/** "Live Matches  ● 3 LIVE", "Upcoming Today  4" or "Today  Mon 12 Oct  9". */
+@Composable
+private fun HomeHeading(view: HomeView, count: Int, countKnown: Boolean, dateLabel: String?) {
+    val title = when (view) {
+        HomeView.LIVE -> "Live Matches"
+        HomeView.UPCOMING -> "Upcoming Today"
+        HomeView.ALL -> "Today"
+    }
+    Row(
+        modifier = Modifier
+            .testTag("screen-title")
+            .semantics(mergeDescendants = true) { heading() },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.headlineSmall)
+        if (view == HomeView.ALL && dateLabel != null) {
+            Spacer(Modifier.width(10.dp))
+            Text(dateLabel, style = MaterialTheme.typography.bodyMedium, color = SportzfyColors.TextSecondary)
+        }
+        // Counts only when the data behind them is reliable.
+        if (countKnown) {
+            Spacer(Modifier.width(10.dp))
+            if (view == HomeView.LIVE) LiveCounter(count) else CountPill(count)
+        }
+    }
+}
+
+@Composable
+private fun CountPill(count: Int) {
+    Text(
+        text = "$count",
+        style = ScoreTextStyle,
+        color = SportzfyColors.TextSecondary,
+        modifier = Modifier
+            .background(SportzfyColors.SlateRaised, RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    )
+}
+
+/** Live | Upcoming | All, plus Refresh with its own progress state. */
+@Composable
+private fun HomeControls(
+    view: HomeView,
+    refreshing: Boolean,
+    onSelect: (HomeView) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        SegmentedControl(
+            options = HomeView.entries.map { it.label },
+            selectedIndex = view.ordinal,
+            onSelect = { onSelect(HomeView.entries[it]) },
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        val shape = RoundedCornerShape(12.dp)
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .tvFocus(shape)
+                .background(SportzfyColors.SlateRaised, shape)
+                // Disabled while a refresh runs, so taps can't stack requests.
+                .clickable(enabled = !refreshing, role = Role.Button, onClick = onRefresh)
+                .semantics { contentDescription = if (refreshing) "Refreshing" else "Refresh" },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (refreshing) {
+                CircularProgressIndicator(Modifier.size(20.dp), color = SportzfyColors.Rose, strokeWidth = 2.dp)
+            } else {
+                SportzfyIcon(SportzfyIcons.Refresh, contentDescription = null, size = 20.dp)
+            }
+        }
+    }
+}
+
+/** Never "nothing here" alone: each empty Home view offers the next place to look. */
+@Composable
+private fun HomeEmptyState(
+    state: CatalogUiState,
+    view: HomeView,
+    onSelectHomeView: (HomeView) -> Unit,
+    onSelectCategory: (SportCategory?) -> Unit,
+    onBrowseTomorrow: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    val category = state.selectedCategory
+    when {
+        category != null -> EmptyState(
+            icon = SportzfyIcons.Football,
+            title = "Nothing in ${category.displayName}",
+            message = when (view) {
+                HomeView.LIVE -> "No ${category.displayName} matches are live right now."
+                HomeView.UPCOMING -> "No more ${category.displayName} kick-offs today."
+                HomeView.ALL -> "No ${category.displayName} fixtures today."
+            },
+            primaryAction = "All sports" to { onSelectCategory(null) },
+        )
+        view == HomeView.LIVE && !state.liveStatusKnown -> EmptyState(
+            icon = SportzfyIcons.Alert,
+            title = "Can't check live matches",
+            message = "The live feed didn't respond, so nothing is marked live. Try again in a moment.",
+            primaryAction = "Retry" to onRefresh,
+            secondaryAction = "Upcoming" to { onSelectHomeView(HomeView.UPCOMING) },
+        )
+        view == HomeView.LIVE -> EmptyState(
+            icon = SportzfyIcons.LiveTv,
+            title = "No live matches right now",
+            message = "Nothing is on air at the moment. See what kicks off later today.",
+            primaryAction = "Upcoming" to { onSelectHomeView(HomeView.UPCOMING) },
+            secondaryAction = "All today" to { onSelectHomeView(HomeView.ALL) },
+        )
+        view == HomeView.UPCOMING -> EmptyState(
+            icon = SportzfyIcons.Clock,
+            title = "Nothing else today",
+            message = "No more kick-offs are scheduled for today.",
+            primaryAction = "Tomorrow" to onBrowseTomorrow,
+            secondaryAction = "All today" to { onSelectHomeView(HomeView.ALL) },
+        )
+        else -> EmptyState(
+            icon = SportzfyIcons.Today,
+            title = "No fixtures today",
+            message = "Nothing is scheduled for today yet.",
+            primaryAction = "Tomorrow" to onBrowseTomorrow,
+        )
     }
 }
 

@@ -50,7 +50,8 @@ Requires JDK 17+ and the Android SDK (platform 36).
 ## Data flow
 
 - **Matches:** `MatchRepository` fetches `all-today` and `live` from `https://streamed.pk/api/matches/` at the same time and tags the matches in the live feed as `LIVE`. Results are cached in memory for 60 seconds.
-  - If the live feed fails, a match is treated as live when it kicked off within the last 3 hours.
+  - Only the live feed can mark a match as `LIVE`; kick-off time never does. If the live feed fails, its last good copy is reused for up to 5 minutes. After that, nothing is marked live, matches that have kicked off show as **Started**, and the app says it couldn't check live matches instead of claiming there are none.
+  - A forced refresh that was queued behind a running one is dropped, so repeated taps on Refresh never stack requests.
   - If `all-today` fails, the last good copy is merged with the fresh live feed.
 - **Streams:** `StreamRepository` resolves each source group from `/api/stream/{source}/{id}` in parallel and caches each one for 60 seconds.
   - A group that fails (429, 5xx or a timeout) is reported back as failed. It never takes down the other groups, and its last good result is served while it is failing.
@@ -78,7 +79,12 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
 
 - **One feed:** matches come from Streamed's `all-today`, `all` (later days) and `live` endpoints, merged into one list with duplicates removed.
 - **Timezone:** "Today" and "Tomorrow" mean the **device's local calendar day** (`ZoneProvider`, `TimeZone.getDefault()`). All the day logic is in `MatchDays`, built on calendar arithmetic, so month and year changes and daylight-saving days are handled. The day boundaries are re-checked every minute, so the tabs roll over at midnight.
-- **Today:** matches that are live right now (even if they started yesterday), kick off today, or have no announced time.
+- **Today (Home):** today's matches, meaning those live right now (even if they started yesterday), kicking off today, or with no announced time. A **Live | Upcoming | All** switch picks what's shown, and it opens on **Live**:
+  - **Live:** only matches in Streamed's live feed. The heading reads "Live Matches" with a live count, which is hidden if the live feed couldn't be checked.
+  - **Upcoming:** today's matches that haven't kicked off yet, or have no announced time.
+  - **All:** everything for today, grouped as Live now, Started, Upcoming and Earlier today. The All Matches tab is the same idea across every day.
+  - **Refresh** reloads the feed, shows a spinner and can't be tapped again until it finishes. The switch, sport filter and search stay as they were.
+  - Each empty view suggests where to look next, e.g. "No live matches right now" offers Upcoming and All today, and an empty Upcoming offers Tomorrow.
 - **Tomorrow:** matches that kick off on the next local day and aren't live.
 - **All Matches:** everything, with live matches first, then one section per day (Yesterday, Today, Tomorrow, then dated days), then matches with no announced time. Every match appears once.
 - **Search and filters:** one `CatalogViewModel` serves all three fixture tabs, so search and the sport and Saved filters carry across them.

@@ -14,12 +14,6 @@ import kotlinx.serialization.json.JsonElement
 
 object MatchMapper {
 
-    /**
-     * When the live feed is unavailable, a match counts as live if it kicked
-     * off within this window. Keeps live badges useful during a live-feed outage.
-     */
-    const val LIVE_FALLBACK_WINDOW_MILLIS = 3 * 60 * 60 * 1000L
-
     /** Decodes a match list, dropping entries that fail to decode. */
     fun decodeList(json: Json, element: JsonElement): List<RemoteMatchDto> {
         val array = element as? JsonArray ?: return emptyList()
@@ -31,8 +25,8 @@ object MatchMapper {
     /**
      * Merges `all-today` with `live`. Matches in the live feed are tagged
      * [MatchStatus.LIVE]; live matches missing from `all-today` are appended.
-     * [live] is null when the live feed failed to load, in which case kick-off
-     * time decides via [LIVE_FALLBACK_WINDOW_MILLIS].
+     * [live] is null when the live feed failed to load: nothing is marked
+     * live then, and matches that have kicked off are [MatchStatus.STARTED].
      */
     fun merge(today: List<RemoteMatchDto>, live: List<RemoteMatchDto>?, nowMillis: Long): List<Match> {
         val liveById = live
@@ -79,7 +73,8 @@ object MatchMapper {
     private fun status(start: Long, now: Long, isLive: Boolean?): MatchStatus = when {
         isLive == true -> MatchStatus.LIVE
         start == 0L || start > now -> MatchStatus.UPCOMING
-        isLive == null && now - start < LIVE_FALLBACK_WINDOW_MILLIS -> MatchStatus.LIVE
+        // Only the live feed may say a match is live; kick-off time never does.
+        isLive == null -> MatchStatus.STARTED
         else -> MatchStatus.ENDED
     }
 
@@ -97,7 +92,7 @@ object MatchMapper {
             }
             .distinct()
 
-    /** Live first, then upcoming by kick-off, then ended (most recent first). */
+    /** Live, then started, then upcoming by kick-off, then ended (most recent first). */
     private val catalogOrder = Comparator<Match> { a, b ->
         val byStatus = a.status.ordinal.compareTo(b.status.ordinal)
         when {

@@ -85,14 +85,15 @@ class MatchMapperTest {
     }
 
     @Test
-    fun `falls back to kick-off time when the live feed is unknown`() {
+    fun `kick-off time never makes a match live when the live feed is unknown`() {
         val today = decode("""[${match("recent", now - hour)}, ${match("old", now - 5 * hour)}, ${match("soon", now + hour)}]""")
 
         val merged = MatchMapper.merge(today, live = null, nowMillis = now).associateBy { it.id }
 
-        assertEquals(MatchStatus.LIVE, merged.getValue("recent").status)
-        assertEquals(MatchStatus.ENDED, merged.getValue("old").status)
+        assertEquals(MatchStatus.STARTED, merged.getValue("recent").status)
+        assertEquals(MatchStatus.STARTED, merged.getValue("old").status)
         assertEquals(MatchStatus.UPCOMING, merged.getValue("soon").status)
+        assertTrue(merged.values.none { it.isLive })
     }
 
     @Test

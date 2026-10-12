@@ -13,6 +13,7 @@ import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.presentation.model.CatalogUiState
 import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.presentation.model.DayWindow
+import com.sportzfy.live.presentation.model.HomeView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -42,6 +43,7 @@ class CatalogViewModel(
         val category: SportCategory? = null,
         val favoritesOnly: Boolean = false,
         val query: String = "",
+        val homeView: HomeView = HomeView.LIVE,
     )
 
     private data class Inputs(
@@ -87,9 +89,18 @@ class CatalogViewModel(
 
     fun state(scope: DayScope): StateFlow<CatalogUiState> = states.getValue(scope)
 
-    /** Cheap to call often: the repository serves from its 60s cache. */
+    /**
+     * Cheap to call often: the repository serves from its 60s cache. A forced
+     * refresh is dropped while one is already running.
+     */
     fun refresh(force: Boolean = false) {
+        if (force && matchRepository.feed.value.isLoading) return
         viewModelScope.launch { matchRepository.refresh(force) }
+    }
+
+    /** Home's Live | Upcoming | All switch. Kept across tab switches. */
+    fun setHomeView(value: HomeView) {
+        filters.value = filters.value.copy(homeView = value)
     }
 
     fun selectCategory(value: SportCategory?) {
@@ -117,5 +128,6 @@ class CatalogViewModel(
         config = config,
         scope = scope,
         window = DayWindow.at(nowMillis, zones.zone()),
+        homeView = filters.homeView,
     )
 }
