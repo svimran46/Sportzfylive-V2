@@ -66,6 +66,7 @@ fun LiveTvScreen(
     onOpenChannel: (String) -> Unit,
     viewModel: LiveTvViewModel = koinViewModel(),
     bottomBar: @Composable () -> Unit = {},
+    onOpenMenu: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -77,6 +78,7 @@ fun LiveTvScreen(
         onQueryChange = viewModel::setQuery,
         onRefresh = { viewModel.refresh(force = true) },
         bottomBar = bottomBar,
+        onOpenMenu = onOpenMenu,
     )
 }
 
@@ -89,10 +91,11 @@ fun LiveTvContent(
     onQueryChange: (String) -> Unit,
     onRefresh: () -> Unit,
     bottomBar: @Composable () -> Unit = {},
+    onOpenMenu: (() -> Unit)? = null,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { LiveTvHeader() },
+        topBar = { LiveTvHeader(onOpenMenu) },
         bottomBar = bottomBar,
     ) { padding ->
         PullToRefreshBox(
@@ -159,16 +162,22 @@ fun LiveTvContent(
 }
 
 @Composable
-private fun LiveTvHeader() {
+private fun LiveTvHeader(onOpenMenu: (() -> Unit)?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(start = if (onOpenMenu != null) 4.dp else 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
             .height(56.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onOpenMenu != null) {
+            IconButton(onClick = onOpenMenu, modifier = Modifier.tvFocus(CircleShape)) {
+                SportzfyIcon(SportzfyIcons.Menu, contentDescription = "Open menu")
+            }
+            Spacer(Modifier.width(4.dp))
+        }
         Box(
             modifier = Modifier
                 .size(36.dp)

@@ -3,16 +3,23 @@ package com.sportzfy.live.presentation.model
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.MatchStatus
 import com.sportzfy.live.domain.model.StreamItem
+import com.sportzfy.live.domain.model.UserSettings
 
 object WatchLogic {
 
     const val RELATED_LIMIT = 8
 
-    /** Default pick: English HD, then any HD, then the first stream. */
-    fun preferredStream(streams: List<StreamItem>): StreamItem? =
-        streams.firstOrNull { it.isHd && it.language.equals("English", ignoreCase = true) }
+    /**
+     * Default pick: HD in [language], then any stream in [language], then any
+     * HD, then the first stream. A null [language] skips the language steps.
+     */
+    fun preferredStream(streams: List<StreamItem>, language: String? = UserSettings.DEFAULT_LANGUAGE): StreamItem? {
+        val inLanguage = if (language == null) emptyList() else streams.filter { it.language.equals(language, ignoreCase = true) }
+        return inLanguage.firstOrNull { it.isHd }
+            ?: inLanguage.firstOrNull()
             ?: streams.firstOrNull { it.isHd }
             ?: streams.firstOrNull()
+    }
 
     /**
      * Other matches worth switching to: not ended, same sport first, then

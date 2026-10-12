@@ -31,9 +31,10 @@ object SportzfyIcons {
     @DrawableRes val Refresh = LucideR.drawable.lucide_ic_refresh_cw
     @DrawableRes val Settings = LucideR.drawable.lucide_ic_settings
     @DrawableRes val About = LucideR.drawable.lucide_ic_info
-    @DrawableRes val Football = LucideR.drawable.lucide_ic_trophy
-    @DrawableRes val Cricket = LucideR.drawable.lucide_ic_circle_slash_2
-    @DrawableRes val OtherSports = LucideR.drawable.lucide_ic_ban
+    @DrawableRes val Football = LucideR.drawable.lucide_ic_goal
+    // Lucide has no cricket icon; a trophy reads as "competition" without misleading.
+    @DrawableRes val Cricket = LucideR.drawable.lucide_ic_trophy
+    @DrawableRes val OtherSports = LucideR.drawable.lucide_ic_volleyball
     @DrawableRes val Play = LucideR.drawable.lucide_ic_play
     @DrawableRes val ChevronRight = LucideR.drawable.lucide_ic_chevron_right
     @DrawableRes val Shield = LucideR.drawable.lucide_ic_shield_check

@@ -25,6 +25,10 @@ class FavoritesRepositoryImpl(
         }
     }
 
+    override suspend fun clear() {
+        dataStore.edit { it.remove(KEY) }
+    }
+
     private companion object {
         val KEY = stringPreferencesKey("favorite_match_ids")
     }

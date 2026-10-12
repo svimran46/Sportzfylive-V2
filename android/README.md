@@ -105,6 +105,20 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
   - **More matches:** a rail of other live and upcoming matches, which switch in place.
   - **Wide screens:** on screens 840dp or wider, the rail becomes a side column. The player instance is kept when the layout changes, so rotating the device doesn't restart the stream.
 
+## Drawer, Settings and About
+
+- **Drawer:** opened by the menu button at the top left of every tab. It covers about 80% of the screen width, up to 320dp. The page behind it dims, it scrolls on short screens, and it stays clear of the status and navigation bars. Tapping outside it, the ✕ or Back closes it, and so does picking an entry. It can't be swiped open, so swipes on sport pills and rails never pull it out by mistake.
+  - **Browse:** Live Matches (Home on Live, filters cleared), Live TV, Fixtures (All Matches, filters cleared), Saved Matches (All Matches filtered to saved), and Search (All Matches with the search field open).
+  - **Sports:** Football and Cricket filter All Matches to that sport. Other Sports shows everything except football and cricket.
+  - **Footer:** Settings and About.
+  - **Selected entry:** it shows a pink accent bar and icon on a subtle surface. Filters live in the same shared catalog state as the tabs, so the drawer and the bottom bar always agree.
+- **Settings** (stored on the device):
+  - **Preferred stream language** (default English, or "Any language"). The player starts on a stream in that language, HD first, when one exists. Otherwise it falls back to any HD stream, then the first stream.
+  - **Time format:** System, 12-hour or 24-hour. Applies to every kick-off time.
+  - **Clear saved matches:** asks for confirmation first.
+  - **App version.**
+- **About:** version, where matches, streams and channels come from, and a note that saved matches and settings never leave the device.
+
 ## Live TV
 
 - **Channel list:** loaded from [`channels.json`](https://github.com/svimran46/playlist.m3u/blob/main/channels.json) in the playlist repo. You can point the app at another file with `channelsUrl` in the remote config.

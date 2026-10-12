@@ -8,4 +8,7 @@ interface FavoritesRepository {
 
     /** Saves [matchId] if it isn't saved yet, otherwise removes it. */
     suspend fun toggle(matchId: String)
+
+    /** Removes every saved match. */
+    suspend fun clear()
 }

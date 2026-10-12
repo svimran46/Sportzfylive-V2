@@ -59,11 +59,18 @@ data class CatalogUiState(
     val liveStatusKnown: Boolean = true,
     /** Matches in the list, spotlight included, after every filter. */
     val listCount: Int = 0,
+    /** "Other sports" filter from the drawer: everything but football and cricket. */
+    val otherSports: Boolean = false,
+    /** The search field is open (shared by every fixture tab). */
+    val searchActive: Boolean = false,
 ) {
     val isEmpty: Boolean
         get() = hero == null && sections.isEmpty()
 
     companion object {
+        /** The sports with their own drawer entry; "Other sports" is the rest. */
+        val MAIN_SPORTS = setOf(SportCategory.FOOTBALL, SportCategory.CRICKET)
+
         fun from(
             feed: MatchFeed,
             category: SportCategory?,
@@ -75,6 +82,8 @@ data class CatalogUiState(
             window: DayWindow? = null,
             locale: Locale = Locale.getDefault(),
             homeView: HomeView? = null,
+            otherSports: Boolean = false,
+            searchActive: Boolean = false,
         ): CatalogUiState {
             val visible = feed.matches.filter { it.category !in config.hiddenCategories }
             // The Live | Upcoming | All switch only exists on Home (Today).
@@ -96,6 +105,7 @@ data class CatalogUiState(
             }
 
             val filtered = CatalogFilter.apply(all, category, query, onlyIds = favoriteIds.takeIf { favoritesOnly })
+                .let { list -> if (otherSports && !favoritesOnly) list.filter { it.category !in MAIN_SPORTS } else list }
             // The banner is for browsing; while searching or viewing saved
             // matches every hit stays in the list.
             val showsHero = scope == null || scope == DayScope.TODAY
@@ -147,6 +157,8 @@ data class CatalogUiState(
                 homeView = view,
                 liveStatusKnown = feed.liveStatusKnown,
                 listCount = filtered.size,
+                otherSports = otherSports && !favoritesOnly,
+                searchActive = searchActive || query.isNotEmpty(),
             )
         }
     }

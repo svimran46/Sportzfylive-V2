@@ -44,6 +44,8 @@ class CatalogViewModel(
         val favoritesOnly: Boolean = false,
         val query: String = "",
         val homeView: HomeView = HomeView.LIVE,
+        val otherSports: Boolean = false,
+        val searchActive: Boolean = false,
     )
 
     private data class Inputs(
@@ -104,11 +106,30 @@ class CatalogViewModel(
     }
 
     fun selectCategory(value: SportCategory?) {
-        filters.value = filters.value.copy(category = value, favoritesOnly = false)
+        filters.value = filters.value.copy(category = value, favoritesOnly = false, otherSports = false)
     }
 
     fun showFavorites() {
-        filters.value = filters.value.copy(category = null, favoritesOnly = true)
+        filters.value = filters.value.copy(category = null, favoritesOnly = true, otherSports = false)
+    }
+
+    /** Every sport except football and cricket (drawer "Other Sports"). */
+    fun showOtherSports() {
+        filters.value = filters.value.copy(category = null, favoritesOnly = false, otherSports = true)
+    }
+
+    fun openSearch() {
+        filters.value = filters.value.copy(searchActive = true)
+    }
+
+    /** Closes the search field and clears what was typed. */
+    fun closeSearch() {
+        filters.value = filters.value.copy(searchActive = false, query = "")
+    }
+
+    /** Back to the unfiltered list: no sport, Saved, Other sports or search. */
+    fun resetFilters() {
+        filters.value = Filters(homeView = filters.value.homeView)
     }
 
     fun setQuery(value: String) {
@@ -129,5 +150,7 @@ class CatalogViewModel(
         scope = scope,
         window = DayWindow.at(nowMillis, zones.zone()),
         homeView = filters.homeView,
+        otherSports = filters.otherSports,
+        searchActive = filters.searchActive,
     )
 }

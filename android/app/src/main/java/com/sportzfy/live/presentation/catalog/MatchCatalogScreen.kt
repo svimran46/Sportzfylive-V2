@@ -36,11 +36,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -64,6 +61,7 @@ import com.sportzfy.live.core.theme.ScoreTextStyle
 import com.sportzfy.live.core.theme.SportzfyColors
 import com.sportzfy.live.core.theme.SportzfyIcon
 import com.sportzfy.live.core.theme.SportzfyIcons
+import com.sportzfy.live.domain.model.ClockFormat
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.components.CategoryPills
 import com.sportzfy.live.presentation.components.EmptyState
@@ -82,6 +80,7 @@ import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.presentation.model.HomeView
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
 import com.sportzfy.live.presentation.model.userMessage
+import com.sportzfy.live.presentation.settings.LocalUserSettings
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -98,6 +97,7 @@ fun MatchCatalogScreen(
     viewModel: CatalogViewModel = koinViewModel(),
     bottomBar: @Composable () -> Unit = {},
     onBrowseTomorrow: () -> Unit = {},
+    onOpenMenu: (() -> Unit)? = null,
 ) {
     val state by viewModel.state(scope).collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -123,6 +123,9 @@ fun MatchCatalogScreen(
         bottomBar = bottomBar,
         onSelectHomeView = viewModel::setHomeView,
         onBrowseTomorrow = onBrowseTomorrow,
+        onOpenSearch = viewModel::openSearch,
+        onCloseSearch = viewModel::closeSearch,
+        onOpenMenu = onOpenMenu,
     )
 }
 
@@ -139,8 +142,10 @@ fun MatchCatalogContent(
     bottomBar: @Composable () -> Unit = {},
     onSelectHomeView: (HomeView) -> Unit = {},
     onBrowseTomorrow: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    onCloseSearch: () -> Unit = {},
+    onOpenMenu: (() -> Unit)? = null,
 ) {
-    var searchOpen by rememberSaveable { mutableStateOf(state.query.isNotEmpty()) }
     val formatter = rememberMatchTimeFormatter()
     val now by rememberNow()
 
@@ -150,14 +155,13 @@ fun MatchCatalogContent(
             CatalogHeader(
                 // Home has its own live heading, so the counter would repeat it.
                 liveCount = state.liveCount.takeIf { state.homeView == null },
-                searchOpen = searchOpen,
+                // Shared by every fixture tab, so the drawer's Search can open it.
+                searchOpen = state.searchActive,
                 query = state.query,
                 onQueryChange = onQueryChange,
-                onOpenSearch = { searchOpen = true },
-                onCloseSearch = {
-                    searchOpen = false
-                    onQueryChange("")
-                },
+                onOpenSearch = onOpenSearch,
+                onCloseSearch = onCloseSearch,
+                onOpenMenu = onOpenMenu,
             )
         },
         bottomBar = bottomBar,
@@ -254,6 +258,7 @@ private fun LazyGridScope.catalogItems(
             savedCount = state.savedCount,
             savedSelected = state.favoritesOnly,
             onSelectSaved = onSelectSaved,
+            otherSportsSelected = state.otherSports,
         )
     }
     val homeView = state.homeView
@@ -301,13 +306,14 @@ private fun CatalogHeader(
     onQueryChange: (String) -> Unit,
     onOpenSearch: () -> Unit,
     onCloseSearch: () -> Unit,
+    onOpenMenu: (() -> Unit)?,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
+            .padding(start = if (onOpenMenu != null) 4.dp else 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
             .height(56.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -334,6 +340,12 @@ private fun CatalogHeader(
             }
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
         } else {
+            if (onOpenMenu != null) {
+                IconButton(onClick = onOpenMenu, modifier = Modifier.tvFocus(CircleShape)) {
+                    SportzfyIcon(SportzfyIcons.Menu, contentDescription = "Open menu")
+                }
+                Spacer(Modifier.width(4.dp))
+            }
             SportzfyWordmark()
             if (liveCount != null) {
                 Spacer(Modifier.width(12.dp))
@@ -492,6 +504,16 @@ private fun HomeEmptyState(
             },
             primaryAction = "All sports" to { onSelectCategory(null) },
         )
+        state.otherSports -> EmptyState(
+            icon = SportzfyIcons.OtherSports,
+            title = "Nothing in other sports",
+            message = when (view) {
+                HomeView.LIVE -> "No sports besides football and cricket are live right now."
+                HomeView.UPCOMING -> "No more kick-offs in other sports today."
+                HomeView.ALL -> "No fixtures in other sports today."
+            },
+            primaryAction = "All sports" to { onSelectCategory(null) },
+        )
         view == HomeView.LIVE && !state.liveStatusKnown -> EmptyState(
             icon = SportzfyIcons.Alert,
             title = "Can't check live matches",
@@ -537,7 +559,11 @@ private fun SectionHeader(title: String, count: Int) {
 @Composable
 internal fun rememberMatchTimeFormatter(): MatchTimeFormatter {
     val context = LocalContext.current
-    val use24Hour = DateFormat.is24HourFormat(context)
+    val use24Hour = when (LocalUserSettings.current.clockFormat) {
+        ClockFormat.H12 -> false
+        ClockFormat.H24 -> true
+        ClockFormat.SYSTEM -> DateFormat.is24HourFormat(context)
+    }
     return remember(use24Hour) { MatchTimeFormatter(use24Hour = use24Hour) }
 }
 

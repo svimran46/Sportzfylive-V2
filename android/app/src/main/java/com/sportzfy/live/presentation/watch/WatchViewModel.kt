@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.StreamItem
+import com.sportzfy.live.domain.model.UserSettings
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
@@ -12,7 +13,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -37,6 +40,7 @@ class WatchViewModel(
     private val matchRepository: MatchRepository,
     private val streamRepository: StreamRepository,
     private val favoritesRepository: FavoritesRepository,
+    settings: Flow<UserSettings> = flowOf(UserSettings()),
 ) : ViewModel() {
 
     private data class StreamLoad(
@@ -57,12 +61,17 @@ class WatchViewModel(
             matchId,
             streamLoad,
             chosenKey,
-            favoritesRepository.favoriteIds.onStart { emit(emptySet()) },
-        ) { feed, id, load, chosen, favorites ->
+            combine(
+                favoritesRepository.favoriteIds.onStart { emit(emptySet()) },
+                // No placeholder value: a default that the stored setting then
+                // replaced would reload the player once on open.
+                settings,
+            ) { favorites, prefs -> favorites to prefs.preferredLanguage },
+        ) { feed, id, load, chosen, (favorites, language) ->
             val match = feed.matches.firstOrNull { it.id == id }
             // Keep the user's pick while it exists; otherwise fall back to the best stream.
             val selected = chosen?.takeIf { key -> load.streams.any { it.key == key } }
-                ?: WatchLogic.preferredStream(load.streams)?.key
+                ?: WatchLogic.preferredStream(load.streams, language)?.key
             WatchUiState(
                 match = match,
                 isMatchMissing = load.matchMissing && match == null,

@@ -23,6 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -99,7 +103,10 @@ private fun BottomNavItem(
     }
 }
 
-/** A navigation row in the side drawer. The active row is filled with the accent. */
+/**
+ * A navigation row in the side drawer. The active row gets a subtle selected
+ * surface, a pink accent bar and a pink icon; pink stays an accent.
+ */
 @Composable
 fun DrawerRow(
     label: String,
@@ -114,7 +121,18 @@ fun DrawerRow(
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .tvFocus(shape, focusedScale = 1f)
-            .background(if (selected) SportzfyColors.Rose else Color.Transparent, shape)
+            .background(if (selected) SportzfyColors.SelectedSurface else Color.Transparent, shape)
+            .drawBehind {
+                if (selected) {
+                    val barHeight = size.height * 0.5f
+                    drawRoundRect(
+                        color = SportzfyColors.Rose,
+                        topLeft = Offset(0f, (size.height - barHeight) / 2),
+                        size = Size(3.dp.toPx(), barHeight),
+                        cornerRadius = CornerRadius(2.dp.toPx()),
+                    )
+                }
+            }
             .selectable(selected = selected, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -122,7 +140,7 @@ fun DrawerRow(
         SportzfyIcon(
             icon,
             contentDescription = null,
-            tint = if (selected) SportzfyColors.TextPrimary else SportzfyColors.TextSecondary,
+            tint = if (selected) SportzfyColors.Rose else SportzfyColors.TextSecondary,
         )
         Spacer(Modifier.width(14.dp))
         Text(

@@ -195,6 +195,40 @@ class CatalogViewModelTest {
     }
 
     @Test
+    fun `drawer filters replace each other and reset clears them`() = runTest {
+        collectState(DayScope.ALL)
+        val all = { viewModel.state(DayScope.ALL).value }
+
+        viewModel.showOtherSports()
+        assertEquals(setOf("night"), all().ids().toSet())
+        assertTrue(all().otherSports)
+
+        viewModel.selectCategory(SportCategory.CRICKET)
+        assertEquals(false, all().otherSports)
+        assertEquals(listOf("india"), all().ids())
+
+        viewModel.openSearch()
+        viewModel.setQuery("india")
+        assertTrue(all().searchActive)
+
+        viewModel.resetFilters()
+        assertEquals(4, all().ids().size)
+        assertEquals(false, all().searchActive)
+        assertEquals("", all().query)
+        assertEquals(HomeView.ALL, today.homeView)
+    }
+
+    @Test
+    fun `closing search clears the query`() = runTest {
+        collectState()
+        viewModel.openSearch()
+        viewModel.setQuery("chelsea")
+        viewModel.closeSearch()
+        assertEquals(false, today.searchActive)
+        assertEquals("", today.query)
+    }
+
+    @Test
     fun `refresh delegates to the repository`() = runTest {
         viewModel.refresh()
         viewModel.refresh(force = true)

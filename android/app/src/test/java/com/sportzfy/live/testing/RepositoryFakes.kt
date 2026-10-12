@@ -61,6 +61,10 @@ class FakeFavoritesRepository(initial: Set<String> = emptySet()) : FavoritesRepo
     override suspend fun toggle(matchId: String) {
         ids.value = if (matchId in ids.value) ids.value - matchId else ids.value + matchId
     }
+
+    override suspend fun clear() {
+        ids.value = emptySet()
+    }
 }
 
 class FakeAppConfigRepository(initial: AppConfig = AppConfig.Default) : AppConfigRepository {

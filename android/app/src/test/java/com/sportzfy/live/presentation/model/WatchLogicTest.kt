@@ -14,11 +14,24 @@ class WatchLogicTest {
     private fun stream(no: Int, language: String = "", hd: Boolean = false) = StreamItem("alpha", "m", no, language, hd)
 
     @Test
-    fun `prefers English HD, then any HD, then the first stream`() {
+    fun `prefers English HD, then any English, then any HD, then the first stream`() {
         assertEquals(3, WatchLogic.preferredStream(listOf(stream(1), stream(2, "Hindi", true), stream(3, "english", true)))?.streamNo)
-        assertEquals(2, WatchLogic.preferredStream(listOf(stream(1, "English"), stream(2, "Hindi", true)))?.streamNo)
+        // The language you asked for beats picture quality.
+        assertEquals(1, WatchLogic.preferredStream(listOf(stream(1, "English"), stream(2, "Hindi", true)))?.streamNo)
+        assertEquals(2, WatchLogic.preferredStream(listOf(stream(1, "Hindi"), stream(2, "Hindi", true)))?.streamNo)
         assertEquals(1, WatchLogic.preferredStream(listOf(stream(1), stream(2)))?.streamNo)
         assertNull(WatchLogic.preferredStream(emptyList()))
+    }
+
+    @Test
+    fun `the preferred language from Settings comes first`() {
+        val streams = listOf(stream(1, "English", true), stream(2, "Spanish"), stream(3, "Spanish", true))
+        assertEquals(3, WatchLogic.preferredStream(streams, "Spanish")?.streamNo)
+        assertEquals(2, WatchLogic.preferredStream(streams.take(2), "spanish")?.streamNo)
+        // No stream in that language: the usual HD-first pick.
+        assertEquals(1, WatchLogic.preferredStream(streams, "Arabic")?.streamNo)
+        // "Any language" ignores language entirely.
+        assertEquals(1, WatchLogic.preferredStream(listOf(stream(1, "Hindi", true), stream(2, "English", true)), null)?.streamNo)
     }
 
     @Test

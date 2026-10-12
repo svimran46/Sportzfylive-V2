@@ -1,7 +1,13 @@
 package com.sportzfy.live.presentation.navigation
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -19,7 +25,9 @@ import com.sportzfy.live.domain.model.MatchStatus.LIVE
 import com.sportzfy.live.domain.model.MatchStatus.UPCOMING
 import com.sportzfy.live.domain.model.ChannelCategory
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
+import com.sportzfy.live.domain.repository.SettingsRepository
 import com.sportzfy.live.presentation.livetv.LiveTvViewModel
+import com.sportzfy.live.presentation.settings.SettingsViewModel
 import com.sportzfy.live.presentation.model.testChannel
 import com.sportzfy.live.presentation.model.testMatch
 import com.sportzfy.live.testing.FakeAppConfigRepository
@@ -27,6 +35,7 @@ import com.sportzfy.live.testing.FakeChannelRepository
 import com.sportzfy.live.testing.FakeClock
 import com.sportzfy.live.testing.FakeFavoritesRepository
 import com.sportzfy.live.testing.FakeMatchRepository
+import com.sportzfy.live.testing.FakeSettingsRepository
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -72,6 +81,8 @@ class MainNavigationTest {
                             ZoneProvider { TimeZone.getTimeZone("UTC") },
                         )
                     }
+                    single<SettingsRepository> { FakeSettingsRepository() }
+                    viewModel { SettingsViewModel(get(), FakeFavoritesRepository()) }
                     viewModel { LiveTvViewModel(FakeChannelRepository(listOf(testChannel("Willow Cricket", ChannelCategory.CRICKET)))) }
                 }
             )
@@ -87,7 +98,19 @@ class MainNavigationTest {
         compose.waitForIdle()
     }
 
-    private fun tab(label: String): SemanticsNodeInteraction = compose.onNode(hasText(label) and isSelectable())
+    // Bottom tabs and drawer rows share labels ("Live TV"); their roles tell them apart.
+    private fun tab(label: String): SemanticsNodeInteraction =
+        compose.onNode(hasText(label) and isSelectable() and hasRole(Role.Tab))
+
+    private fun drawerItem(label: String): SemanticsNodeInteraction =
+        compose.onNode(hasText(label) and isSelectable() and hasRole(Role.Button))
+
+    private fun hasRole(role: Role) = SemanticsMatcher.expectValue(SemanticsProperties.Role, role)
+
+    private fun openDrawer() {
+        compose.onNodeWithContentDescription("Open menu").performClick()
+        settle()
+    }
 
     @Test
     fun bottomBarSwitchesTabsAndBackReturnsToToday() {
@@ -120,6 +143,50 @@ class MainNavigationTest {
         compose.onAllNodesWithText("Live Derby", substring = true).assertCountEquals(1)
 
         // Back from any tab goes to Today.
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        settle()
+        tab("Today").assertIsSelected()
+    }
+
+    @Test
+    fun drawerOpensClosesAndNavigates() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { SportzfyTheme { SportzfyNavHost() } }
+        settle()
+
+        openDrawer()
+        compose.onNodeWithContentDescription("Close menu").assertIsDisplayed()
+        drawerItem("Live Matches").assertIsSelected()
+
+        // A sport entry lands on All Matches with that sport filtered.
+        drawerItem("Cricket").performClick()
+        settle()
+        compose.onNodeWithContentDescription("Close menu").assertIsNotDisplayed()
+        tab("All Matches").assertIsSelected()
+        compose.onNodeWithTag("screen-title").assertTextContains("All Matches")
+        compose.onAllNodesWithText("Live Derby", substring = true).assertCountEquals(0)
+
+        openDrawer()
+        drawerItem("Cricket").assertIsSelected()
+        drawerItem("Live Matches").assertIsNotSelected()
+
+        // Close button.
+        compose.onNodeWithContentDescription("Close menu").performClick()
+        settle()
+        compose.onNodeWithContentDescription("Close menu").assertIsNotDisplayed()
+
+        // Home resets the filter and opens Live Matches.
+        openDrawer()
+        drawerItem("Live Matches").performClick()
+        settle()
+        tab("Today").assertIsSelected()
+        compose.onAllNodesWithText("Live Derby", substring = true).assertCountEquals(1)
+
+        // Footer entries open full screens.
+        openDrawer()
+        drawerItem("Settings").performClick()
+        settle()
+        compose.onNodeWithTag("screen-title").assertTextContains("Settings")
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         settle()
         tab("Today").assertIsSelected()

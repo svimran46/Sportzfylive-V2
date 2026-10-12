@@ -25,6 +25,8 @@ fun CategoryPills(
     savedSelected: Boolean = false,
     onSelectSaved: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    /** The drawer's "Other sports" filter is on: shown as its own selected pill. */
+    otherSportsSelected: Boolean = false,
 ) {
     LazyRow(
         modifier = modifier,
@@ -41,10 +43,15 @@ fun CategoryPills(
                 )
             }
         }
+        if (otherSportsSelected) {
+            item(key = "OTHER_SPORTS") {
+                Pill(label = "Other sports", selected = true, onClick = {})
+            }
+        }
         items(options, key = { it.category?.name ?: "ALL" }) { option ->
             Pill(
                 label = if (option.count > 0) "${option.label}  ${option.count}" else option.label,
-                selected = !savedSelected && option.category == selected,
+                selected = !savedSelected && !otherSportsSelected && option.category == selected,
                 onClick = { onSelect(option.category) },
             )
         }

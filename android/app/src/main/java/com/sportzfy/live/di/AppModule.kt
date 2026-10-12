@@ -20,16 +20,19 @@ import com.sportzfy.live.data.config.HttpConfigSource
 import com.sportzfy.live.data.repository.FavoritesRepositoryImpl
 import com.sportzfy.live.data.repository.MatchRepositoryImpl
 import com.sportzfy.live.data.repository.StreamRepositoryImpl
+import com.sportzfy.live.data.settings.SettingsRepositoryImpl
 import com.sportzfy.live.domain.repository.AppConfigRepository
 import com.sportzfy.live.domain.repository.ChannelRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
+import com.sportzfy.live.domain.repository.SettingsRepository
 import com.sportzfy.live.domain.repository.StreamRepository
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
 import com.sportzfy.live.presentation.livetv.ChannelPlayerViewModel
 import com.sportzfy.live.presentation.livetv.LiveTvViewModel
 import com.sportzfy.live.presentation.navigation.ChannelRoute
 import com.sportzfy.live.presentation.navigation.WatchRoute
+import com.sportzfy.live.presentation.settings.SettingsViewModel
 import com.sportzfy.live.presentation.watch.WatchViewModel
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -42,6 +45,7 @@ import retrofit2.create
 
 private val Context.favoritesDataStore: DataStore<Preferences> by preferencesDataStore(name = "favorites")
 private val Context.appConfigDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_config")
+private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 val networkModule = module {
     single<Json> { NetworkJson }
@@ -56,6 +60,7 @@ val dataModule = module {
     single<MatchRepository> { MatchRepositoryImpl(get(), get(), get()) }
     single<StreamRepository> { StreamRepositoryImpl(get(), get(), get()) }
     single<FavoritesRepository> { FavoritesRepositoryImpl(androidContext().favoritesDataStore) }
+    single<SettingsRepository> { SettingsRepositoryImpl(androidContext().settingsDataStore) }
     single<AppConfigRepository> {
         AppConfigRepositoryImpl(
             source = HttpConfigSource(get(), BuildConfig.REMOTE_CONFIG_URL, get()),
@@ -79,6 +84,7 @@ val dataModule = module {
 val presentationModule = module {
     viewModelOf(::CatalogViewModel)
     viewModelOf(::LiveTvViewModel)
+    viewModelOf(::SettingsViewModel)
     viewModel {
         ChannelPlayerViewModel(
             initialChannelId = get<SavedStateHandle>().toRoute<ChannelRoute>().channelId,
@@ -91,6 +97,7 @@ val presentationModule = module {
             matchRepository = get(),
             streamRepository = get(),
             favoritesRepository = get(),
+            settings = get<SettingsRepository>().settings,
         )
     }
 }
