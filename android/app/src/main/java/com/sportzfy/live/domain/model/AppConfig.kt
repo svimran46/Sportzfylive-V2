@@ -18,7 +18,11 @@ data class AppConfig(
     val adBlocking: Boolean = false,
     /** Extra hosts the player refuses, on top of (or instead of) the built-in list. */
     val extraBlockedHosts: Set<String> = emptySet(),
-    val playerMode: PlayerMode = PlayerMode.IFRAME,
+    /**
+     * How embeds load. Direct by default: the page opens like a browser tab,
+     * which is how Live TV channels already play.
+     */
+    val playerMode: PlayerMode = PlayerMode.DIRECT,
     /** Builds older than this show an "update required" screen. */
     val minVersionCode: Int = 0,
     val updateUrl: String? = null,
@@ -46,6 +50,6 @@ enum class PlayerMode {
     /** The embed runs inside a plain, unsandboxed iframe, like the website. */
     IFRAME,
 
-    /** The embed page is loaded directly as the WebView's page. */
+    /** The embed page is loaded directly as the WebView's page, like a browser tab (the default). */
     DIRECT,
 }

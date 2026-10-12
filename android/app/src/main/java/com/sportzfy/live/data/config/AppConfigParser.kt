@@ -54,8 +54,8 @@ object AppConfigParser {
                 .filter { it.isNotEmpty() && it.none(Char::isWhitespace) && '/' !in it }
                 .toSet(),
             playerMode = when (dto.playerMode?.trim()?.lowercase()) {
-                "direct" -> PlayerMode.DIRECT
-                else -> PlayerMode.IFRAME
+                "iframe" -> PlayerMode.IFRAME
+                else -> PlayerMode.DIRECT
             },
             minVersionCode = dto.minVersionCode?.coerceAtLeast(0) ?: 0,
             updateUrl = httpsOrNull(dto.updateUrl),
