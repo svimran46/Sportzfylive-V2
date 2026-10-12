@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Message
+import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.JsPromptResult
@@ -74,6 +75,19 @@ internal fun createSandboxedWebView(
     setOnLongClickListener { true }
     isHapticFeedbackEnabled = false
     setDownloadListener { _, _, _, _, _ -> }
+    // D-pad: the page keeps left/right/center for its own controls, but
+    // up/down always leave the player so a TV remote can reach the stream
+    // pills and the back button instead of getting trapped in the page.
+    setOnKeyListener { view, keyCode, event ->
+        val direction = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> View.FOCUS_UP
+            KeyEvent.KEYCODE_DPAD_DOWN -> View.FOCUS_DOWN
+            else -> return@setOnKeyListener false
+        }
+        if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener true
+        val next = view.focusSearch(direction)
+        next != null && next !== view && next.requestFocus(direction)
+    }
 
     webViewClient = SandboxedWebViewClient(policy, listener)
     webChromeClient = SandboxedChromeClient(listener)

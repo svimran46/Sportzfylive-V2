@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.StreamItem
+import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
 import com.sportzfy.live.presentation.model.WatchLogic
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -26,6 +28,7 @@ data class WatchUiState(
     val failedSourceCount: Int = 0,
     val selectedStreamKey: String? = null,
     val related: List<Match> = emptyList(),
+    val isFavorite: Boolean = false,
 ) {
     val selectedStream: StreamItem?
         get() = streams.firstOrNull { it.key == selectedStreamKey }
@@ -35,6 +38,7 @@ class WatchViewModel(
     savedStateHandle: SavedStateHandle,
     private val matchRepository: MatchRepository,
     private val streamRepository: StreamRepository,
+    private val favoritesRepository: FavoritesRepository,
 ) : ViewModel() {
 
     private data class StreamLoad(
@@ -50,7 +54,13 @@ class WatchViewModel(
     private var loadJob: Job? = null
 
     val uiState: StateFlow<WatchUiState> =
-        combine(matchRepository.feed, matchId, streamLoad, chosenKey) { feed, id, load, chosen ->
+        combine(
+            matchRepository.feed,
+            matchId,
+            streamLoad,
+            chosenKey,
+            favoritesRepository.favoriteIds.onStart { emit(emptySet()) },
+        ) { feed, id, load, chosen, favorites ->
             val match = feed.matches.firstOrNull { it.id == id }
             // Keep the user's pick while it exists; otherwise fall back to the best stream.
             val selected = chosen?.takeIf { key -> load.streams.any { it.key == key } }
@@ -63,6 +73,7 @@ class WatchViewModel(
                 failedSourceCount = load.failedSources,
                 selectedStreamKey = selected,
                 related = WatchLogic.related(feed.matches, match),
+                isFavorite = id in favorites,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WatchUiState())
 
@@ -83,6 +94,11 @@ class WatchViewModel(
     }
 
     fun retryStreams() = load(matchId.value)
+
+    fun toggleFavorite() {
+        val id = matchId.value
+        viewModelScope.launch { favoritesRepository.toggle(id) }
+    }
 
     private fun load(id: String) {
         loadJob?.cancel()

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -45,7 +46,7 @@ fun HeroSpotlight(
 ) {
     Card(
         onClick = onWatch,
-        modifier = modifier.fillMaxWidth().height(220.dp),
+        modifier = modifier.fillMaxWidth().height(220.dp).tvFocus(MaterialTheme.shapes.large, focusedScale = 1.01f),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = SportzfyColors.SlateRaised),
     ) {
@@ -107,6 +108,7 @@ fun HeroSpotlight(
                 }
                 Button(
                     onClick = onWatch,
+                    modifier = Modifier.tvFocus(RoundedCornerShape(50)),
                     colors = ButtonDefaults.buttonColors(containerColor = SportzfyColors.Rose),
                 ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))

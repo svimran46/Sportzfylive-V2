@@ -50,7 +50,7 @@ fun MessageState(
             textAlign = TextAlign.Center,
         )
         if (actionLabel != null) {
-            OutlinedButton(onClick = onAction) { Text(actionLabel) }
+            OutlinedButton(onClick = onAction, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text(actionLabel) }
         }
     }
 }

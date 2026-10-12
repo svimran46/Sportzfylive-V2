@@ -29,6 +29,11 @@ data class CatalogUiState(
     val liveCount: Int = 0,
     val categories: List<CategoryOption> = listOf(CategoryOption(null, 0)),
     val selectedCategory: SportCategory? = null,
+    /** "Saved" pill: only matches the user bookmarked. */
+    val favoritesOnly: Boolean = false,
+    val favoriteIds: Set<String> = emptySet(),
+    /** Saved matches present in today's feed. */
+    val savedCount: Int = 0,
     val query: String = "",
     val hero: Match? = null,
     val sections: List<MatchSection> = emptyList(),
@@ -37,7 +42,13 @@ data class CatalogUiState(
         get() = hero == null && sections.isEmpty()
 
     companion object {
-        fun from(feed: MatchFeed, category: SportCategory?, query: String): CatalogUiState {
+        fun from(
+            feed: MatchFeed,
+            category: SportCategory?,
+            query: String,
+            favoriteIds: Set<String> = emptySet(),
+            favoritesOnly: Boolean = false,
+        ): CatalogUiState {
             val all = feed.matches
             val counts = all.groupingBy { it.category }.eachCount()
             val categories = buildList {
@@ -49,9 +60,10 @@ data class CatalogUiState(
                     .forEach { add(CategoryOption(it.key, it.value)) }
             }
 
-            val filtered = CatalogFilter.apply(all, category, query)
-            // The banner is for browsing; while searching every hit stays in the list.
-            val hero = if (query.isBlank()) CatalogFilter.spotlight(filtered) else null
+            val filtered = CatalogFilter.apply(all, category, query, onlyIds = favoriteIds.takeIf { favoritesOnly })
+            // The banner is for browsing; while searching or viewing saved
+            // matches every hit stays in the list.
+            val hero = if (query.isBlank() && !favoritesOnly) CatalogFilter.spotlight(filtered) else null
             val rest = if (hero == null) filtered else filtered.filter { it.id != hero.id }
             val sections = SectionKind.entries.mapNotNull { kind ->
                 rest.filter { it.status == kind.status }
@@ -67,6 +79,9 @@ data class CatalogUiState(
                 liveCount = feed.liveCount,
                 categories = categories,
                 selectedCategory = category,
+                favoritesOnly = favoritesOnly,
+                favoriteIds = favoriteIds,
+                savedCount = all.count { it.id in favoriteIds },
                 query = query,
                 hero = hero,
                 sections = sections,

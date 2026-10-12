@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,12 +51,14 @@ import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.Team
 import com.sportzfy.live.presentation.catalog.rememberMatchTimeFormatter
 import com.sportzfy.live.presentation.catalog.rememberNow
+import com.sportzfy.live.presentation.components.FavoriteButton
 import com.sportzfy.live.presentation.components.MatchCard
 import com.sportzfy.live.presentation.components.MatchRailCard
 import com.sportzfy.live.presentation.components.MessageState
 import com.sportzfy.live.presentation.components.StatusTag
 import com.sportzfy.live.presentation.components.StreamChip
 import com.sportzfy.live.presentation.components.TeamCrest
+import com.sportzfy.live.presentation.components.tvFocus
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
 import com.sportzfy.live.presentation.watch.player.StreamPlayer
 import com.sportzfy.live.presentation.watch.player.StreamPlayerState
@@ -75,6 +79,7 @@ fun WatchStudioScreen(
         onSelectStream = viewModel::selectStream,
         onSelectMatch = viewModel::selectMatch,
         onRetryStreams = viewModel::retryStreams,
+        onToggleFavorite = viewModel::toggleFavorite,
     )
 }
 
@@ -85,6 +90,7 @@ fun WatchStudioContent(
     onSelectStream: (String) -> Unit,
     onSelectMatch: (String) -> Unit,
     onRetryStreams: () -> Unit,
+    onToggleFavorite: () -> Unit,
     playerState: StreamPlayerState = rememberStreamPlayerState(),
 ) {
     val formatter = rememberMatchTimeFormatter()
@@ -101,7 +107,7 @@ fun WatchStudioContent(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { WatchTopBar(state.match, onBack) },
+        topBar = { WatchTopBar(state.match, state.isFavorite, onBack, onToggleFavorite) },
     ) { padding ->
         if (state.isMatchMissing) {
             MessageState(
@@ -153,16 +159,16 @@ fun WatchStudioContent(
 }
 
 @Composable
-private fun WatchTopBar(match: Match?, onBack: () -> Unit) {
+private fun WatchTopBar(match: Match?, isFavorite: Boolean, onBack: () -> Unit, onToggleFavorite: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(end = 16.dp, top = 4.dp, bottom = 4.dp),
+            .padding(end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, modifier = Modifier.tvFocus(CircleShape)) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
         }
         Column(Modifier.weight(1f)) {
@@ -178,6 +184,7 @@ private fun WatchTopBar(match: Match?, onBack: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (match != null) FavoriteButton(isFavorite, onToggleFavorite)
     }
 }
 
@@ -280,7 +287,7 @@ private fun StreamSelector(
                             style = MaterialTheme.typography.labelMedium,
                             color = SportzfyColors.TextMuted,
                         )
-                        TextButton(onClick = onRetryStreams) { Text("Retry") }
+                        TextButton(onClick = onRetryStreams, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text("Retry") }
                     }
                 }
             }

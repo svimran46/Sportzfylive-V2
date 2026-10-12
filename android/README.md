@@ -83,3 +83,12 @@ Requires JDK 17+ and the Android SDK (platform 36).
   - **Stream pills:** labelled like "Stream 1 HD • English". Picking a pill reloads only the player. The screen also shows how many pop-ups were blocked.
   - **More matches:** a rail of other live and upcoming matches, which switch in place.
   - **Wide screens:** on screens 840dp or wider, the rail becomes a side column. The player instance is kept when the layout changes, so rotating the device doesn't restart the stream.
+
+## Search, saved matches and Android TV
+
+- **Search:** results update as you type. A match is shown when every word you type appears in its title (which is where upstream puts league names, e.g. "Premier League: …"), its team names, its sport, or a common nickname for that sport ("soccer", "F1", "UFC", "NBA", "IPL" and so on).
+- **Saved matches:** tap the star on a card, or in the Watch top bar, to save a match. Saved IDs are kept on the device with DataStore, newest first and capped at 200. The **Saved** pill filters the catalog down to them.
+- **Android TV:**
+  - The app appears in the TV launcher (`LEANBACK_LAUNCHER`) with its own banner, and neither touch nor leanback support is required to install it.
+  - Anything you can select gets a 2dp rose border and a slight scale-up when the D-pad focuses it (`Modifier.tvFocus`).
+  - Inside the player, Up/Down always move focus out of the WebView, so the remote can't get stuck in the page.
