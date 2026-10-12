@@ -1,16 +1,13 @@
 package com.sportzfy.live.presentation.watch
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.StreamItem
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
 import com.sportzfy.live.presentation.model.WatchLogic
-import com.sportzfy.live.presentation.navigation.WatchRoute
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,8 +31,9 @@ data class WatchUiState(
         get() = streams.firstOrNull { it.key == selectedStreamKey }
 }
 
+/** [initialMatchId] comes from the [com.sportzfy.live.presentation.navigation.WatchRoute] argument. */
 class WatchViewModel(
-    savedStateHandle: SavedStateHandle,
+    initialMatchId: String,
     private val matchRepository: MatchRepository,
     private val streamRepository: StreamRepository,
     private val favoritesRepository: FavoritesRepository,
@@ -48,7 +46,7 @@ class WatchViewModel(
         val matchMissing: Boolean = false,
     )
 
-    private val matchId = MutableStateFlow(savedStateHandle.toRoute<WatchRoute>().matchId)
+    private val matchId = MutableStateFlow(initialMatchId)
     private val streamLoad = MutableStateFlow(StreamLoad())
     private val chosenKey = MutableStateFlow<String?>(null)
     private var loadJob: Job? = null

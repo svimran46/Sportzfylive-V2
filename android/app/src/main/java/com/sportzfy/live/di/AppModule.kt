@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.SavedStateHandle
+import androidx.navigation.toRoute
 import com.sportzfy.live.BuildConfig
 import com.sportzfy.live.core.network.HttpClientFactory
 import com.sportzfy.live.core.network.NetworkJson
@@ -16,10 +18,12 @@ import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
+import com.sportzfy.live.presentation.navigation.WatchRoute
 import com.sportzfy.live.presentation.watch.WatchViewModel
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 import retrofit2.Retrofit
@@ -43,7 +47,14 @@ val dataModule = module {
 
 val presentationModule = module {
     viewModelOf(::CatalogViewModel)
-    viewModelOf(::WatchViewModel)
+    viewModel {
+        WatchViewModel(
+            initialMatchId = get<SavedStateHandle>().toRoute<WatchRoute>().matchId,
+            matchRepository = get(),
+            streamRepository = get(),
+            favoritesRepository = get(),
+        )
+    }
 }
 
 val appModules = listOf(networkModule, dataModule, presentationModule)

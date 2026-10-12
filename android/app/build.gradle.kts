@@ -19,10 +19,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Real releases are signed with a keystore supplied through the
+        // environment (CI secrets or a local shell). Without one, release
+        // builds fall back to the debug key so the shrunk APK stays installable
+        // for testing.
+        val keystore = System.getenv("SPORTZFY_KEYSTORE_FILE")
+        if (!keystore.isNullOrBlank() && file(keystore).exists()) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("SPORTZFY_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SPORTZFY_KEY_ALIAS")
+                keyPassword = System.getenv("SPORTZFY_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -46,6 +63,8 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Robolectric-backed Compose UI tests need the merged resources.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -95,6 +114,9 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

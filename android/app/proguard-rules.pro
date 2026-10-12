@@ -1,13 +1,29 @@
-# Sportzfy release rules. Media3 and Coil ship consumer rules; Phase 6 adds
-# targeted rules after the first R8 build is verified.
+# Sportzfy release (R8) rules.
+#
+# Most libraries ship their own consumer rules, which R8 applies automatically:
+# Media3 (ExoPlayer, HLS), Coil 3, OkHttp, Retrofit, kotlinx.serialization,
+# Koin, Navigation and Compose. The rules below cover only what is specific
+# to this app.
 
-# kotlinx.serialization: keep generated serializers for DTOs.
--keepattributes *Annotation*, InnerClasses
--dontnote kotlinx.serialization.**
--keep,includedescriptorclasses class com.sportzfy.live.data.model.**$$serializer { *; }
--keepclassmembers class com.sportzfy.live.data.model.** {
+# Keep source file names and line numbers so release crash traces map back
+# to code; the original class names are recovered from mapping.txt.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# kotlinx.serialization: wire DTOs and type-safe navigation routes are
+# looked up by their generated serializers.
+-keepattributes *Annotation*, InnerClasses, Signature
+-keep,includedescriptorclasses class com.sportzfy.live.**$$serializer { *; }
+-keepclassmembers @kotlinx.serialization.Serializable class com.sportzfy.live.** {
     *** Companion;
-}
--keepclasseswithmembers class com.sportzfy.live.data.model.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Retrofit builds the API from its interface at runtime; keep the service
+# methods and the generic signatures (suspend + JsonElement) they rely on.
+-keep,allowobfuscation interface com.sportzfy.live.core.network.StreamedApiService
+-keepclassmembers interface com.sportzfy.live.core.network.StreamedApiService { *; }
+
+# WebView clients are instantiated by the app but invoked by the platform.
+-keep class com.sportzfy.live.presentation.watch.player.** extends android.webkit.WebViewClient { *; }
+-keep class com.sportzfy.live.presentation.watch.player.** extends android.webkit.WebChromeClient { *; }
