@@ -13,13 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcon
+import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
 
@@ -111,7 +110,7 @@ fun HeroSpotlight(
                     modifier = Modifier.tvFocus(RoundedCornerShape(50)),
                     colors = ButtonDefaults.buttonColors(containerColor = SportzfyColors.Rose),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    SportzfyIcon(SportzfyIcons.Play, contentDescription = null, size = 18.dp)
                     Spacer(Modifier.width(6.dp))
                     Text("Watch")
                 }

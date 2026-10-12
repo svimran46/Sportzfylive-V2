@@ -11,12 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -27,6 +22,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcon
+import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.Announcement
 
 @Composable
@@ -81,7 +78,7 @@ fun AnnouncementBanner(announcement: Announcement, modifier: Modifier = Modifier
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Campaign, contentDescription = null, tint = SportzfyColors.Emerald, modifier = Modifier.size(18.dp))
+        SportzfyIcon(SportzfyIcons.Announcement, contentDescription = null, tint = SportzfyColors.Emerald, size = 18.dp)
         Text(
             announcement.message,
             style = MaterialTheme.typography.bodyMedium,
@@ -89,7 +86,7 @@ fun AnnouncementBanner(announcement: Announcement, modifier: Modifier = Modifier
             modifier = Modifier.weight(1f),
         )
         if (link != null) {
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open link", tint = SportzfyColors.Emerald, modifier = Modifier.size(16.dp))
+            SportzfyIcon(SportzfyIcons.ExternalLink, contentDescription = "Open link", tint = SportzfyColors.Emerald, size = 16.dp)
         }
     }
 }
@@ -105,7 +102,50 @@ fun InlineBanner(message: String, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.ErrorOutline, contentDescription = null, tint = SportzfyColors.Rose, modifier = Modifier.size(18.dp))
+        SportzfyIcon(SportzfyIcons.Alert, contentDescription = null, tint = SportzfyColors.Rose, size = 18.dp)
         Text(message, style = MaterialTheme.typography.bodyMedium, color = SportzfyColors.TextPrimary)
+    }
+}
+
+/**
+ * Designed empty or error state: an icon, a title, a short message and up to
+ * two actions (e.g. "Browse Today" / "See upcoming").
+ */
+@Composable
+fun EmptyState(
+    @androidx.annotation.DrawableRes icon: Int,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    primaryAction: Pair<String, () -> Unit>? = null,
+    secondaryAction: Pair<String, () -> Unit>? = null,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier.size(56.dp).background(SportzfyColors.SlateRaised, RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            SportzfyIcon(icon, contentDescription = null, tint = SportzfyColors.TextSecondary, size = 26.dp)
+        }
+        Text(title, style = MaterialTheme.typography.titleMedium, color = SportzfyColors.TextPrimary, textAlign = TextAlign.Center)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = SportzfyColors.TextSecondary, textAlign = TextAlign.Center)
+        if (primaryAction != null || secondaryAction != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 6.dp)) {
+                primaryAction?.let { (label, action) ->
+                    androidx.compose.material3.Button(
+                        onClick = action,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = SportzfyColors.Rose),
+                        modifier = Modifier.tvFocus(RoundedCornerShape(50)),
+                    ) { Text(label) }
+                }
+                secondaryAction?.let { (label, action) ->
+                    OutlinedButton(onClick = action, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text(label) }
+                }
+            }
+        }
     }
 }

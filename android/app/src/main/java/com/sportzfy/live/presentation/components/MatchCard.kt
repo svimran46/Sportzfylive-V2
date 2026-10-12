@@ -13,11 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +24,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sportzfy.live.core.theme.ScoreTextStyle
 import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcon
+import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.Team
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
@@ -92,10 +90,12 @@ fun MatchCard(
 @Composable
 fun FavoriteButton(isFavorite: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     IconButton(onClick = onToggle, modifier = modifier.tvFocus(CircleShape)) {
-        Icon(
-            imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+        // Lucide is outline-only: the saved state is the accent colour.
+        SportzfyIcon(
+            SportzfyIcons.Saved,
             contentDescription = if (isFavorite) "Remove from saved" else "Save match",
             tint = if (isFavorite) SportzfyColors.Rose else SportzfyColors.TextMuted,
+            size = 20.dp,
         )
     }
 }

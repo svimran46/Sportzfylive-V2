@@ -25,11 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -48,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sportzfy.live.core.player.PlayerConfig
 import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcon
+import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.Team
 import com.sportzfy.live.presentation.catalog.rememberMatchTimeFormatter
@@ -176,7 +174,7 @@ private fun WatchTopBar(match: Match?, isFavorite: Boolean, onBack: () -> Unit, 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack, modifier = Modifier.tvFocus(CircleShape)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            SportzfyIcon(SportzfyIcons.Back, contentDescription = "Back")
         }
         Column(Modifier.weight(1f)) {
             Text(
@@ -305,7 +303,7 @@ private fun StreamSelector(
 @Composable
 private fun ShieldNote(blocked: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.Shield, contentDescription = null, tint = SportzfyColors.Emerald, modifier = Modifier.size(14.dp))
+        SportzfyIcon(SportzfyIcons.Shield, contentDescription = null, tint = SportzfyColors.Emerald, size = 14.dp)
         Spacer(Modifier.width(4.dp))
         Text(
             text = if (blocked == 1) "1 pop-up blocked" else "$blocked pop-ups blocked",

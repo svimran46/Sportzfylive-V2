@@ -2,20 +2,12 @@ package com.sportzfy.live.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.model.CategoryOption
 
@@ -66,29 +58,10 @@ private fun Pill(
     onClick: () -> Unit,
     leadingStar: Boolean = false,
 ) {
-    FilterChip(
+    SportzfyChip(
+        label = label,
         selected = selected,
         onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = if (leadingStar) {
-            { Icon(Icons.Filled.Star, contentDescription = null, modifier = Modifier.size(16.dp)) }
-        } else {
-            null
-        },
-        modifier = Modifier.tvFocus(RoundedCornerShape(8.dp)),
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = SportzfyColors.SlateRaised,
-            labelColor = SportzfyColors.TextSecondary,
-            iconColor = SportzfyColors.TextSecondary,
-            selectedContainerColor = SportzfyColors.Rose,
-            selectedLabelColor = SportzfyColors.TextPrimary,
-            selectedLeadingIconColor = SportzfyColors.TextPrimary,
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = selected,
-            borderColor = SportzfyColors.Outline,
-            selectedBorderColor = SportzfyColors.Rose,
-        ),
+        leadingIcon = if (leadingStar) SportzfyIcons.Saved else null,
     )
 }

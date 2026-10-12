@@ -2,15 +2,31 @@ package com.sportzfy.live.core.theme
 
 import androidx.compose.ui.graphics.Color
 
+/** SPORTZFY design tokens (UI style guide). */
 object SportzfyColors {
-    val Charcoal = Color(0xFF0B0E14)
-    val Slate = Color(0xFF0E121A)
-    val SlateRaised = Color(0xFF161C28)
-    val Outline = Color(0xFF242C3B)
-    val Rose = Color(0xFFE11D48)
-    val RoseDim = Color(0xFF9F1239)
+    /** Main app background. */
+    val Charcoal = Color(0xFF0B0F17)
+
+    /** Bars and sheets that sit directly on the background. */
+    val Slate = Color(0xFF0E131D)
+
+    /** Match and channel cards. */
+    val SlateRaised = Color(0xFF171E2B)
+
+    /** Active rows and subtle emphasis. */
+    val SelectedSurface = Color(0xFF191F2C)
+
+    /** Dividers and borders. */
+    val Outline = Color(0xFF273246)
+
+    /** Primary accent: selected tab, live badge, primary action. */
+    val Rose = Color(0xFFF01E4F)
+    val RoseDim = Color(0xFFA3123A)
+
+    /** HD tags. */
     val Emerald = Color(0xFF10B981)
-    val TextPrimary = Color(0xFFF1F5F9)
-    val TextSecondary = Color(0xFF94A3B8)
-    val TextMuted = Color(0xFF64748B)
+
+    val TextPrimary = Color(0xFFFFFFFF)
+    val TextSecondary = Color(0xFFAAB7CC)
+    val TextMuted = Color(0xFF6E7C93)
 }

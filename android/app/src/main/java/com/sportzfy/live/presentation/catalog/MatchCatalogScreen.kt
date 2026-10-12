@@ -21,11 +21,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -57,6 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sportzfy.live.core.theme.ScoreTextStyle
 import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcon
+import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.components.CategoryPills
 import com.sportzfy.live.presentation.components.HeroSpotlight
@@ -250,7 +248,7 @@ private fun CatalogHeader(
                 value = query,
                 onValueChange = onQueryChange,
                 placeholder = { Text("Search teams, leagues or sports") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                leadingIcon = { SportzfyIcon(SportzfyIcons.Search, contentDescription = null, size = 20.dp) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.colors(
@@ -263,7 +261,7 @@ private fun CatalogHeader(
                 modifier = Modifier.weight(1f).focusRequester(focusRequester),
             )
             IconButton(onClick = onCloseSearch, modifier = Modifier.tvFocus(CircleShape)) {
-                Icon(Icons.Filled.Close, contentDescription = "Close search")
+                SportzfyIcon(SportzfyIcons.Close, contentDescription = "Close search")
             }
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
         } else {
@@ -278,7 +276,7 @@ private fun CatalogHeader(
             LiveCounter(liveCount)
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onOpenSearch, modifier = Modifier.tvFocus(CircleShape)) {
-                Icon(Icons.Filled.Search, contentDescription = "Search")
+                SportzfyIcon(SportzfyIcons.Search, contentDescription = "Search")
             }
         }
     }
