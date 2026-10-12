@@ -18,6 +18,10 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.UserAgentMetadata
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
+import com.sportzfy.live.core.player.ChromeUserAgent
 import com.sportzfy.live.core.player.PlayerUrlPolicy
 import java.io.ByteArrayInputStream
 
@@ -34,7 +38,8 @@ internal interface SandboxListener {
 
 /**
  * Creates the player WebView for third-party embeds. It behaves like a
- * browser tab, because the stream sites are paid for by their ads:
+ * Chrome tab, because the stream sites are paid for by their ads and refuse
+ * to play in an app's WebView:
  * - pop-up windows (the ads) open in the phone's browser, the stream stays here;
  * - navigation follows [PlayerUrlPolicy]; app links open in their app, and
  *   hosts the owner blocks remotely get an empty response;
@@ -69,9 +74,10 @@ internal fun createSandboxedWebView(
         displayZoomControls = false
         useWideViewPort = true
         loadWithOverviewMode = true
-        // Some embeds refuse the WebView marker; present as regular Chrome.
-        userAgentString = userAgentString?.replace("; wv", "")
+        // Stream sites refuse in-app WebViews; present exactly as Chrome.
+        userAgentString = ChromeUserAgent.from(userAgentString.orEmpty())
     }
+    presentAsChrome(settings)
     // Embedded players sit in cross-site iframes and need their own cookies
     // for anti-bot checks.
     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
@@ -98,6 +104,41 @@ internal fun createSandboxedWebView(
 
     webViewClient = SandboxedWebViewClient(policy, listener)
     webChromeClient = SandboxedChromeClient(listener)
+}
+
+/**
+ * Hides the WebView signals a page can read besides the user agent string:
+ * the "Android WebView" brand in `navigator.userAgentData` (and the matching
+ * Sec-CH-UA headers), and the X-Requested-With header carrying the app id.
+ * Each needs a recent WebView; older ones keep their defaults.
+ */
+private fun presentAsChrome(settings: WebSettings) {
+    // Best effort: a missing or unusual WebView provider must not stop playback.
+    runCatching {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
+            val current = WebSettingsCompat.getUserAgentMetadata(settings)
+            val brands = current.brandVersionList.map { brand ->
+                if (brand.brand != ChromeUserAgent.WEBVIEW_BRAND) {
+                    brand
+                } else {
+                    UserAgentMetadata.BrandVersion.Builder()
+                        .setBrand(ChromeUserAgent.CHROME_BRAND)
+                        .setMajorVersion(brand.majorVersion)
+                        .setFullVersion(brand.fullVersion)
+                        .build()
+                }
+            }
+            WebSettingsCompat.setUserAgentMetadata(
+                settings,
+                UserAgentMetadata.Builder(current).setBrandVersionList(brands).build(),
+            )
+        }
+    }
+    runCatching {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+        }
+    }
 }
 
 /**
