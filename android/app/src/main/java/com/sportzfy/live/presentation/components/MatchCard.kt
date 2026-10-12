@@ -7,10 +7,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,10 +41,12 @@ fun MatchCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.tvFocus(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = SportzfyColors.SlateRaised),
     ) {
@@ -51,6 +60,9 @@ fun MatchCard(
                     modifier = Modifier.weight(1f),
                 )
                 StatusTag(match, nowMillis, formatter)
+                if (onToggleFavorite != null) {
+                    FavoriteButton(isFavorite, onToggleFavorite, Modifier.size(32.dp))
+                }
             }
             Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
 
@@ -74,6 +86,17 @@ fun MatchCard(
                 FeedChip(sourcesLabel(match.sources.size))
             }
         }
+    }
+}
+
+@Composable
+fun FavoriteButton(isFavorite: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(onClick = onToggle, modifier = modifier.tvFocus(CircleShape)) {
+        Icon(
+            imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+            contentDescription = if (isFavorite) "Remove from saved" else "Save match",
+            tint = if (isFavorite) SportzfyColors.Rose else SportzfyColors.TextMuted,
+        )
     }
 }
 

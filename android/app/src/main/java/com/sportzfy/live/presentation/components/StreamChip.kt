@@ -33,7 +33,9 @@ fun StreamChip(
     Surface(
         selected = selected,
         onClick = onClick,
-        modifier = modifier.semantics { contentDescription = WatchLogic.streamLabel(index, stream) },
+        modifier = modifier
+            .tvFocus(RoundedCornerShape(10.dp))
+            .semantics { contentDescription = WatchLogic.streamLabel(index, stream) },
         shape = RoundedCornerShape(10.dp),
         color = if (selected) SportzfyColors.Rose else SportzfyColors.SlateRaised,
         contentColor = SportzfyColors.TextPrimary,

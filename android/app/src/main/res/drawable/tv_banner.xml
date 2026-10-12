@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV home-row banner (320x180dp): play mark plus a rose underline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#FF0B0E14"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#FF161C28"
+        android:pathData="M0,120h320v60h-320z" />
+    <path
+        android:fillColor="#FFE11D48"
+        android:pathData="M160,30a40,40 0,1 1,0 80a40,40 0,1 1,0 -80z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M148,50L182,70L148,90Z" />
+    <path
+        android:fillColor="#FFE11D48"
+        android:pathData="M120,146h80v6h-80z" />
+</vector>

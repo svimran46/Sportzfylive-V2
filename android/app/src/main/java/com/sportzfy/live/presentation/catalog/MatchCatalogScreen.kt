@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -64,6 +65,7 @@ import com.sportzfy.live.presentation.components.LoadingState
 import com.sportzfy.live.presentation.components.MatchCard
 import com.sportzfy.live.presentation.components.MessageState
 import com.sportzfy.live.presentation.components.PulsingDot
+import com.sportzfy.live.presentation.components.tvFocus
 import com.sportzfy.live.presentation.model.CatalogUiState
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
 import com.sportzfy.live.presentation.model.userMessage
@@ -94,6 +96,8 @@ fun MatchCatalogScreen(
         state = state,
         onOpenMatch = onOpenMatch,
         onSelectCategory = viewModel::selectCategory,
+        onSelectSaved = viewModel::showFavorites,
+        onToggleFavorite = viewModel::toggleFavorite,
         onQueryChange = viewModel::setQuery,
         onRefresh = { viewModel.refresh(force = true) },
     )
@@ -105,6 +109,8 @@ fun MatchCatalogContent(
     state: CatalogUiState,
     onOpenMatch: (String) -> Unit,
     onSelectCategory: (SportCategory?) -> Unit,
+    onSelectSaved: () -> Unit,
+    onToggleFavorite: (String) -> Unit,
     onQueryChange: (String) -> Unit,
     onRefresh: () -> Unit,
 ) {
@@ -148,7 +154,7 @@ fun MatchCatalogContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    catalogItems(state, now, formatter, onOpenMatch, onSelectCategory)
+                    catalogItems(state, now, formatter, onOpenMatch, onSelectCategory, onSelectSaved, onToggleFavorite)
                 }
             }
         }
@@ -161,6 +167,8 @@ private fun LazyGridScope.catalogItems(
     formatter: MatchTimeFormatter,
     onOpenMatch: (String) -> Unit,
     onSelectCategory: (SportCategory?) -> Unit,
+    onSelectSaved: () -> Unit,
+    onToggleFavorite: (String) -> Unit,
 ) {
     val fullSpan: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
 
@@ -175,13 +183,23 @@ private fun LazyGridScope.catalogItems(
         }
     }
     item(key = "categories", span = fullSpan) {
-        CategoryPills(state.categories, state.selectedCategory, onSelectCategory)
+        CategoryPills(
+            options = state.categories,
+            selected = state.selectedCategory,
+            onSelect = onSelectCategory,
+            savedCount = state.savedCount,
+            savedSelected = state.favoritesOnly,
+            onSelectSaved = onSelectSaved,
+        )
     }
     if (state.isEmpty) {
         item(key = "empty", span = fullSpan) {
             MessageState(
-                if (state.query.isNotBlank()) "No matches for \"${state.query.trim()}\"."
-                else "No fixtures in this category right now."
+                when {
+                    state.query.isNotBlank() -> "No matches for \"${state.query.trim()}\"."
+                    state.favoritesOnly -> "No saved matches today. Tap the star on a match to save it."
+                    else -> "No fixtures in this category right now."
+                }
             )
         }
     }
@@ -190,7 +208,14 @@ private fun LazyGridScope.catalogItems(
             SectionHeader(section.kind.title, section.matches.size)
         }
         items(section.matches, key = { "match-${it.id}" }) { match ->
-            MatchCard(match, now, formatter, onClick = { onOpenMatch(match.id) })
+            MatchCard(
+                match = match,
+                nowMillis = now,
+                formatter = formatter,
+                onClick = { onOpenMatch(match.id) },
+                isFavorite = match.id in state.favoriteIds,
+                onToggleFavorite = { onToggleFavorite(match.id) },
+            )
         }
     }
 }
@@ -218,7 +243,7 @@ private fun CatalogHeader(
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text("Search teams or sports") },
+                placeholder = { Text("Search teams, leagues or sports") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -231,7 +256,7 @@ private fun CatalogHeader(
                 ),
                 modifier = Modifier.weight(1f).focusRequester(focusRequester),
             )
-            IconButton(onClick = onCloseSearch) {
+            IconButton(onClick = onCloseSearch, modifier = Modifier.tvFocus(CircleShape)) {
                 Icon(Icons.Filled.Close, contentDescription = "Close search")
             }
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -246,7 +271,7 @@ private fun CatalogHeader(
             Spacer(Modifier.width(12.dp))
             LiveCounter(liveCount)
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = onOpenSearch) {
+            IconButton(onClick = onOpenSearch, modifier = Modifier.tvFocus(CircleShape)) {
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
         }
