@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
 import com.sportzfy.live.presentation.catalog.MatchCatalogScreen
@@ -30,7 +28,6 @@ private const val TAB_FADE_MILLIS = 180
  * App shell. The four tabs show the bottom bar; the player is full-screen.
  * Back from any tab returns to Today, and back from Today leaves the app.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SportzfyNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
@@ -38,19 +35,9 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
     // tabs: search and filters carry across Today, Tomorrow and All Matches.
     val catalogViewModel: CatalogViewModel = koinViewModel()
 
-    val entry by navController.currentBackStackEntryAsState()
-    val currentTab = MainTab.of(entry?.destination)
-    // Hidden while the keyboard is open so it never sits on top of the IME.
-    val imeVisible = WindowInsets.isImeVisible
-    val bottomBar: @Composable () -> Unit = {
-        if (!imeVisible) {
-            BottomNavBar(
-                items = MainTab.items,
-                selectedKey = currentTab?.item?.key,
-                onSelect = { key -> navController.navigateToTab(MainTab.fromKey(key)) },
-            )
-        }
-    }
+    // Each tab passes its own identity: NavHost builds its graph once, so the
+    // destinations must not capture state that changes between compositions.
+    val bottomBar: @Composable (MainTab) -> Unit = { tab -> MainBottomBar(tab, navController) }
     val openMatch: (String) -> Unit = { id -> navController.navigate(WatchRoute(id)) }
 
     NavHost(
@@ -61,21 +48,33 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
         exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
     ) {
         composable<TodayRoute> {
-            MatchCatalogScreen(DayScope.TODAY, openMatch, viewModel = catalogViewModel, bottomBar = bottomBar)
+            MatchCatalogScreen(DayScope.TODAY, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.TODAY) })
         }
         composable<TomorrowRoute> {
-            MatchCatalogScreen(DayScope.TOMORROW, openMatch, viewModel = catalogViewModel, bottomBar = bottomBar)
+            MatchCatalogScreen(DayScope.TOMORROW, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.TOMORROW) })
         }
         composable<LiveTvRoute> {
-            LiveTvScreen(bottomBar = bottomBar)
+            LiveTvScreen(bottomBar = { bottomBar(MainTab.LIVE_TV) })
         }
         composable<AllMatchesRoute> {
-            MatchCatalogScreen(DayScope.ALL, openMatch, viewModel = catalogViewModel, bottomBar = bottomBar)
+            MatchCatalogScreen(DayScope.ALL, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.ALL_MATCHES) })
         }
         composable<WatchRoute> {
             WatchStudioScreen(onBack = { navController.popBackStack() })
         }
     }
+}
+
+/** Bottom bar for [selected]; hidden while the keyboard is open so it never sits on the IME. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MainBottomBar(selected: MainTab, navController: NavController) {
+    if (WindowInsets.isImeVisible) return
+    BottomNavBar(
+        items = MainTab.items,
+        selectedKey = selected.item.key,
+        onSelect = { key -> navController.navigateToTab(MainTab.fromKey(key)) },
+    )
 }
 
 /** Standard tab switch: one copy of each tab, state saved and restored, Today at the root. */

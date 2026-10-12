@@ -1,7 +1,5 @@
 package com.sportzfy.live.presentation.navigation
 
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hasRoute
 import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.presentation.components.NavBarItem
 
@@ -17,14 +15,5 @@ enum class MainTab(val item: NavBarItem) {
 
         fun fromKey(key: String): MainTab = entries.first { it.item.key == key }
 
-        /** The tab a destination belongs to, or null (e.g. the player). */
-        fun of(destination: NavDestination?): MainTab? = when {
-            destination == null -> null
-            destination.hasRoute<TodayRoute>() -> TODAY
-            destination.hasRoute<TomorrowRoute>() -> TOMORROW
-            destination.hasRoute<LiveTvRoute>() -> LIVE_TV
-            destination.hasRoute<AllMatchesRoute>() -> ALL_MATCHES
-            else -> null
-        }
     }
 }
