@@ -7,6 +7,7 @@ import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.MatchFeed
 import com.sportzfy.live.domain.model.MatchStatus
 import com.sportzfy.live.domain.model.SportCategory
+import java.util.Locale
 
 data class CategoryOption(val category: SportCategory?, val count: Int) {
     val label: String
@@ -19,7 +20,13 @@ enum class SectionKind(val title: String, val status: MatchStatus) {
     ENDED("Earlier today", MatchStatus.ENDED),
 }
 
-data class MatchSection(val kind: SectionKind, val matches: List<Match>)
+/** A titled group of match cards. Status sections carry their [kind]; day sections don't. */
+data class MatchSection(
+    val kind: SectionKind?,
+    val matches: List<Match>,
+    val key: String = kind?.name ?: "section",
+    val title: String = kind?.title.orEmpty(),
+)
 
 data class CatalogUiState(
     /** Nothing has loaded yet, successfully or not. */
@@ -41,6 +48,10 @@ data class CatalogUiState(
     val sections: List<MatchSection> = emptyList(),
     /** Owner's message from the remote config. */
     val announcement: Announcement? = null,
+    /** Day slice this state was built for; null means the whole feed. */
+    val scope: DayScope? = null,
+    /** "Tue 13 Oct" for the scope's day (Today/Tomorrow), when known. */
+    val dateLabel: String? = null,
 ) {
     val isEmpty: Boolean
         get() = hero == null && sections.isEmpty()
@@ -53,8 +64,14 @@ data class CatalogUiState(
             favoriteIds: Set<String> = emptySet(),
             favoritesOnly: Boolean = false,
             config: AppConfig = AppConfig.Default,
+            scope: DayScope? = null,
+            window: DayWindow? = null,
+            locale: Locale = Locale.getDefault(),
         ): CatalogUiState {
-            val all = feed.matches.filter { it.category !in config.hiddenCategories }
+            val visible = feed.matches.filter { it.category !in config.hiddenCategories }
+            // Pills, counts and the list all describe the scope's day; the header
+            // live counter stays global.
+            val all = if (scope != null && window != null) MatchDays.inScope(visible, scope, window) else visible
             val counts = all.groupingBy { it.category }.eachCount()
             val categories = buildList {
                 add(CategoryOption(null, all.size))
@@ -70,7 +87,8 @@ data class CatalogUiState(
             val filtered = CatalogFilter.apply(all, category, query, onlyIds = favoriteIds.takeIf { favoritesOnly })
             // The banner is for browsing; while searching or viewing saved
             // matches every hit stays in the list.
-            val hero = if (query.isBlank() && !favoritesOnly) {
+            val showsHero = scope == null || scope == DayScope.TODAY
+            val hero = if (showsHero && query.isBlank() && !favoritesOnly) {
                 // A match pinned in the remote config wins while it is in the feed.
                 config.featuredMatchId?.let { id -> filtered.firstOrNull { it.id == id } }
                     ?: CatalogFilter.spotlight(filtered)
@@ -78,10 +96,21 @@ data class CatalogUiState(
                 null
             }
             val rest = if (hero == null) filtered else filtered.filter { it.id != hero.id }
-            val sections = SectionKind.entries.mapNotNull { kind ->
-                rest.filter { it.status == kind.status }
-                    .takeIf { it.isNotEmpty() }
-                    ?.let { MatchSection(kind, it) }
+            val sections = if (scope == DayScope.ALL && window != null) {
+                MatchDays.sectionsByDay(rest, window, locale)
+            } else {
+                SectionKind.entries.mapNotNull { kind ->
+                    rest.filter { it.status == kind.status }
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { MatchSection(kind, it) }
+                }
+            }
+            val dateLabel = window?.let {
+                when (scope) {
+                    DayScope.TODAY -> it.dateLabel(it.todayStart, locale)
+                    DayScope.TOMORROW -> it.dateLabel(it.tomorrowStart, locale)
+                    else -> null
+                }
             }
 
             return CatalogUiState(
@@ -89,7 +118,7 @@ data class CatalogUiState(
                 isRefreshing = feed.isLoading,
                 error = feed.error,
                 hasData = feed.updatedAtMillis != null,
-                liveCount = all.count { it.isLive },
+                liveCount = visible.count { it.isLive },
                 categories = categories,
                 selectedCategory = category,
                 favoritesOnly = favoritesOnly,
@@ -99,6 +128,8 @@ data class CatalogUiState(
                 hero = hero,
                 sections = sections,
                 announcement = config.announcement,
+                scope = scope,
+                dateLabel = dateLabel,
             )
         }
     }

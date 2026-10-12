@@ -72,6 +72,18 @@ By default (`playerMode: "iframe"`), the embed runs inside a **plain iframe with
 - **Fullscreen:** `onShowCustomView` and `onHideCustomView` move the video into a fullscreen landscape view with the system bars hidden. Back exits fullscreen.
 - **Renderer crashes:** if the renderer dies, the player rebuilds its WebView instead of crashing the app.
 
+## Navigation and dates
+
+A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorrow**, **Live TV** and **All Matches**. It sits above the system navigation bar, hides while the keyboard is open, and isn't shown on the full-screen player. Back from any tab returns to Today; back from Today leaves the app.
+
+- **One feed:** matches come from Streamed's `all-today`, `all` (later days) and `live` endpoints, merged into one list with duplicates removed.
+- **Timezone:** "Today" and "Tomorrow" mean the **device's local calendar day** (`ZoneProvider`, `TimeZone.getDefault()`). All the day logic is in `MatchDays`, built on calendar arithmetic, so month and year changes and daylight-saving days are handled. The day boundaries are re-checked every minute, so the tabs roll over at midnight.
+- **Today:** matches that are live right now (even if they started yesterday), kick off today, or have no announced time.
+- **Tomorrow:** matches that kick off on the next local day and aren't live.
+- **All Matches:** everything, with live matches first, then one section per day (Yesterday, Today, Tomorrow, then dated days), then matches with no announced time. Every match appears once.
+- **Search and filters:** one `CatalogViewModel` serves all three fixture tabs, so search and the sport and Saved filters carry across them.
+- **Live TV:** a placeholder screen until the channel directory arrives in the next phase.
+
 ## Screens
 
 - **Catalog**

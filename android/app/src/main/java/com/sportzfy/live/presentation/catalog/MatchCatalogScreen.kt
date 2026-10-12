@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -64,8 +65,10 @@ import com.sportzfy.live.presentation.components.LoadingState
 import com.sportzfy.live.presentation.components.MatchCard
 import com.sportzfy.live.presentation.components.MessageState
 import com.sportzfy.live.presentation.components.PulsingDot
+import com.sportzfy.live.presentation.components.SportzfyWordmark
 import com.sportzfy.live.presentation.components.tvFocus
 import com.sportzfy.live.presentation.model.CatalogUiState
+import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.presentation.model.MatchTimeFormatter
 import com.sportzfy.live.presentation.model.userMessage
 import kotlinx.coroutines.delay
@@ -73,12 +76,18 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private const val AUTO_REFRESH_MILLIS = 60_000L
 
+/**
+ * One fixture list screen. The Today, Tomorrow and All Matches tabs are this
+ * screen with a different [scope], sharing one [viewModel].
+ */
 @Composable
 fun MatchCatalogScreen(
+    scope: DayScope,
     onOpenMatch: (String) -> Unit,
     viewModel: CatalogViewModel = koinViewModel(),
+    bottomBar: @Composable () -> Unit = {},
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by viewModel.state(scope).collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Poll while the screen is visible so live badges stay current.
@@ -99,6 +108,7 @@ fun MatchCatalogScreen(
         onToggleFavorite = viewModel::toggleFavorite,
         onQueryChange = viewModel::setQuery,
         onRefresh = { viewModel.refresh(force = true) },
+        bottomBar = bottomBar,
     )
 }
 
@@ -112,6 +122,7 @@ fun MatchCatalogContent(
     onToggleFavorite: (String) -> Unit,
     onQueryChange: (String) -> Unit,
     onRefresh: () -> Unit,
+    bottomBar: @Composable () -> Unit = {},
 ) {
     var searchOpen by rememberSaveable { mutableStateOf(state.query.isNotEmpty()) }
     val formatter = rememberMatchTimeFormatter()
@@ -132,6 +143,7 @@ fun MatchCatalogContent(
                 },
             )
         },
+        bottomBar = bottomBar,
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.isRefreshing && state.hasData,
@@ -171,6 +183,16 @@ private fun LazyGridScope.catalogItems(
 ) {
     val fullSpan: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
 
+    val title = when (state.scope) {
+        DayScope.TOMORROW -> "Tomorrow"
+        DayScope.ALL -> "All Matches"
+        else -> null
+    }
+    if (title != null) {
+        item(key = "title", span = fullSpan) {
+            ScreenTitle(title, state.dateLabel)
+        }
+    }
     state.announcement?.let { announcement ->
         item(key = "announcement", span = fullSpan) {
             AnnouncementBanner(announcement)
@@ -201,15 +223,17 @@ private fun LazyGridScope.catalogItems(
             MessageState(
                 when {
                     state.query.isNotBlank() -> "No matches for \"${state.query.trim()}\"."
-                    state.favoritesOnly -> "No saved matches today. Tap the star on a match to save it."
+                    state.favoritesOnly -> "No saved matches here. Tap the star on a match to save it."
+                    state.scope == DayScope.TOMORROW -> "No fixtures announced for tomorrow yet."
+                    state.scope == DayScope.ALL -> "No fixtures available right now."
                     else -> "No fixtures in this category right now."
                 }
             )
         }
     }
     state.sections.forEach { section ->
-        item(key = "section-${section.kind}", span = fullSpan) {
-            SectionHeader(section.kind.title, section.matches.size)
+        item(key = "section-${section.key}", span = fullSpan) {
+            SectionHeader(section.title, section.matches.size)
         }
         items(section.matches, key = { "match-${it.id}" }) { match ->
             MatchCard(
@@ -265,13 +289,7 @@ private fun CatalogHeader(
             }
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
         } else {
-            Text(
-                text = buildAnnotatedString {
-                    append("SPORTZ")
-                    withStyle(SpanStyle(color = SportzfyColors.Rose)) { append("FY") }
-                },
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-            )
+            SportzfyWordmark()
             Spacer(Modifier.width(12.dp))
             LiveCounter(liveCount)
             Spacer(Modifier.weight(1f))
@@ -308,6 +326,26 @@ private fun PulsingDotPlaceholder() {
             .height(8.dp)
             .background(SportzfyColors.TextMuted, RoundedCornerShape(50))
     )
+}
+
+@Composable
+private fun ScreenTitle(title: String, dateLabel: String?) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.testTag("screen-title"),
+        )
+        if (dateLabel != null) {
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = dateLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = SportzfyColors.TextSecondary,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+        }
+    }
 }
 
 @Composable

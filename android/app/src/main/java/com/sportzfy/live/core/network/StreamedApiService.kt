@@ -16,6 +16,10 @@ interface StreamedApiService {
     suspend fun getMatchesToday(): JsonElement
 
     /** Throws `retrofit2.HttpException` on non-2xx. */
+    @GET(StreamedEndpoints.MATCHES_ALL)
+    suspend fun getAllMatches(): JsonElement
+
+    /** Throws `retrofit2.HttpException` on non-2xx. */
     @GET(StreamedEndpoints.MATCHES_LIVE)
     suspend fun getLiveMatches(): JsonElement
 

@@ -103,6 +103,7 @@ class MatchRepositoryImplTest {
         repository.refresh()
 
         api.today = { throw httpError(429) }
+        api.all = { throw httpError(429) }
         api.live = { throw httpError(429) }
         repository.refresh(force = true)
 
@@ -115,9 +116,34 @@ class MatchRepositoryImplTest {
     @Test
     fun `maps network failures`() = runTest {
         api.today = { FakeStreamedApi.networkDown() }
+        api.all = { FakeStreamedApi.networkDown() }
         api.live = { FakeStreamedApi.networkDown() }
         repository.refresh()
         assertEquals(DataError.NETWORK, repository.feed.value.error)
+    }
+
+    @Test
+    fun `later days come from the all feed without duplicates`() = runTest {
+        api.today = { json("""[${match("a", hour)}]""") }
+        api.all = { json("""[${match("a", hour)}, ${match("tomorrow", 30 * hour)}]""") }
+
+        repository.refresh()
+
+        assertEquals(listOf("a", "tomorrow"), repository.feed.value.matches.map { it.id })
+        assertEquals(1, api.allCalls)
+    }
+
+    @Test
+    fun `an all-feed failure keeps its last payload`() = runTest {
+        api.all = { json("""[${match("tomorrow", 30 * hour)}]""") }
+        repository.refresh()
+
+        api.all = { throw httpError(503) }
+        api.today = { json("""[${match("a", hour)}]""") }
+        repository.refresh(force = true)
+
+        assertEquals(setOf("a", "tomorrow"), repository.feed.value.matches.map { it.id }.toSet())
+        assertNull(repository.feed.value.error)
     }
 
     @Test

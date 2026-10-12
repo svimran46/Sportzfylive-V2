@@ -47,6 +47,13 @@ class StreamedApiServiceTest {
     }
 
     @Test
+    fun `requests every listed match`() = runTest {
+        server.enqueue(MockResponse().setBody("[]"))
+        api.getAllMatches()
+        assertEquals("/api/matches/all", server.takeRequest().path)
+    }
+
+    @Test
     fun `requests the live feed`() = runTest {
         server.enqueue(MockResponse().setBody("[]"))
         api.getLiveMatches()

@@ -7,6 +7,8 @@ object StreamedEndpoints {
 
     const val MATCHES_TODAY = "api/matches/all-today"
     const val MATCHES_LIVE = "api/matches/live"
+    /** Every listed match, including later days (powers Tomorrow and All Matches). */
+    const val MATCHES_ALL = "api/matches/all"
     const val STREAM = "api/stream/{source}/{id}"
 
     private const val BADGE_PREFIX = "${BASE_URL}api/images/badge/"

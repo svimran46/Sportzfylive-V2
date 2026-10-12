@@ -11,6 +11,7 @@ import com.sportzfy.live.core.network.HttpClientFactory
 import com.sportzfy.live.core.network.NetworkJson
 import com.sportzfy.live.core.network.StreamedApiService
 import com.sportzfy.live.core.time.Clock
+import com.sportzfy.live.core.time.ZoneProvider
 import com.sportzfy.live.data.config.AppConfigRepositoryImpl
 import com.sportzfy.live.data.config.DataStoreConfigCache
 import com.sportzfy.live.data.config.HttpConfigSource
@@ -45,6 +46,7 @@ val networkModule = module {
 
 val dataModule = module {
     single<Clock> { Clock.System }
+    single<ZoneProvider> { ZoneProvider.System }
     single<MatchRepository> { MatchRepositoryImpl(get(), get(), get()) }
     single<StreamRepository> { StreamRepositoryImpl(get(), get(), get()) }
     single<FavoritesRepository> { FavoritesRepositoryImpl(androidContext().favoritesDataStore) }

@@ -21,15 +21,17 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 /**
- * Fetches `all-today` and `live` concurrently and merges them. Results are
- * held in memory for [ttlMillis] so rapid tab switches never reach upstream;
- * concurrent refreshes share one request through [mutex].
+ * Fetches `all-today`, `all` (later days) and `live` concurrently and merges
+ * them into one de-duplicated list. Results are held in memory for
+ * [ttlMillis] so rapid tab switches never reach upstream; concurrent
+ * refreshes share one request through [mutex].
  *
  * Failure isolation:
  * - `live` fails → statuses fall back to kick-off time.
- * - `all-today` fails → the last good `all-today` payload is merged with the
- *   fresh `live` feed, and the cache stays stale so the next call retries.
- * - both fail → the previous matches stay and [MatchFeed.error] is set.
+ * - `all-today` or `all` fails → its last good payload is merged with the
+ *   fresh feeds; a failed `all-today` keeps the cache stale so the next call
+ *   retries.
+ * - all three fail → the previous matches stay and [MatchFeed.error] is set.
  */
 class MatchRepositoryImpl(
     private val api: StreamedApiService,
@@ -43,6 +45,7 @@ class MatchRepositoryImpl(
 
     private val mutex = Mutex()
     private var lastTodayPayload: List<RemoteMatchDto>? = null
+    private var lastAllPayload: List<RemoteMatchDto>? = null
     private var lastSuccessMillis: Long? = null
 
     override suspend fun refresh(force: Boolean) {
@@ -51,16 +54,18 @@ class MatchRepositoryImpl(
             if (!force && last != null && clock.nowMillis() - last < ttlMillis) return
 
             state.update { it.copy(isLoading = true) }
-            val (today, live) = coroutineScope {
+            val (today, all, live) = coroutineScope {
                 val today = async { fetchList(api::getMatchesToday) }
+                val all = async { fetchList(api::getAllMatches) }
                 val live = async { fetchList(api::getLiveMatches) }
-                today.await() to live.await()
+                Triple(today.await(), all.await(), live.await())
             }
 
             val now = clock.nowMillis()
             val todayList = today.getOrNull()
+            val allList = all.getOrNull()
             val liveList = live.getOrNull()
-            if (todayList == null && liveList == null) {
+            if (todayList == null && allList == null && liveList == null) {
                 state.update { it.copy(isLoading = false, error = today.exceptionOrNull().toDataError()) }
                 return
             }
@@ -69,8 +74,11 @@ class MatchRepositoryImpl(
                 lastTodayPayload = todayList
                 lastSuccessMillis = now
             }
+            if (allList != null) lastAllPayload = allList
+            // all-today first so its entries win when both feeds list a match.
+            val base = (todayList ?: lastTodayPayload.orEmpty()) + (allList ?: lastAllPayload.orEmpty())
             state.value = MatchFeed(
-                matches = MatchMapper.merge(todayList ?: lastTodayPayload.orEmpty(), liveList, now),
+                matches = MatchMapper.merge(base, liveList, now),
                 updatedAtMillis = now,
                 isLoading = false,
                 error = null,

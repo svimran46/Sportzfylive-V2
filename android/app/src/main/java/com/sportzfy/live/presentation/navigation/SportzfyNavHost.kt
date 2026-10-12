@@ -1,22 +1,94 @@
 package com.sportzfy.live.presentation.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.sportzfy.live.presentation.catalog.CatalogViewModel
 import com.sportzfy.live.presentation.catalog.MatchCatalogScreen
+import com.sportzfy.live.presentation.components.BottomNavBar
+import com.sportzfy.live.presentation.livetv.LiveTvScreen
+import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.presentation.watch.WatchStudioScreen
+import org.koin.compose.viewmodel.koinViewModel
 
+private const val TAB_FADE_MILLIS = 180
+
+/**
+ * App shell. The four tabs show the bottom bar; the player is full-screen.
+ * Back from any tab returns to Today, and back from Today leaves the app.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SportzfyNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = CatalogRoute, modifier = modifier) {
-        composable<CatalogRoute> {
-            MatchCatalogScreen(onOpenMatch = { id -> navController.navigate(WatchRoute(id)) })
+    // Created outside the NavHost, so it is Activity-scoped and shared by the
+    // tabs: search and filters carry across Today, Tomorrow and All Matches.
+    val catalogViewModel: CatalogViewModel = koinViewModel()
+
+    val entry by navController.currentBackStackEntryAsState()
+    val currentTab = MainTab.of(entry?.destination)
+    // Hidden while the keyboard is open so it never sits on top of the IME.
+    val imeVisible = WindowInsets.isImeVisible
+    val bottomBar: @Composable () -> Unit = {
+        if (!imeVisible) {
+            BottomNavBar(
+                items = MainTab.items,
+                selectedKey = currentTab?.item?.key,
+                onSelect = { key -> navController.navigateToTab(MainTab.fromKey(key)) },
+            )
+        }
+    }
+    val openMatch: (String) -> Unit = { id -> navController.navigate(WatchRoute(id)) }
+
+    NavHost(
+        navController = navController,
+        startDestination = TodayRoute,
+        modifier = modifier,
+        enterTransition = { fadeIn(tween(TAB_FADE_MILLIS)) },
+        exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
+    ) {
+        composable<TodayRoute> {
+            MatchCatalogScreen(DayScope.TODAY, openMatch, viewModel = catalogViewModel, bottomBar = bottomBar)
+        }
+        composable<TomorrowRoute> {
+            MatchCatalogScreen(DayScope.TOMORROW, openMatch, viewModel = catalogViewModel, bottomBar = bottomBar)
+        }
+        composable<LiveTvRoute> {
+            LiveTvScreen(bottomBar = bottomBar)
+        }
+        composable<AllMatchesRoute> {
+            MatchCatalogScreen(DayScope.ALL, openMatch, viewModel = catalogViewModel, bottomBar = bottomBar)
         }
         composable<WatchRoute> {
             WatchStudioScreen(onBack = { navController.popBackStack() })
         }
+    }
+}
+
+/** Standard tab switch: one copy of each tab, state saved and restored, Today at the root. */
+private fun NavController.navigateToTab(tab: MainTab) {
+    val options: NavOptionsBuilder.() -> Unit = {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+    when (tab) {
+        MainTab.TODAY -> navigate(TodayRoute, options)
+        MainTab.TOMORROW -> navigate(TomorrowRoute, options)
+        MainTab.LIVE_TV -> navigate(LiveTvRoute, options)
+        MainTab.ALL_MATCHES -> navigate(AllMatchesRoute, options)
     }
 }

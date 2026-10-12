@@ -22,14 +22,17 @@ fun httpError(code: Int): HttpException = HttpException(Response.error<Any>(code
 class FakeStreamedApi : StreamedApiService {
     var today: () -> JsonElement = { json("[]") }
     var live: () -> JsonElement = { json("[]") }
+    var all: () -> JsonElement = { json("[]") }
     var streams: (source: String, id: String) -> Response<JsonElement> = { _, _ -> Response.success(json("[]")) }
 
     var todayCalls = 0
     var liveCalls = 0
+    var allCalls = 0
     val streamCalls = mutableListOf<String>()
 
     override suspend fun getMatchesToday(): JsonElement { todayCalls++; return today() }
     override suspend fun getLiveMatches(): JsonElement { liveCalls++; return live() }
+    override suspend fun getAllMatches(): JsonElement { allCalls++; return all() }
     override suspend fun getSourceStreams(source: String, id: String): Response<JsonElement> {
         streamCalls += "$source/$id"
         return streams(source, id)

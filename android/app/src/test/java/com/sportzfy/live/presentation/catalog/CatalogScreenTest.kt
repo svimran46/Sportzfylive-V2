@@ -9,7 +9,10 @@ import com.sportzfy.live.core.theme.SportzfyTheme
 import com.sportzfy.live.domain.model.MatchStatus.LIVE
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.presentation.model.testMatch
+import com.sportzfy.live.core.time.ZoneProvider
+import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.testing.FakeAppConfigRepository
+import com.sportzfy.live.testing.FakeClock
 import com.sportzfy.live.testing.FakeFavoritesRepository
 import com.sportzfy.live.testing.FakeMatchRepository
 import org.junit.Rule
@@ -43,13 +46,15 @@ class CatalogScreenTest {
         ),
         FakeFavoritesRepository(),
         FakeAppConfigRepository(),
+        FakeClock(),
+        ZoneProvider { java.util.TimeZone.getTimeZone("UTC") },
     )
 
     @Test
     fun categoryPillFiltersTheMatchList() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SportzfyTheme { MatchCatalogScreen(onOpenMatch = {}, viewModel = viewModel) }
+            SportzfyTheme { MatchCatalogScreen(scope = DayScope.TODAY, onOpenMatch = {}, viewModel = viewModel) }
         }
         settle()
 
@@ -68,7 +73,7 @@ class CatalogScreenTest {
     fun searchFiltersTheMatchList() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SportzfyTheme { MatchCatalogScreen(onOpenMatch = {}, viewModel = viewModel) }
+            SportzfyTheme { MatchCatalogScreen(scope = DayScope.TODAY, onOpenMatch = {}, viewModel = viewModel) }
         }
         settle()
 
