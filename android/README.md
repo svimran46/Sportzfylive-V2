@@ -52,6 +52,9 @@ Requires JDK 17+ and the Android SDK (platform 36).
 - **Matches:** `MatchRepository` fetches `all-today` and `live` from `https://streamed.pk/api/matches/` at the same time and tags the matches in the live feed as `LIVE`. Results are cached in memory for 60 seconds.
   - Only the live feed can mark a match as `LIVE`; kick-off time never does. If the live feed fails, its last good copy is reused for up to 5 minutes. After that, nothing is marked live, matches that have kicked off show as **Started**, and the app says it couldn't check live matches instead of claiming there are none.
   - A forced refresh that was queued behind a running one is dropped, so repeated taps on Refresh never stack requests.
+  - If every feed fails, the last matches stay on screen with an error banner. Once the last live list is more than 5 minutes old, LIVE badges are dropped too.
+  - A match fetched as upcoming whose kick-off has since passed shows as **Started** until the next refresh. It never shows as Live.
+  - The 60-second auto-refresh is silent: spinners only show for refreshes you start.
   - If `all-today` fails, the last good copy is merged with the fresh live feed.
 - **Streams:** `StreamRepository` resolves each source group from `/api/stream/{source}/{id}` in parallel and caches each one for 60 seconds.
   - A group that fails (429, 5xx or a timeout) is reported back as failed. It never takes down the other groups, and its last good result is served while it is failing.
@@ -78,6 +81,7 @@ By default (`playerMode: "iframe"`), the embed runs inside a **plain iframe with
 A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorrow**, **Live TV** and **All Matches**. It sits above the system navigation bar, hides while the keyboard is open, and isn't shown on the full-screen player. Back from any tab returns to Today; back from Today leaves the app.
 
 - **One feed:** matches come from Streamed's `all-today`, `all` (later days) and `live` endpoints, merged into one list with duplicates removed.
+- **Daylight saving:** days where daylight saving skips midnight (Chile, Cairo, Havana) start at 01:00, and that never shifts the neighbouring days. The tabs re-check every minute and exactly at local midnight.
 - **Timezone:** "Today" and "Tomorrow" mean the **device's local calendar day** (`ZoneProvider`, `TimeZone.getDefault()`). All the day logic is in `MatchDays`, built on calendar arithmetic, so month and year changes and daylight-saving days are handled. The day boundaries are re-checked every minute, so the tabs roll over at midnight.
 - **Today (Home):** today's matches, meaning those live right now (even if they started yesterday), kicking off today, or with no announced time. A **Live | Upcoming | All** switch picks what's shown, and it opens on **Live**:
   - **Live:** only matches in Streamed's live feed. The heading reads "Live Matches" with a live count, which is hidden if the live feed couldn't be checked.

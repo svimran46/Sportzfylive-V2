@@ -1,6 +1,8 @@
 package com.sportzfy.live.presentation.watch
 
+import com.sportzfy.live.domain.model.DataError
 import com.sportzfy.live.domain.model.Match
+import com.sportzfy.live.domain.model.MatchFeed
 import com.sportzfy.live.domain.model.MatchStatus.LIVE
 import com.sportzfy.live.domain.model.SportCategory
 import com.sportzfy.live.domain.model.StreamItem
@@ -101,6 +103,19 @@ class WatchViewModelTest {
         collect(vm)
         assertTrue(vm.uiState.value.isMatchMissing)
         assertFalse(vm.uiState.value.isResolvingStreams)
+    }
+
+    @Test
+    fun `a missing match after a failed load offers retry instead of "gone"`() = runTest {
+        val offline = FakeMatchRepository(emptyList()).apply {
+            emit(MatchFeed(emptyList(), updatedAtMillis = null, isLoading = false, error = DataError.NETWORK))
+        }
+        val vm = WatchViewModel("madrid", offline, streamRepository, favorites)
+        collect(vm)
+        assertTrue(vm.uiState.value.isMatchMissing)
+        assertTrue(vm.uiState.value.isLoadFailed)
+
+        assertFalse(viewModel("gone").also { collect(it) }.uiState.value.isLoadFailed)
     }
 
     @Test

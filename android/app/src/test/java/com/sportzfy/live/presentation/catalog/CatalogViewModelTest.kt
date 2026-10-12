@@ -220,6 +220,13 @@ class CatalogViewModelTest {
     }
 
     @Test
+    fun `a tab opened after a filter was set starts filtered`() = runTest {
+        viewModel.selectCategory(SportCategory.CRICKET)
+        // First value, before any collection: no unfiltered flash.
+        assertEquals(SportCategory.CRICKET, viewModel.state(DayScope.TOMORROW).value.selectedCategory)
+    }
+
+    @Test
     fun `closing search clears the query`() = runTest {
         collectState()
         viewModel.openSearch()

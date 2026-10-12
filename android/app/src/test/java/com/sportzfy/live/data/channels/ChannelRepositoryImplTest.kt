@@ -5,6 +5,7 @@ import com.sportzfy.live.domain.model.DataError
 import com.sportzfy.live.testing.FakeClock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -17,7 +18,7 @@ class ChannelRepositoryImplTest {
 
     private val clock = FakeClock()
     private var url = "https://raw.example/channels.json"
-    private var response: () -> String = { directory("ESPN") }
+    private var response: suspend () -> String = { directory("ESPN") }
     private val fetched = mutableListOf<String>()
     private val source = object : ChannelSource {
         override suspend fun fetch(url: String): String {
@@ -72,6 +73,16 @@ class ChannelRepositoryImplTest {
         repository.refresh(force = true)
         assertEquals(DataError.UNKNOWN, repository.feed.value.error)
         assertEquals(1, repository.feed.value.channels.size)
+    }
+
+    @Test
+    fun `a refresh cancelled mid-fetch doesn't leave the list loading`() = runTest {
+        response = { kotlinx.coroutines.awaitCancellation() }
+        val job = launch { repository.refresh() }
+        testScheduler.advanceUntilIdle()
+        job.cancel()
+        job.join()
+        assertFalse(repository.feed.value.isLoading)
     }
 
     @Test

@@ -52,33 +52,43 @@ class ChannelRepositoryImpl(
     override suspend fun refresh(force: Boolean) {
         val seen = fetchCount
         mutex.withLock {
-            // A load finished while this call waited for the lock; it is fresh enough.
-            if (fetchCount != seen) return
-            val target = url()
-            val last = lastSuccessMillis
-            if (!force && target == lastUrl && last != null && clock.nowMillis() - last < ttlMillis) return
-
-            state.update { it.copy(isLoading = true) }
-            val channels = try {
-                ChannelParser.parse(json, source.fetch(target))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                fetchCount++
-                val error = if (e is HttpStatusException) httpStatusToDataError(e.code) else e.toDataError()
-                state.update { it.copy(isLoading = false, error = error) }
-                return
+            try {
+                refreshLocked(seen, force)
+            } finally {
+                // A cancelled fetch (screen left mid-request) must not leave the
+                // feed "loading": that would block every later refresh.
+                if (state.value.isLoading) state.update { it.copy(isLoading = false) }
             }
-            fetchCount++
-            if (channels == null) {
-                state.update { it.copy(isLoading = false, error = DataError.UNKNOWN) }
-                return
-            }
-            val now = clock.nowMillis()
-            lastSuccessMillis = now
-            lastUrl = target
-            state.value = ChannelFeed(channels, updatedAtMillis = now, isLoading = false, error = null)
         }
+    }
+
+    private suspend fun refreshLocked(seen: Long, force: Boolean) {
+        // A load finished while this call waited for the lock; it is fresh enough.
+        if (fetchCount != seen) return
+        val target = url()
+        val last = lastSuccessMillis
+        if (!force && target == lastUrl && last != null && clock.nowMillis() - last < ttlMillis) return
+
+        state.update { it.copy(isLoading = true) }
+        val channels = try {
+            ChannelParser.parse(json, source.fetch(target))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            fetchCount++
+            val error = if (e is HttpStatusException) httpStatusToDataError(e.code) else e.toDataError()
+            state.update { it.copy(isLoading = false, error = error) }
+            return
+        }
+        fetchCount++
+        if (channels == null) {
+            state.update { it.copy(isLoading = false, error = DataError.UNKNOWN) }
+            return
+        }
+        val now = clock.nowMillis()
+        lastSuccessMillis = now
+        lastUrl = target
+        state.value = ChannelFeed(channels, updatedAtMillis = now, isLoading = false, error = null)
     }
 
     override suspend fun getChannel(id: String): Channel? {

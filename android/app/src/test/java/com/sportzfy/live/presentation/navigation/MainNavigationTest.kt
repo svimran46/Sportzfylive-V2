@@ -151,6 +151,29 @@ class MainNavigationTest {
     }
 
     @Test
+    fun backClosesTheDrawerAndSearchBeforeLeavingTheTab() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { SportzfyTheme { SportzfyNavHost() } }
+        settle()
+        tab("Tomorrow").performClick()
+        settle()
+
+        openDrawer()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        settle()
+        compose.onNodeWithContentDescription("Close menu").assertIsNotDisplayed()
+        tab("Tomorrow").assertIsSelected()
+
+        compose.onNodeWithContentDescription("Search").performClick()
+        settle()
+        compose.onNodeWithContentDescription("Close search").assertExists()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        settle()
+        compose.onNodeWithContentDescription("Close search").assertDoesNotExist()
+        tab("Tomorrow").assertIsSelected()
+    }
+
+    @Test
     fun drawerOpensClosesAndNavigates() {
         compose.mainClock.autoAdvance = false
         compose.setContent { SportzfyTheme { SportzfyNavHost() } }

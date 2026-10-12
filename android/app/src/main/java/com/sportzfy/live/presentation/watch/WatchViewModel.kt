@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
 data class WatchUiState(
     val match: Match? = null,
     val isMatchMissing: Boolean = false,
+    /** The match couldn't be found because loading failed, not because it's gone. */
+    val isLoadFailed: Boolean = false,
     val streams: List<StreamItem> = emptyList(),
     val isResolvingStreams: Boolean = true,
     val failedSourceCount: Int = 0,
@@ -48,6 +50,7 @@ class WatchViewModel(
         val streams: List<StreamItem> = emptyList(),
         val failedSources: Int = 0,
         val matchMissing: Boolean = false,
+        val loadFailed: Boolean = false,
     )
 
     private val matchId = MutableStateFlow(initialMatchId)
@@ -75,6 +78,7 @@ class WatchViewModel(
             WatchUiState(
                 match = match,
                 isMatchMissing = load.matchMissing && match == null,
+                isLoadFailed = load.loadFailed && match == null,
                 streams = load.streams,
                 isResolvingStreams = load.isLoading,
                 failedSourceCount = load.failedSources,
@@ -113,7 +117,8 @@ class WatchViewModel(
             streamLoad.value = StreamLoad(isLoading = true)
             val match = matchRepository.getMatch(id)
             if (match == null) {
-                streamLoad.value = StreamLoad(isLoading = false, matchMissing = true)
+                val failed = matchRepository.feed.value.error != null
+                streamLoad.value = StreamLoad(isLoading = false, matchMissing = true, loadFailed = failed)
                 return@launch
             }
             val resolution = streamRepository.resolveStreams(match.sources)

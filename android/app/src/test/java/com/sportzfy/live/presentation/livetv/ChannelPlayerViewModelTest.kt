@@ -2,6 +2,8 @@ package com.sportzfy.live.presentation.livetv
 
 import com.sportzfy.live.domain.model.ChannelCategory.CRICKET
 import com.sportzfy.live.domain.model.ChannelCategory.FOOTBALL
+import com.sportzfy.live.domain.model.ChannelFeed
+import com.sportzfy.live.domain.model.DataError
 import com.sportzfy.live.presentation.model.testChannel
 import com.sportzfy.live.testing.FakeChannelRepository
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +13,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -48,6 +51,19 @@ class ChannelPlayerViewModelTest {
         viewModel.selectChannel("willow-cricket")
         assertEquals("Willow Cricket", viewModel.state.value.channel?.name)
         assertEquals(listOf("Sky Sports Cricket"), viewModel.state.value.related.map { it.name })
+    }
+
+    @Test
+    fun `a failed directory load offers retry, which recovers`() {
+        val channels = repository.feed.value.channels
+        repository.emit(ChannelFeed(emptyList(), updatedAtMillis = null, isLoading = false, error = DataError.NETWORK))
+        val viewModel = ChannelPlayerViewModel("willow-cricket", repository)
+        assertTrue(viewModel.state.value.isLoadFailed)
+
+        repository.emit(ChannelFeed(channels, updatedAtMillis = 2L, isLoading = false, error = null))
+        viewModel.retry()
+        assertEquals("Willow Cricket", viewModel.state.value.channel?.name)
+        assertFalse(viewModel.state.value.isLoadFailed)
     }
 
     @Test

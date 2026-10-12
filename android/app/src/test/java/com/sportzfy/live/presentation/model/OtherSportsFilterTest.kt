@@ -40,6 +40,12 @@ class OtherSportsFilterTest {
     }
 
     @Test
+    fun `the selected sport keeps its pill even when this tab has none`() {
+        val state = CatalogUiState.from(feed, SportCategory.DARTS, "")
+        assertEquals(0, state.categories.single { it.category == SportCategory.DARTS }.count)
+    }
+
+    @Test
     fun `typing a query counts as an open search`() {
         assertTrue(CatalogUiState.from(feed, null, "ten").searchActive)
         assertFalse(CatalogUiState.from(feed, null, "").searchActive)

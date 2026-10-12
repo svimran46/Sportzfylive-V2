@@ -115,12 +115,22 @@ fun WatchStudioContent(
         topBar = { WatchTopBar(state.match, state.isFavorite, onBack, onToggleFavorite) },
     ) { padding ->
         if (state.isMatchMissing) {
-            MessageState(
-                message = "This match is no longer available.",
-                actionLabel = "Back to matches",
-                onAction = onBack,
-                modifier = Modifier.padding(padding),
-            )
+            // Offline or rate-limited: offer Retry instead of claiming the match is gone.
+            if (state.isLoadFailed) {
+                MessageState(
+                    message = "Couldn't load this match. Check your connection and try again.",
+                    actionLabel = "Retry",
+                    onAction = onRetryStreams,
+                    modifier = Modifier.padding(padding),
+                )
+            } else {
+                MessageState(
+                    message = "This match is no longer available.",
+                    actionLabel = "Back to matches",
+                    onAction = onBack,
+                    modifier = Modifier.padding(padding),
+                )
+            }
             return@Scaffold
         }
 

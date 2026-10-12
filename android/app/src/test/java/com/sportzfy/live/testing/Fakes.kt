@@ -20,9 +20,9 @@ fun httpError(code: Int): HttpException = HttpException(Response.error<Any>(code
 
 /** Scriptable [StreamedApiService]; each handler may throw to simulate failures. */
 class FakeStreamedApi : StreamedApiService {
-    var today: () -> JsonElement = { json("[]") }
-    var live: () -> JsonElement = { json("[]") }
-    var all: () -> JsonElement = { json("[]") }
+    var today: suspend () -> JsonElement = { json("[]") }
+    var live: suspend () -> JsonElement = { json("[]") }
+    var all: suspend () -> JsonElement = { json("[]") }
     var streams: (source: String, id: String) -> Response<JsonElement> = { _, _ -> Response.success(json("[]")) }
 
     var todayCalls = 0

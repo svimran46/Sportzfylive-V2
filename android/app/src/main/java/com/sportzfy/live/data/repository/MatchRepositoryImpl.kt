@@ -59,68 +59,78 @@ class MatchRepositoryImpl(
     override suspend fun refresh(force: Boolean) {
         val seen = fetchCount
         mutex.withLock {
-            // A fetch finished while this call waited: its data is as fresh as
-            // ours would be, so taps on Refresh never stack up requests.
-            if (fetchCount != seen) return
-            val last = lastSuccessMillis
-            if (!force && last != null && clock.nowMillis() - last < ttlMillis) return
-
-            // The cache age counts from when the fetch started, so a 60s poll
-            // isn't skipped just because the previous fetch took a moment.
-            val startedAt = clock.nowMillis()
-            state.update { it.copy(isLoading = true) }
-            val (today, all, live) = coroutineScope {
-                val today = async { fetchList(api::getMatchesToday) }
-                val all = async { fetchList(api::getAllMatches) }
-                val live = async { fetchList(api::getLiveMatches) }
-                Triple(today.await(), all.await(), live.await())
+            try {
+                refreshLocked(seen, force)
+            } finally {
+                // A cancelled fetch (screen left mid-request) must not leave the
+                // feed "loading": that would block every later refresh.
+                if (state.value.isLoading) state.update { it.copy(isLoading = false) }
             }
-            fetchCount++
-
-            val now = clock.nowMillis()
-            val todayList = today.getOrNull()
-            val allList = all.getOrNull()
-            val liveList = live.getOrNull()
-            if (todayList == null && allList == null && liveList == null) {
-                val error = today.exceptionOrNull().toDataError()
-                val liveStale = lastLiveMillis?.let { now - it > LIVE_REUSE_MILLIS } ?: true
-                if (liveStale && state.value.liveStatusKnown && state.value.updatedAtMillis != null) {
-                    // Offline for a while: the last live list no longer proves
-                    // anything is on air, so stop showing LIVE badges.
-                    val known = lastTodayPayload.orEmpty() + lastAllPayload.orEmpty() + lastLivePayload.orEmpty()
-                    state.value = state.value.copy(
-                        matches = MatchMapper.merge(known, live = null, nowMillis = now),
-                        isLoading = false,
-                        error = error,
-                        liveStatusKnown = false,
-                    )
-                } else {
-                    state.update { it.copy(isLoading = false, error = error) }
-                }
-                return
-            }
-
-            if (todayList != null) {
-                lastTodayPayload = todayList
-                lastSuccessMillis = startedAt
-            }
-            if (allList != null) lastAllPayload = allList
-            if (liveList != null) {
-                lastLivePayload = liveList
-                lastLiveMillis = now
-            }
-            val liveFresh = lastLiveMillis?.let { now - it <= LIVE_REUSE_MILLIS } == true
-            val liveForMerge = liveList ?: lastLivePayload?.takeIf { liveFresh }
-            // all-today first so its entries win when both feeds list a match.
-            val base = (todayList ?: lastTodayPayload.orEmpty()) + (allList ?: lastAllPayload.orEmpty())
-            state.value = MatchFeed(
-                matches = MatchMapper.merge(base, liveForMerge, now),
-                updatedAtMillis = now,
-                isLoading = false,
-                error = null,
-                liveStatusKnown = liveForMerge != null,
-            )
         }
+    }
+
+    private suspend fun refreshLocked(seen: Long, force: Boolean) {
+        // A fetch finished while this call waited: its data is as fresh as
+        // ours would be, so taps on Refresh never stack up requests.
+        if (fetchCount != seen) return
+        val last = lastSuccessMillis
+        if (!force && last != null && clock.nowMillis() - last < ttlMillis) return
+
+        // The cache age counts from when the fetch started, so a 60s poll
+        // isn't skipped just because the previous fetch took a moment.
+        val startedAt = clock.nowMillis()
+        state.update { it.copy(isLoading = true) }
+        val (today, all, live) = coroutineScope {
+            val today = async { fetchList(api::getMatchesToday) }
+            val all = async { fetchList(api::getAllMatches) }
+            val live = async { fetchList(api::getLiveMatches) }
+            Triple(today.await(), all.await(), live.await())
+        }
+        fetchCount++
+
+        val now = clock.nowMillis()
+        val todayList = today.getOrNull()
+        val allList = all.getOrNull()
+        val liveList = live.getOrNull()
+        if (todayList == null && allList == null && liveList == null) {
+            val error = today.exceptionOrNull().toDataError()
+            val liveStale = lastLiveMillis?.let { now - it > LIVE_REUSE_MILLIS } ?: true
+            if (liveStale && state.value.liveStatusKnown && state.value.updatedAtMillis != null) {
+                // Offline for a while: the last live list no longer proves
+                // anything is on air, so stop showing LIVE badges.
+                val known = lastTodayPayload.orEmpty() + lastAllPayload.orEmpty() + lastLivePayload.orEmpty()
+                state.value = state.value.copy(
+                    matches = MatchMapper.merge(known, live = null, nowMillis = now),
+                    isLoading = false,
+                    error = error,
+                    liveStatusKnown = false,
+                )
+            } else {
+                state.update { it.copy(isLoading = false, error = error) }
+            }
+            return
+        }
+
+        if (todayList != null) {
+            lastTodayPayload = todayList
+            lastSuccessMillis = startedAt
+        }
+        if (allList != null) lastAllPayload = allList
+        if (liveList != null) {
+            lastLivePayload = liveList
+            lastLiveMillis = now
+        }
+        val liveFresh = lastLiveMillis?.let { now - it <= LIVE_REUSE_MILLIS } == true
+        val liveForMerge = liveList ?: lastLivePayload?.takeIf { liveFresh }
+        // all-today first so its entries win when both feeds list a match.
+        val base = (todayList ?: lastTodayPayload.orEmpty()) + (allList ?: lastAllPayload.orEmpty())
+        state.value = MatchFeed(
+            matches = MatchMapper.merge(base, liveForMerge, now),
+            updatedAtMillis = now,
+            isLoading = false,
+            error = null,
+            liveStatusKnown = liveForMerge != null,
+        )
     }
 
     override suspend fun getMatch(id: String): Match? {

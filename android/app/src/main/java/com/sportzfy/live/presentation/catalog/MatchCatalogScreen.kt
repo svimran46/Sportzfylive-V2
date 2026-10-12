@@ -33,7 +33,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -150,6 +153,17 @@ fun MatchCatalogContent(
     val formatter = rememberMatchTimeFormatter()
     val now by rememberNow()
 
+    // Spinners are for refreshes the user asked for, not the silent 60s poll.
+    var userRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isRefreshing) { if (!state.isRefreshing) userRefreshing = false }
+    val requestRefresh: () -> Unit = {
+        userRefreshing = true
+        onRefresh()
+    }
+
+    // Back closes the search field first (registered after the NavHost, so it wins).
+    BackHandler(enabled = state.searchActive) { onCloseSearch() }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -168,16 +182,17 @@ fun MatchCatalogContent(
         bottomBar = bottomBar,
     ) { padding ->
         PullToRefreshBox(
-            isRefreshing = state.isRefreshing && state.hasData,
-            onRefresh = onRefresh,
+            isRefreshing = userRefreshing && state.isRefreshing && state.hasData,
+            onRefresh = requestRefresh,
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             when {
-                state.isInitialLoading -> MatchListSkeleton()
+                // A Retry after a failed first load shows the skeleton while it runs.
+                state.isInitialLoading || (!state.hasData && state.isRefreshing) -> MatchListSkeleton()
                 !state.hasData && state.error != null -> MessageState(
                     message = state.error.userMessage(),
                     actionLabel = "Retry",
-                    onAction = onRefresh,
+                    onAction = requestRefresh,
                     modifier = Modifier.align(Alignment.Center),
                 )
                 else -> LazyVerticalGrid(
@@ -189,7 +204,8 @@ fun MatchCatalogContent(
                 ) {
                     catalogItems(
                         state, now, formatter, onOpenMatch, onSelectCategory, onSelectSaved, onToggleFavorite,
-                        onRefresh, onSelectHomeView, onBrowseTomorrow,
+                        requestRefresh, onSelectHomeView, onBrowseTomorrow,
+                        refreshing = userRefreshing && state.isRefreshing,
                     )
                 }
             }
@@ -208,6 +224,7 @@ private fun LazyGridScope.catalogItems(
     onRefresh: () -> Unit,
     onSelectHomeView: (HomeView) -> Unit,
     onBrowseTomorrow: () -> Unit,
+    refreshing: Boolean,
 ) {
     val fullSpan: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
 
@@ -243,7 +260,7 @@ private fun LazyGridScope.catalogItems(
             HomeHeading(view, state.listCount, countKnown = view != HomeView.LIVE || state.liveStatusKnown, state.dateLabel)
         }
         item(key = "home-controls", span = fullSpan) {
-            HomeControls(view, state.isRefreshing, onSelectHomeView, onRefresh)
+            HomeControls(view, refreshing, onSelectHomeView, onRefresh)
         }
     }
     state.hero?.let { hero ->
@@ -266,6 +283,22 @@ private fun LazyGridScope.catalogItems(
     if (state.isEmpty && homeView != null && state.query.isBlank() && !state.favoritesOnly) {
         item(key = "empty", span = fullSpan) {
             HomeEmptyState(state, homeView, onSelectHomeView, onSelectCategory, onBrowseTomorrow, onRefresh)
+        }
+    } else if (state.isEmpty && state.query.isBlank() && !state.favoritesOnly &&
+        (state.selectedCategory != null || state.otherSports)
+    ) {
+        // A sport filter carried over from another tab: say so and offer a way out.
+        item(key = "empty", span = fullSpan) {
+            val name = state.selectedCategory?.displayName ?: "other sports"
+            EmptyState(
+                icon = if (state.otherSports) SportzfyIcons.OtherSports else SportzfyIcons.Football,
+                title = "Nothing in $name",
+                message = when (state.scope) {
+                    DayScope.TOMORROW -> "No $name fixtures are announced for tomorrow."
+                    else -> "No $name fixtures right now."
+                },
+                primaryAction = "All sports" to { onSelectCategory(null) },
+            )
         }
     } else if (state.isEmpty) {
         item(key = "empty", span = fullSpan) {
@@ -339,7 +372,9 @@ private fun CatalogHeader(
             IconButton(onClick = onCloseSearch, modifier = Modifier.tvFocus(CircleShape)) {
                 SportzfyIcon(SportzfyIcons.Close, contentDescription = "Close search")
             }
-            LaunchedEffect(Unit) { focusRequester.requestFocus() }
+            // Only an empty field grabs focus, so returning to a tab with a
+            // search already typed doesn't pop the keyboard up again.
+            LaunchedEffect(Unit) { if (query.isEmpty()) focusRequester.requestFocus() }
         } else {
             if (onOpenMenu != null) {
                 IconButton(onClick = onOpenMenu, modifier = Modifier.tvFocus(CircleShape)) {

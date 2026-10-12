@@ -9,6 +9,7 @@ import com.sportzfy.live.testing.httpError
 import com.sportzfy.live.testing.json
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -134,6 +135,16 @@ class MatchRepositoryImplTest {
         clock.advance(58_000) // next poll, 60s after the first one started
         repository.refresh()
         assertEquals(2, api.todayCalls)
+    }
+
+    @Test
+    fun `a refresh cancelled mid-fetch doesn't leave the feed loading`() = runTest {
+        api.today = { kotlinx.coroutines.awaitCancellation() }
+        val job = launch { repository.refresh() }
+        testScheduler.advanceUntilIdle()
+        job.cancel()
+        job.join()
+        assertFalse(repository.feed.value.isLoading)
     }
 
     @Test

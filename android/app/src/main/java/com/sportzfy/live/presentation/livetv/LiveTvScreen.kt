@@ -104,7 +104,8 @@ fun LiveTvContent(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             when {
-                state.isInitialLoading -> MatchListSkeleton(contentDescription = "Loading channels")
+                state.isInitialLoading || (!state.hasData && state.isRefreshing) ->
+                    MatchListSkeleton(contentDescription = "Loading channels")
                 !state.hasData && state.error != null -> EmptyState(
                     icon = SportzfyIcons.Offline,
                     title = "Couldn't load channels",

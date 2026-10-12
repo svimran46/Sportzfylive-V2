@@ -80,21 +80,24 @@ class CatalogViewModel(
     ) { feed, f, favorites, config, now -> Inputs(feed, f, favorites, config, now) }
         .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
 
-    private val states: Map<DayScope, StateFlow<CatalogUiState>> = DayScope.entries.associateWith { scope ->
+    // Built on first use, so a tab opened later starts from the filters set
+    // by then instead of flashing the unfiltered list for a frame.
+    private val states = mutableMapOf<DayScope, StateFlow<CatalogUiState>>()
+
+    private fun buildState(scope: DayScope): StateFlow<CatalogUiState> =
         inputs.map { it.toState(scope) }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = Inputs(
                 feed = matchRepository.feed.value,
-                filters = Filters(),
+                filters = filters.value,
                 favorites = emptySet(),
                 config = configRepository.config.value,
                 nowMillis = clock.nowMillis(),
             ).toState(scope),
         )
-    }
 
-    fun state(scope: DayScope): StateFlow<CatalogUiState> = states.getValue(scope)
+    fun state(scope: DayScope): StateFlow<CatalogUiState> = states.getOrPut(scope) { buildState(scope) }
 
     /**
      * Cheap to call often: the repository serves from its 60s cache. A forced

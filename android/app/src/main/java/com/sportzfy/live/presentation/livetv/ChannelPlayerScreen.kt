@@ -66,6 +66,12 @@ fun ChannelPlayerScreen(
         topBar = { ChannelTopBar(channel, onBack) },
     ) { padding ->
         when {
+            state.isMissing && state.isLoadFailed -> MessageState(
+                message = "Couldn't load the channel list. Check your connection and try again.",
+                actionLabel = "Retry",
+                onAction = viewModel::retry,
+                modifier = Modifier.padding(padding),
+            )
             state.isMissing -> MessageState(
                 message = "This channel is no longer available.",
                 actionLabel = "Back to Live TV",

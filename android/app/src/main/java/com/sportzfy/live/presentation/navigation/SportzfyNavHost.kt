@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -63,8 +64,6 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
         val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
         val closeDrawer: () -> Unit = { scope.launch { drawerState.close() } }
 
-        BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
-
         ModalNavigationDrawer(
             drawerState = drawerState,
             // Opened from the menu button only, so horizontal swipes on pills,
@@ -77,8 +76,10 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
             // Each tab passes its own identity: NavHost builds its graph once, so the
             // destinations must not capture state that changes between compositions.
             val bottomBar: @Composable (MainTab) -> Unit = { tab -> MainBottomBar(tab, navController) }
-            val openMatch: (String) -> Unit = { id -> navController.navigate(WatchRoute(id)) }
-            val back: () -> Unit = { navController.popBackStack() }
+            // Taps on a screen that is still fading in or out are ignored, so
+            // a double tap can't push a player twice or pop past the tab.
+            val openMatch: (String) -> Unit = { id -> navController.ifSettled { navigate(WatchRoute(id)) } }
+            val back: () -> Unit = { navController.ifSettled { popBackStack() } }
 
             NavHost(
                 navController = navController,
@@ -107,7 +108,7 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
                 }
                 composable<LiveTvRoute> {
                     LiveTvScreen(
-                        onOpenChannel = { id -> navController.navigate(ChannelRoute(id)) },
+                        onOpenChannel = { id -> navController.ifSettled { navigate(ChannelRoute(id)) } },
                         bottomBar = { bottomBar(MainTab.LIVE_TV) },
                         onOpenMenu = openDrawer,
                     )
@@ -134,8 +135,16 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
                     AboutScreen(onBack = back, versionName = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE)
                 }
             }
+            // Registered after the NavHost so it wins over its back handling:
+            // Back closes an open drawer before it changes screen.
+            BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
         }
     }
+}
+
+/** Runs [action] only when the current screen has finished its transition. */
+private inline fun NavController.ifSettled(action: NavController.() -> Unit) {
+    if (currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) action()
 }
 
 /** Reads navigation and filter state here, not in the shell, so the NavHost graph never rebuilds. */

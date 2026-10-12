@@ -14,6 +14,8 @@ data class ChannelPlayerUiState(
     val isLoading: Boolean = true,
     /** The id isn't in the directory (removed upstream, or a stale back stack). */
     val isMissing: Boolean = false,
+    /** The directory failed to load, so the channel couldn't be looked up. */
+    val isLoadFailed: Boolean = false,
     /** Other channels in the same group, for switching without leaving the player. */
     val related: List<Channel> = emptyList(),
 )
@@ -26,16 +28,29 @@ class ChannelPlayerViewModel(
     private val _state = MutableStateFlow(ChannelPlayerUiState())
     val state: StateFlow<ChannelPlayerUiState> = _state.asStateFlow()
 
+    private var requestedId = initialChannelId
+
     init {
         selectChannel(initialChannelId)
     }
 
+    /** Tries the last requested channel again after a failed load. */
+    fun retry() {
+        _state.value = ChannelPlayerUiState()
+        selectChannel(requestedId)
+    }
+
     fun selectChannel(id: String) {
         if (_state.value.channel?.id == id) return
+        requestedId = id
         viewModelScope.launch {
             val channel = channelRepository.getChannel(id)
             _state.value = if (channel == null) {
-                ChannelPlayerUiState(isLoading = false, isMissing = true)
+                ChannelPlayerUiState(
+                    isLoading = false,
+                    isMissing = true,
+                    isLoadFailed = channelRepository.feed.value.error != null,
+                )
             } else {
                 ChannelPlayerUiState(
                     channel = channel,

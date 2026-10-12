@@ -6,7 +6,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.sportzfy.live.data.local.FavoriteIds
 import com.sportzfy.live.domain.repository.FavoritesRepository
+import androidx.datastore.preferences.core.emptyPreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import java.io.IOException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -16,6 +19,8 @@ class FavoritesRepositoryImpl(
 
     override val favoriteIds: Flow<Set<String>> =
         dataStore.data
+            // A disk error reads as "nothing saved" instead of crashing the app.
+            .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
             .map { prefs -> FavoriteIds.decode(prefs[KEY]).toSet() }
             .distinctUntilChanged()
 

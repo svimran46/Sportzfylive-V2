@@ -113,6 +113,9 @@ data class CatalogUiState(
                     .filter { it.key !in SportCategory.featured }
                     .sortedByDescending { it.value }
                     .forEach { add(CategoryOption(it.key, it.value)) }
+                // The selected sport keeps its pill even with nothing in this
+                // tab, so it's clear a filter is on and it can be changed.
+                if (category != null && none { it.category == category }) add(CategoryOption(category, 0))
             }
 
             val filtered = CatalogFilter.apply(all, category, query, onlyIds = favoriteIds.takeIf { favoritesOnly })

@@ -7,13 +7,18 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.sportzfy.live.domain.model.ClockFormat
 import com.sportzfy.live.domain.model.UserSettings
 import com.sportzfy.live.domain.repository.SettingsRepository
+import androidx.datastore.preferences.core.emptyPreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import java.io.IOException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 class SettingsRepositoryImpl(private val dataStore: DataStore<Preferences>) : SettingsRepository {
 
     override val settings: Flow<UserSettings> = dataStore.data
+        // A disk error falls back to the defaults instead of crashing the app.
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs ->
             UserSettings(
                 preferredLanguage = when (val stored = prefs[LANGUAGE]) {
