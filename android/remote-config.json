@@ -7,7 +7,7 @@
   "hiddenCategories": [],
   "adBlocking": false,
   "extraBlockedHosts": [],
-  "playerMode": "iframe",
+  "playerMode": "direct",
   "minVersionCode": 0,
   "updateUrl": "",
   "maintenance": {

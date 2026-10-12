@@ -32,7 +32,7 @@ class AppConfigParserTest {
               "hiddenCategories": ["fight", "Motor-Sports", "nope"],
               "adBlocking": false,
               "extraBlockedHosts": ["*.Bad-Ads.com.", "evil.net", "has space.com", "a/b"],
-              "playerMode": "direct",
+              "playerMode": "iframe",
               "minVersionCode": 3,
               "updateUrl": "https://github.com/svimran46/Sportzfylive-V2/releases",
               "maintenance": {"enabled": true, "message": "Back at 9pm"}
@@ -43,7 +43,7 @@ class AppConfigParserTest {
         assertEquals(setOf(SportCategory.FIGHT, SportCategory.MOTORSPORT), config.hiddenCategories)
         assertFalse(config.adBlocking)
         assertEquals(setOf("bad-ads.com", "evil.net"), config.extraBlockedHosts)
-        assertEquals(PlayerMode.DIRECT, config.playerMode)
+        assertEquals(PlayerMode.IFRAME, config.playerMode)
         assertEquals("Back at 9pm", config.maintenanceMessage)
         assertTrue(config.requiresUpdate(2))
         assertFalse(config.requiresUpdate(3))
@@ -55,7 +55,7 @@ class AppConfigParserTest {
         assertNull(config.announcement)
         assertNull(config.featuredMatchId)
         assertNull(config.maintenanceMessage)
-        assertEquals(PlayerMode.IFRAME, config.playerMode)
+        assertEquals(PlayerMode.DIRECT, config.playerMode)
     }
 
     @Test

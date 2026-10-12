@@ -26,9 +26,9 @@ import com.sportzfy.live.domain.model.EmbedUrl
 import com.sportzfy.live.domain.model.PlayerMode
 
 /**
- * Plays an `embed.st` page. In [PlayerMode.IFRAME] (the default) the embed
- * runs in a plain iframe inside a wrapper page, exactly like the website; in
- * [PlayerMode.DIRECT] it is the WebView's page itself.
+ * Plays an `embed.st` page. In [PlayerMode.DIRECT] (the default) it is the
+ * WebView's page itself, like a browser tab; in [PlayerMode.IFRAME] it runs
+ * in a plain iframe inside a wrapper page, like the website.
  *
  * The WebView is created once and reused: a new [url], mode or
  * [StreamPlayerState.retry] reloads the same instance, so switching streams

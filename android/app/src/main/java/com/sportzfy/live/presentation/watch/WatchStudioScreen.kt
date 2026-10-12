@@ -1,5 +1,6 @@
 package com.sportzfy.live.presentation.watch
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +43,7 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -323,8 +326,24 @@ private fun StreamSelector(
                         TextButton(onClick = onRetryStreams, modifier = Modifier.tvFocus(RoundedCornerShape(50))) { Text("Retry") }
                     }
                 }
+                state.selectedStream?.embedUrl?.let { OpenInBrowserButton(it) }
             }
         }
+    }
+}
+
+/** Escape hatch for a stream page that won't play inside the app, as on Live TV. */
+@Composable
+private fun OpenInBrowserButton(url: String) {
+    val uriHandler = LocalUriHandler.current
+    OutlinedButton(
+        onClick = { runCatching { uriHandler.openUri(url) } },
+        border = BorderStroke(1.dp, SportzfyColors.TextMuted),
+        modifier = Modifier.padding(start = 16.dp, top = 12.dp).tvFocus(RoundedCornerShape(50)),
+    ) {
+        SportzfyIcon(SportzfyIcons.ExternalLink, contentDescription = null, size = 18.dp)
+        Spacer(Modifier.width(8.dp))
+        Text("Open in browser")
     }
 }
 

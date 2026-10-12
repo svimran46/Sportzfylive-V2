@@ -64,7 +64,7 @@ Requires JDK 17+ and the Android SDK (platform 36).
 
 `StreamPlayer(url)` chooses an engine from the URL. `.m3u8` links play in Media3 ExoPlayer, which fetches segments through the app's OkHttp client. Everything else, which means the `embed.st` pages, plays in a WebView.
 
-By default (`playerMode: "iframe"`), the embed runs inside a **plain iframe with no `sandbox` attribute**, the same way the website plays it. The iframe has `allow="autoplay; fullscreen; encrypted-media; picture-in-picture"`, `allowfullscreen` and `referrerpolicy="no-referrer"`. Embeds that expect to be framed, or that redirect themselves in script, play normally, while the app still owns the outer page. With `playerMode: "direct"`, the embed page is loaded as the WebView's own page instead.
+By default (`playerMode: "direct"`), the embed page is loaded as the WebView's own page, like a browser tab, with streamed.pk as the referer (as streamed.pk's own embed iframe sends). This is how Live TV channels play, and it works for embeds that show only a black frame when nested in an iframe inside the WebView. With `playerMode: "iframe"`, the embed instead runs inside a **plain iframe with no `sandbox` attribute**, the same way the website plays it (`allow="autoplay; fullscreen; encrypted-media; picture-in-picture"`, `allowfullscreen`, `referrerpolicy="no-referrer"`). Each match also has an **Open in browser** button for a stream that won't play in the app.
 
 - **Pop-ups:** `setSupportMultipleWindows(true)` together with `onCreateWindow` returning `false`, so every `window.open` or `target=_blank` is dropped instead of loading over the player. `javaScriptCanOpenWindowsAutomatically` is `false`.
 - **Navigation:** handled by `PlayerUrlPolicy`.
@@ -164,7 +164,7 @@ Every installed app reads [`android/remote-config.json`](remote-config.json) fro
 | `hiddenCategories` | Sports to hide completely, e.g. `["fight", "motor-sports"]`. Uses the Streamed category keys. |
 | `adBlocking` | `false` turns off the built-in ad-network blocking in the player. Pop-up windows stay blocked either way. |
 | `extraBlockedHosts` | More hosts for the player to refuse, e.g. `["newads.example"]`. Subdomains are included. |
-| `playerMode` | `"iframe"` (the default; an unsandboxed iframe, like the website) or `"direct"` (the embed page is the WebView itself). |
+| `playerMode` | `"direct"` (the default; the embed page is the WebView itself, like a browser tab) or `"iframe"` (an unsandboxed iframe, like the website). |
 | `minVersionCode` | Builds with a lower `versionCode` (in `app/build.gradle.kts`) show an "Update required" screen. |
 | `updateUrl` | Where that screen's button sends the user (https only). |
 | `maintenance.enabled` / `maintenance.message` | `true` replaces the whole app with a maintenance screen showing the message. |
