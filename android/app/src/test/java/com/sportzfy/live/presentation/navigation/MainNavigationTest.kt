@@ -33,10 +33,13 @@ import org.koin.core.context.stopKoin
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.util.TimeZone
 
 /** Drives the real app shell: bottom bar, tab routes and back navigation. */
+// Tall screen: the lazy list only composes what fits on it.
 @RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w411dp-h2000dp")
 class MainNavigationTest {
 
     @get:Rule
