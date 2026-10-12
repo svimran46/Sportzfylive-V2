@@ -19,7 +19,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.core.player.EmbedFrame
 import com.sportzfy.live.core.player.PlayerConfig
 import com.sportzfy.live.core.player.PlayerUrlPolicy
@@ -43,8 +42,12 @@ internal fun EmbedPlayerView(
     modifier: Modifier = Modifier,
     config: PlayerConfig = PlayerConfig(),
 ) {
-    val policy = remember(config.blockedHosts, config.trustedHosts) {
-        PlayerUrlPolicy(trustedHosts = setOf(EmbedUrl.HOST) + config.trustedHosts, blockedHosts = config.blockedHosts)
+    val policy = remember(config.blockedHosts, config.trustedHosts, config.allowAnyTopLevel) {
+        PlayerUrlPolicy(
+            trustedHosts = setOf(EmbedUrl.HOST) + config.trustedHosts,
+            blockedHosts = config.blockedHosts,
+            allowAnyTopLevel = config.allowAnyTopLevel,
+        )
     }
     val currentPolicy by rememberUpdatedState(policy)
     val context = LocalContext.current
@@ -137,7 +140,7 @@ internal fun EmbedPlayerView(
                             "utf-8",
                             null,
                         )
-                        PlayerMode.DIRECT -> webView.loadUrl(url, mapOf("Referer" to StreamedEndpoints.REFERER))
+                        PlayerMode.DIRECT -> webView.loadUrl(url, config.referer?.let { mapOf("Referer" to it) } ?: emptyMap())
                     }
                 }
             },

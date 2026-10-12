@@ -1,5 +1,6 @@
 package com.sportzfy.live.core.player
 
+import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.PlayerMode
 
@@ -12,6 +13,10 @@ data class PlayerConfig(
      * channel's own host, so direct mode can open that channel's page.
      */
     val trustedHosts: Set<String> = emptySet(),
+    /** See [PlayerUrlPolicy]'s allowAnyTopLevel: on for Live TV channels only. */
+    val allowAnyTopLevel: Boolean = false,
+    /** Referer sent when the page is loaded directly; null sends none. */
+    val referer: String? = StreamedEndpoints.REFERER,
 ) {
     companion object {
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(

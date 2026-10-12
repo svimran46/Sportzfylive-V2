@@ -19,6 +19,12 @@ import com.sportzfy.live.domain.model.EmbedUrl
 class PlayerUrlPolicy(
     private val trustedHosts: Set<String> = setOf(EmbedUrl.HOST),
     private val blockedHosts: Set<String> = AdHosts.DEFAULT,
+    /**
+     * Lets the page itself move to any https host that isn't blocked. Live TV
+     * channel pages hand off to their real player on another site, so they
+     * need this; pop-up windows stay blocked either way.
+     */
+    private val allowAnyTopLevel: Boolean = false,
 ) {
 
     enum class Decision { ALLOW, BLOCK }
@@ -31,7 +37,7 @@ class PlayerUrlPolicy(
         val host = parsed.host
         if (parsed.scheme != "https" || host == null) return Decision.BLOCK
         if (host.matchesAny(blockedHosts)) return Decision.BLOCK
-        if (!isMainFrame || isRedirect) return Decision.ALLOW
+        if (!isMainFrame || isRedirect || allowAnyTopLevel) return Decision.ALLOW
         return if (host.matchesAny(trustedHosts)) Decision.ALLOW else Decision.BLOCK
     }
 

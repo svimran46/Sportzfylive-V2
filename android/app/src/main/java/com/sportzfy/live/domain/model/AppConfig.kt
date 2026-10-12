@@ -23,10 +23,14 @@ data class AppConfig(
     val maintenanceMessage: String? = null,
     /** Where the Live TV channel directory is loaded from (https only). */
     val channelsUrl: String = DEFAULT_CHANNELS_URL,
+    /** The website's Worker, used for streams when streamed.pk blocks the phone; null turns it off. */
+    val streamProxyUrl: String? = DEFAULT_STREAM_PROXY_URL,
 ) {
     fun requiresUpdate(versionCode: Int): Boolean = versionCode < minVersionCode
 
     companion object {
+        const val DEFAULT_STREAM_PROXY_URL = "https://sportzfylive.svimranmy.workers.dev"
+
         const val DEFAULT_CHANNELS_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"
 
         val Default = AppConfig()

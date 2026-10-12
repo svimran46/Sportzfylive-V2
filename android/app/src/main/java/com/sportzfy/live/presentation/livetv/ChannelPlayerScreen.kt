@@ -1,5 +1,10 @@
 package com.sportzfy.live.presentation.livetv
 
+import com.sportzfy.live.domain.model.PlayerMode
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,7 +97,16 @@ fun ChannelPlayerScreen(
                 // Only this channel's own host joins embed.st as a page the
                 // player may open; every other rule stays as it is for matches.
                 val base = PlayerConfig.from(LocalAppConfig.current)
-                val config = base.copy(trustedHosts = base.trustedHosts + channel.sourceHost)
+                // Channel pages are opened like a browser tab: loaded directly
+                // (many refuse to run inside someone else's frame), free to hand
+                // off to their real player on another site, and without the
+                // streamed.pk referer. Pop-up windows and ad hosts stay blocked.
+                val config = base.copy(
+                    mode = PlayerMode.DIRECT,
+                    trustedHosts = base.trustedHosts + channel.sourceHost,
+                    allowAnyTopLevel = true,
+                    referer = null,
+                )
                 BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
                     // Measured outside the scroll so the player can be capped to
                     // the viewport: on TV/landscape a full-width 16:9 player would
@@ -171,6 +185,7 @@ private fun ChannelTopBar(channel: Channel?, onBack: () -> Unit) {
 
 @Composable
 private fun ChannelInfo(channel: Channel, blockedCount: Int) {
+    val uriHandler = LocalUriHandler.current
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(channel.name, style = MaterialTheme.typography.titleLarge)
         Text(
@@ -186,6 +201,16 @@ private fun ChannelInfo(channel: Channel, blockedCount: Int) {
                 color = SportzfyColors.TextMuted,
                 modifier = Modifier.padding(top = 6.dp),
             )
+        }
+        // Escape hatch for a channel page that won't play inside the app.
+        OutlinedButton(
+            onClick = { runCatching { uriHandler.openUri(channel.streamUrl) } },
+            border = BorderStroke(1.dp, SportzfyColors.TextMuted),
+            modifier = Modifier.padding(top = 12.dp).tvFocus(RoundedCornerShape(50)),
+        ) {
+            SportzfyIcon(SportzfyIcons.ExternalLink, contentDescription = null, size = 18.dp)
+            Spacer(Modifier.width(8.dp))
+            Text("Open in browser")
         }
     }
 }

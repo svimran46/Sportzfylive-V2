@@ -20,6 +20,7 @@ import com.sportzfy.live.data.config.HttpConfigSource
 import com.sportzfy.live.data.repository.FavoritesRepositoryImpl
 import com.sportzfy.live.data.repository.MatchRepositoryImpl
 import com.sportzfy.live.data.repository.StreamRepositoryImpl
+import com.sportzfy.live.data.repository.WorkerStreamFallback
 import com.sportzfy.live.data.settings.SettingsRepositoryImpl
 import com.sportzfy.live.domain.repository.AppConfigRepository
 import com.sportzfy.live.domain.repository.ChannelRepository
@@ -58,7 +59,16 @@ val dataModule = module {
     single<Clock> { Clock.System }
     single<ZoneProvider> { ZoneProvider.System }
     single<MatchRepository> { MatchRepositoryImpl(get(), get(), get()) }
-    single<StreamRepository> { StreamRepositoryImpl(get(), get(), get()) }
+    single<StreamRepository> {
+        val config = get<AppConfigRepository>()
+        StreamRepositoryImpl(
+            api = get(),
+            json = get(),
+            clock = get(),
+            // streamed.pk can block phones (DDoS-Guard); the website's Worker is the second route.
+            fallback = WorkerStreamFallback(get(), get(), baseUrl = { config.config.value.streamProxyUrl }),
+        )
+    }
     single<FavoritesRepository> { FavoritesRepositoryImpl(androidContext().favoritesDataStore) }
     single<SettingsRepository> { SettingsRepositoryImpl(androidContext().settingsDataStore) }
     single<AppConfigRepository> {

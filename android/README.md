@@ -56,7 +56,7 @@ Requires JDK 17+ and the Android SDK (platform 36).
   - A match fetched as upcoming whose kick-off has since passed shows as **Started** until the next refresh. It never shows as Live.
   - The 60-second auto-refresh is silent: spinners only show for refreshes you start.
   - If `all-today` fails, the last good copy is merged with the fresh live feed.
-- **Streams:** `StreamRepository` resolves each source group from `/api/stream/{source}/{id}` in parallel and caches each one for 60 seconds.
+- **Streams:** `StreamRepository` resolves each source group from `/api/stream/{source}/{id}` in parallel and caches each one for 60 seconds. If that direct call fails or comes back blocked, the group is fetched again through the website's Worker (`/api/streamed/streams`, see `streamProxyUrl`).
   - A group that fails (429, 5xx or a timeout) is reported back as failed. It never takes down the other groups, and its last good result is served while it is failing.
 - **Playback:** stream URLs are always built as `https://embed.st/embed/{source}/{id}/{streamNo}`. Any `embedUrl` sent by upstream is ignored.
 
@@ -135,9 +135,13 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
   - A chip only appears for a group that has channels.
 - **Search:** matches every word you type against the channel's name and group.
 - **No LIVE badges:** the directory doesn't say whether a channel is on air, so the app doesn't claim it.
-- **Playback:** tapping a channel opens it in the same player as matches, with the same pop-up blocking, ad-host blocking and fullscreen. Below the player, other channels from the same group switch in place.
-  - In `direct` player mode, the page itself may load from embed.st or from the channel's own stream host, and nowhere else.
-  - The stream host is shown as the channel's source.
+- **Playback:** a channel opens like a browser tab.
+  - Its page is loaded directly, not inside a frame (many channel pages refuse to run in someone else's frame).
+  - It may hand off to its real player on another https site.
+  - No streamed.pk referrer is sent.
+  - Pop-up windows and known ad hosts stay blocked, and fullscreen works as for matches.
+  - The stream host is shown as the channel's source, with an **Open in browser** button as a fallback.
+  - Other channels from the same group sit below the player and switch in place.
 
 ## Search, saved matches and Android TV
 
@@ -164,6 +168,7 @@ Every installed app reads [`android/remote-config.json`](remote-config.json) fro
 | `minVersionCode` | Builds with a lower `versionCode` (in `app/build.gradle.kts`) show an "Update required" screen. |
 | `updateUrl` | Where that screen's button sends the user (https only). |
 | `maintenance.enabled` / `maintenance.message` | `true` replaces the whole app with a maintenance screen showing the message. |
+| `streamProxyUrl` | The website's Worker, which the app asks for a match's streams when streamed.pk blocks the phone (it sits behind DDoS-Guard). Defaults to `https://sportzfylive.svimranmy.workers.dev`; `""` turns the fallback off. |
 | `channelsUrl` | Where Live TV loads its channel list from (https only). Defaults to `channels.json` in the playlist repo. |
 
 ## Testing

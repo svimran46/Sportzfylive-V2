@@ -78,6 +78,17 @@ class PlayerUrlPolicyTest {
     }
 
     @Test
+    fun `channel pages may hand off to another site, but never to an ad host`() {
+        val channel = PlayerUrlPolicy(trustedHosts = setOf("exmxbxe.cfd"), allowAnyTopLevel = true)
+        assertEquals(ALLOW, channel.navigation("https://player.example/live/1", isMainFrame = true))
+        assertEquals(BLOCK, channel.navigation("https://popads.net/x", isMainFrame = true))
+        assertEquals(BLOCK, channel.navigation("intent://evil#Intent;end", isMainFrame = true))
+        assertEquals(BLOCK, channel.navigation("http://player.example/live/1", isMainFrame = true))
+        // Matches keep the strict rule.
+        assertEquals(BLOCK, policy.navigation("https://player.example/live/1", isMainFrame = true))
+    }
+
+    @Test
     fun `trusted and blocked hosts are configurable`() {
         val custom = PlayerUrlPolicy(trustedHosts = setOf("player.test"), blockedHosts = setOf("bad.test"))
         assertEquals(ALLOW, custom.navigation("https://player.test/x", isMainFrame = true))

@@ -20,6 +20,7 @@ internal data class RemoteConfigDto(
     val updateUrl: String? = null,
     val maintenance: MaintenanceDto? = null,
     val channelsUrl: String? = null,
+    val streamProxyUrl: String? = null,
 )
 
 @Serializable
@@ -62,6 +63,12 @@ object AppConfigParser {
                 it.message?.trim()?.takeIf(String::isNotEmpty) ?: DEFAULT_MAINTENANCE_MESSAGE
             },
             channelsUrl = httpsOrNull(dto.channelsUrl) ?: AppConfig.DEFAULT_CHANNELS_URL,
+            // Missing means the default Worker; "" turns the fallback off.
+            streamProxyUrl = when (val raw = dto.streamProxyUrl?.trim()) {
+                null -> AppConfig.DEFAULT_STREAM_PROXY_URL
+                "" -> null
+                else -> httpsOrNull(raw) ?: AppConfig.DEFAULT_STREAM_PROXY_URL
+            },
         )
     }
 

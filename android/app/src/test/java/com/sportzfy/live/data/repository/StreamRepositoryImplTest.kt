@@ -80,4 +80,42 @@ class StreamRepositoryImplTest {
         repository.resolveStreams(listOf(alpha, alpha))
         assertEquals(1, api.streamCalls.size)
     }
+
+    @Test
+    fun `a blocked direct call is answered by the Worker`() = runTest {
+        val asked = mutableListOf<StreamSource>()
+        val withWorker = StreamRepositoryImpl(
+            api, NetworkJson, clock,
+            fallback = { group ->
+                asked += group
+                json("""{"source":"alpha","id":"m-a","streamCount":1,"streams":[{"streamNo":3,"language":"Spanish","hd":true,"source":"alpha"}]}""")
+            },
+        )
+        api.streams = { _, _ -> FakeStreamedApi.errorResponse(403) }
+
+        val result = withWorker.resolveStreams(listOf(alpha))
+
+        assertEquals(listOf("alpha/m-a/3"), result.streams.map { it.key })
+        assertTrue(result.streams.single().isHd)
+        assertTrue(result.failedSources.isEmpty())
+        assertEquals(listOf(alpha), asked)
+    }
+
+    @Test
+    fun `the Worker is only asked when the direct call fails`() = runTest {
+        var asked = 0
+        val withWorker = StreamRepositoryImpl(api, NetworkJson, clock, fallback = { asked++; json("[]") })
+        api.streams = { _, _ -> ok(1) }
+        withWorker.resolveStreams(listOf(alpha))
+        api.streams = { _, _ -> FakeStreamedApi.errorResponse(404) }
+        withWorker.resolveStreams(listOf(bravo))
+        assertEquals(0, asked)
+    }
+
+    @Test
+    fun `a group fails only when the Worker fails too`() = runTest {
+        val withWorker = StreamRepositoryImpl(api, NetworkJson, clock, fallback = { throw IOException("proxy down") })
+        api.streams = { _, _ -> throw IOException("blocked") }
+        assertEquals(listOf(alpha), withWorker.resolveStreams(listOf(alpha)).failedSources)
+    }
 }

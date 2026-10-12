@@ -78,6 +78,14 @@ class AppConfigParserTest {
     }
 
     @Test
+    fun `the stream proxy defaults to the website's Worker and can be turned off`() {
+        assertEquals(AppConfig.DEFAULT_STREAM_PROXY_URL, parse("{}")!!.streamProxyUrl)
+        assertEquals(null, parse("""{"streamProxyUrl":""}""")!!.streamProxyUrl)
+        assertEquals("https://proxy.example", parse("""{"streamProxyUrl":"https://proxy.example"}""")!!.streamProxyUrl)
+        assertEquals(AppConfig.DEFAULT_STREAM_PROXY_URL, parse("""{"streamProxyUrl":"http://insecure.example"}""")!!.streamProxyUrl)
+    }
+
+    @Test
     fun `invalid json is rejected`() {
         assertNull(parse("not json"))
         assertNull(parse("[1,2]"))
