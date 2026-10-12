@@ -13,5 +13,6 @@
   "maintenance": {
     "enabled": false,
     "message": ""
-  }
+  },
+  "channelsUrl": "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"
 }

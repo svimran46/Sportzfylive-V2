@@ -14,15 +14,21 @@ import com.sportzfy.live.core.time.Clock
 import com.sportzfy.live.core.time.ZoneProvider
 import com.sportzfy.live.data.config.AppConfigRepositoryImpl
 import com.sportzfy.live.data.config.DataStoreConfigCache
+import com.sportzfy.live.data.channels.ChannelRepositoryImpl
+import com.sportzfy.live.data.channels.HttpChannelSource
 import com.sportzfy.live.data.config.HttpConfigSource
 import com.sportzfy.live.data.repository.FavoritesRepositoryImpl
 import com.sportzfy.live.data.repository.MatchRepositoryImpl
 import com.sportzfy.live.data.repository.StreamRepositoryImpl
 import com.sportzfy.live.domain.repository.AppConfigRepository
+import com.sportzfy.live.domain.repository.ChannelRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
+import com.sportzfy.live.presentation.livetv.ChannelPlayerViewModel
+import com.sportzfy.live.presentation.livetv.LiveTvViewModel
+import com.sportzfy.live.presentation.navigation.ChannelRoute
 import com.sportzfy.live.presentation.navigation.WatchRoute
 import com.sportzfy.live.presentation.watch.WatchViewModel
 import kotlinx.serialization.json.Json
@@ -58,10 +64,27 @@ val dataModule = module {
             clock = get(),
         )
     }
+    single<ChannelRepository> {
+        val config = get<AppConfigRepository>()
+        ChannelRepositoryImpl(
+            source = HttpChannelSource(get(), get()),
+            json = get(),
+            clock = get(),
+            // Read on each load, so a new channelsUrl applies without a restart.
+            url = { config.config.value.channelsUrl },
+        )
+    }
 }
 
 val presentationModule = module {
     viewModelOf(::CatalogViewModel)
+    viewModelOf(::LiveTvViewModel)
+    viewModel {
+        ChannelPlayerViewModel(
+            initialChannelId = get<SavedStateHandle>().toRoute<ChannelRoute>().channelId,
+            channelRepository = get(),
+        )
+    }
     viewModel {
         WatchViewModel(
             initialMatchId = get<SavedStateHandle>().toRoute<WatchRoute>().matchId,

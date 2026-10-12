@@ -21,10 +21,14 @@ data class AppConfig(
     val updateUrl: String? = null,
     /** Non-null switches the whole app to a maintenance screen with this message. */
     val maintenanceMessage: String? = null,
+    /** Where the Live TV channel directory is loaded from (https only). */
+    val channelsUrl: String = DEFAULT_CHANNELS_URL,
 ) {
     fun requiresUpdate(versionCode: Int): Boolean = versionCode < minVersionCode
 
     companion object {
+        const val DEFAULT_CHANNELS_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"
+
         val Default = AppConfig()
     }
 }

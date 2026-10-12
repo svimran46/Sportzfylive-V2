@@ -71,6 +71,13 @@ class AppConfigParserTest {
     }
 
     @Test
+    fun `the channel directory URL can be moved, but only to https`() {
+        assertEquals("https://example.com/tv.json", parse("""{"channelsUrl":" https://example.com/tv.json "}""")!!.channelsUrl)
+        assertEquals(AppConfig.DEFAULT_CHANNELS_URL, parse("""{"channelsUrl":"http://example.com/tv.json"}""")!!.channelsUrl)
+        assertEquals(AppConfig.DEFAULT_CHANNELS_URL, parse("""{"channelsUrl":""}""")!!.channelsUrl)
+    }
+
+    @Test
     fun `invalid json is rejected`() {
         assertNull(parse("not json"))
         assertNull(parse("[1,2]"))

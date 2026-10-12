@@ -88,7 +88,7 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
 - **Tomorrow:** matches that kick off on the next local day and aren't live.
 - **All Matches:** everything, with live matches first, then one section per day (Yesterday, Today, Tomorrow, then dated days), then matches with no announced time. Every match appears once.
 - **Search and filters:** one `CatalogViewModel` serves all three fixture tabs, so search and the sport and Saved filters carry across them.
-- **Live TV:** a placeholder screen until the channel directory arrives in the next phase.
+- **Live TV:** a channel directory, separate from match fixtures. See [Live TV](#live-tv).
 
 ## Screens
 
@@ -104,6 +104,22 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
   - **Stream pills:** labelled like "Stream 1 HD • English". Picking a pill reloads only the player. The screen also shows how many pop-ups were blocked.
   - **More matches:** a rail of other live and upcoming matches, which switch in place.
   - **Wide screens:** on screens 840dp or wider, the rail becomes a side column. The player instance is kept when the layout changes, so rotating the device doesn't restart the stream.
+
+## Live TV
+
+- **Channel list:** loaded from [`channels.json`](https://github.com/svimran46/playlist.m3u/blob/main/channels.json) in the playlist repo. You can point the app at another file with `channelsUrl` in the remote config.
+  - The file can be the JavaScript snippet it is today (`const channels = [...];`) or a plain JSON array. Each entry needs a `name` and an https `url`. `logo` is optional.
+  - Entries without a name or an https stream are skipped, and so are repeated streams. Logo URLs have their repeated `&amp;` escaping undone, and non-https logos show the channel's initials instead.
+  - The list is kept for 30 minutes. If a reload fails, the last good list stays on screen with a banner.
+- **Groups:** **Football**, **Cricket** and **Others**. Every entry upstream has `"genre": "Sports"`, cartoon channels included, so genre can't be used to group them. Instead:
+  - An entry's optional `category` field (`football`, `cricket` or `others`) decides its group.
+  - Otherwise the name decides. "Cricket" or "Willow" means Cricket. "Football", "Fussball", "LaLiga", "Bundesliga", "Premier League" and similar mean Football. Everything else is Others.
+  - A chip only appears for a group that has channels.
+- **Search:** matches every word you type against the channel's name and group.
+- **No LIVE badges:** the directory doesn't say whether a channel is on air, so the app doesn't claim it.
+- **Playback:** tapping a channel opens it in the same player as matches, with the same pop-up blocking, ad-host blocking and fullscreen. Below the player, other channels from the same group switch in place.
+  - In `direct` player mode, the page itself may load from embed.st or from the channel's own stream host, and nowhere else.
+  - The stream host is shown as the channel's source.
 
 ## Search, saved matches and Android TV
 
@@ -130,6 +146,7 @@ Every installed app reads [`android/remote-config.json`](remote-config.json) fro
 | `minVersionCode` | Builds with a lower `versionCode` (in `app/build.gradle.kts`) show an "Update required" screen. |
 | `updateUrl` | Where that screen's button sends the user (https only). |
 | `maintenance.enabled` / `maintenance.message` | `true` replaces the whole app with a maintenance screen showing the message. |
+| `channelsUrl` | Where Live TV loads its channel list from (https only). Defaults to `channels.json` in the playlist repo. |
 
 ## Testing
 

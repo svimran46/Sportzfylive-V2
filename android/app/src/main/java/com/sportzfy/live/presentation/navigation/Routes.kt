@@ -2,7 +2,7 @@ package com.sportzfy.live.presentation.navigation
 
 import kotlinx.serialization.Serializable
 
-/** Start destination: today's fixtures (Phase 3 turns it into Live Matches). */
+/** Start destination: Home, which opens on today's live matches. */
 @Serializable
 data object TodayRoute
 
@@ -17,3 +17,7 @@ data object AllMatchesRoute
 
 @Serializable
 data class WatchRoute(val matchId: String)
+
+/** Full-screen player for one Live TV channel. */
+@Serializable
+data class ChannelRoute(val channelId: String)

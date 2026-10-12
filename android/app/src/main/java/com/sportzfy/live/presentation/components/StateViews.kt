@@ -45,7 +45,11 @@ fun LoadingState(modifier: Modifier = Modifier) {
 
 /** Placeholder cards that gently pulse while the first load runs. */
 @Composable
-fun MatchListSkeleton(modifier: Modifier = Modifier, count: Int = 4) {
+fun MatchListSkeleton(
+    modifier: Modifier = Modifier,
+    count: Int = 4,
+    contentDescription: String = "Loading matches",
+) {
     val transition = rememberInfiniteTransition(label = "skeleton")
     val pulse by transition.animateFloat(
         initialValue = 0.45f,
@@ -57,7 +61,7 @@ fun MatchListSkeleton(modifier: Modifier = Modifier, count: Int = 4) {
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
-            .semantics { contentDescription = "Loading matches" },
+            .semantics { this.contentDescription = contentDescription },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(

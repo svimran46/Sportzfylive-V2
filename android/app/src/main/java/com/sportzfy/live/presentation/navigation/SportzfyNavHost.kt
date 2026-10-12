@@ -17,6 +17,7 @@ import androidx.navigation.compose.rememberNavController
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
 import com.sportzfy.live.presentation.catalog.MatchCatalogScreen
 import com.sportzfy.live.presentation.components.BottomNavBar
+import com.sportzfy.live.presentation.livetv.ChannelPlayerScreen
 import com.sportzfy.live.presentation.livetv.LiveTvScreen
 import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.presentation.watch.WatchStudioScreen
@@ -25,7 +26,8 @@ import org.koin.compose.viewmodel.koinViewModel
 private const val TAB_FADE_MILLIS = 180
 
 /**
- * App shell. The four tabs show the bottom bar; the player is full-screen.
+ * App shell. The four tabs show the bottom bar; the match and channel
+ * players are full-screen.
  * Back from any tab returns to Today, and back from Today leaves the app.
  */
 @Composable
@@ -60,13 +62,19 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
             MatchCatalogScreen(DayScope.TOMORROW, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.TOMORROW) })
         }
         composable<LiveTvRoute> {
-            LiveTvScreen(bottomBar = { bottomBar(MainTab.LIVE_TV) })
+            LiveTvScreen(
+                onOpenChannel = { id -> navController.navigate(ChannelRoute(id)) },
+                bottomBar = { bottomBar(MainTab.LIVE_TV) },
+            )
         }
         composable<AllMatchesRoute> {
             MatchCatalogScreen(DayScope.ALL, openMatch, viewModel = catalogViewModel, bottomBar = { bottomBar(MainTab.ALL_MATCHES) })
         }
         composable<WatchRoute> {
             WatchStudioScreen(onBack = { navController.popBackStack() })
+        }
+        composable<ChannelRoute> {
+            ChannelPlayerScreen(onBack = { navController.popBackStack() })
         }
     }
 }

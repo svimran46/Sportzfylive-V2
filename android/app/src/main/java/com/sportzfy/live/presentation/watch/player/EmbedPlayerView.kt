@@ -23,6 +23,7 @@ import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.core.player.EmbedFrame
 import com.sportzfy.live.core.player.PlayerConfig
 import com.sportzfy.live.core.player.PlayerUrlPolicy
+import com.sportzfy.live.domain.model.EmbedUrl
 import com.sportzfy.live.domain.model.PlayerMode
 
 /**
@@ -42,7 +43,9 @@ internal fun EmbedPlayerView(
     modifier: Modifier = Modifier,
     config: PlayerConfig = PlayerConfig(),
 ) {
-    val policy = remember(config.blockedHosts) { PlayerUrlPolicy(blockedHosts = config.blockedHosts) }
+    val policy = remember(config.blockedHosts, config.trustedHosts) {
+        PlayerUrlPolicy(trustedHosts = setOf(EmbedUrl.HOST) + config.trustedHosts, blockedHosts = config.blockedHosts)
+    }
     val currentPolicy by rememberUpdatedState(policy)
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current

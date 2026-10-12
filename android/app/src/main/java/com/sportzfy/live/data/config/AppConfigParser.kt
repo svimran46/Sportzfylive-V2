@@ -19,6 +19,7 @@ internal data class RemoteConfigDto(
     val minVersionCode: Int? = null,
     val updateUrl: String? = null,
     val maintenance: MaintenanceDto? = null,
+    val channelsUrl: String? = null,
 )
 
 @Serializable
@@ -60,6 +61,7 @@ object AppConfigParser {
             maintenanceMessage = dto.maintenance?.takeIf { it.enabled == true }?.let {
                 it.message?.trim()?.takeIf(String::isNotEmpty) ?: DEFAULT_MAINTENANCE_MESSAGE
             },
+            channelsUrl = httpsOrNull(dto.channelsUrl) ?: AppConfig.DEFAULT_CHANNELS_URL,
         )
     }
 

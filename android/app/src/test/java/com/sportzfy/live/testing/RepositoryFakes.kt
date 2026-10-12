@@ -1,12 +1,15 @@
 package com.sportzfy.live.testing
 
 import com.sportzfy.live.domain.model.AppConfig
+import com.sportzfy.live.domain.model.Channel
+import com.sportzfy.live.domain.model.ChannelFeed
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.MatchFeed
 import com.sportzfy.live.domain.model.StreamItem
 import com.sportzfy.live.domain.model.StreamResolution
 import com.sportzfy.live.domain.model.StreamSource
 import com.sportzfy.live.domain.repository.AppConfigRepository
+import com.sportzfy.live.domain.repository.ChannelRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
@@ -70,3 +73,26 @@ class FakeAppConfigRepository(initial: AppConfig = AppConfig.Default) : AppConfi
 
     override suspend fun refresh(force: Boolean) = Unit
 }
+
+/** Channel directory with a fixed list; [refreshCalls] counts loads. */
+class FakeChannelRepository(channels: List<Channel> = emptyList()) : ChannelRepository {
+    private val state = MutableStateFlow(ChannelFeed(channels, updatedAtMillis = 1L, isLoading = false, error = null))
+    override val feed: StateFlow<ChannelFeed> = state
+
+    var refreshCalls = 0
+        private set
+    var forcedRefreshCalls = 0
+        private set
+
+    fun emit(feed: ChannelFeed) {
+        state.value = feed
+    }
+
+    override suspend fun refresh(force: Boolean) {
+        refreshCalls++
+        if (force) forcedRefreshCalls++
+    }
+
+    override suspend fun getChannel(id: String): Channel? = state.value.channels.firstOrNull { it.id == id }
+}
+

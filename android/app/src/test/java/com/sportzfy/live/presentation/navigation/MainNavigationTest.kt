@@ -17,9 +17,13 @@ import com.sportzfy.live.core.theme.SportzfyTheme
 import com.sportzfy.live.core.time.ZoneProvider
 import com.sportzfy.live.domain.model.MatchStatus.LIVE
 import com.sportzfy.live.domain.model.MatchStatus.UPCOMING
+import com.sportzfy.live.domain.model.ChannelCategory
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
+import com.sportzfy.live.presentation.livetv.LiveTvViewModel
+import com.sportzfy.live.presentation.model.testChannel
 import com.sportzfy.live.presentation.model.testMatch
 import com.sportzfy.live.testing.FakeAppConfigRepository
+import com.sportzfy.live.testing.FakeChannelRepository
 import com.sportzfy.live.testing.FakeClock
 import com.sportzfy.live.testing.FakeFavoritesRepository
 import com.sportzfy.live.testing.FakeMatchRepository
@@ -68,6 +72,7 @@ class MainNavigationTest {
                             ZoneProvider { TimeZone.getTimeZone("UTC") },
                         )
                     }
+                    viewModel { LiveTvViewModel(FakeChannelRepository(listOf(testChannel("Willow Cricket", ChannelCategory.CRICKET)))) }
                 }
             )
         }
@@ -105,7 +110,8 @@ class MainNavigationTest {
         tab("Live TV").performClick()
         settle()
         tab("Live TV").assertIsSelected()
-        compose.onNodeWithText("Live TV is coming").assertExists()
+        compose.onNodeWithTag("screen-title").assertTextContains("Live TV")
+        compose.onNodeWithText("Willow Cricket").assertExists()
 
         tab("All Matches").performClick()
         settle()
