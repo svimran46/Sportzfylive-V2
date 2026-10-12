@@ -3,11 +3,11 @@ package com.sportzfy.live.presentation.navigation
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavOptionsBuilder
@@ -66,10 +66,11 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
 }
 
 /** Bottom bar for [selected]; hidden while the keyboard is open so it never sits on the IME. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MainBottomBar(selected: MainTab, navController: NavController) {
-    if (WindowInsets.isImeVisible) return
+    // Measured, not WindowInsets.isImeVisible: a window without real insets
+    // reports every type as "visible", which would hide the bar for good.
+    if (WindowInsets.ime.getBottom(LocalDensity.current) > 0) return
     BottomNavBar(
         items = MainTab.items,
         selectedKey = selected.item.key,

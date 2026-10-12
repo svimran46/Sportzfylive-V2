@@ -72,6 +72,13 @@ android {
         unitTests.isReturnDefaultValues = true
         // Robolectric-backed Compose UI tests need the merged resources.
         unitTests.isIncludeAndroidResources = true
+        // Print the assertion message and stack trace in the CI log.
+        unitTests.all {
+            it.testLogging {
+                events("failed")
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            }
+        }
     }
 }
 
