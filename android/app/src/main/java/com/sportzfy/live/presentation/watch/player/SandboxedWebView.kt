@@ -63,7 +63,7 @@ internal fun createSandboxedWebView(
         useWideViewPort = true
         loadWithOverviewMode = true
         // Some embeds refuse the WebView marker; present as regular Chrome.
-        userAgentString = userAgentString.replace("; wv", "")
+        userAgentString = userAgentString?.replace("; wv", "")
     }
     // Embedded players sit in cross-site iframes and need their own cookies
     // for anti-bot checks.

@@ -42,8 +42,9 @@ app/src/main/java/com/sportzfy/live/
 Requires JDK 17+ and the Android SDK (platform 36).
 
 ```bash
-./gradlew assembleDebug
-./gradlew testDebugUnitTest
+./gradlew assembleDebug        # debug APK
+./gradlew testDebugUnitTest    # JVM unit tests + Robolectric Compose UI tests
+./gradlew assembleRelease      # R8-shrunk release APK (runs lint vital)
 ```
 
 ## Data flow
@@ -92,3 +93,30 @@ Requires JDK 17+ and the Android SDK (platform 36).
   - The app appears in the TV launcher (`LEANBACK_LAUNCHER`) with its own banner, and neither touch nor leanback support is required to install it.
   - Anything you can select gets a 2dp rose border and a slight scale-up when the D-pad focuses it (`Modifier.tvFocus`).
   - Inside the player, Up/Down always move focus out of the WebView, so the remote can't get stuck in the page.
+
+## Testing
+
+All tests run on the JVM with `./gradlew testDebugUnitTest`. No emulator is needed.
+
+| Layer | What is covered |
+|---|---|
+| Network | Request paths, URL encoding and browser headers, against MockWebServer; mapping error codes to user-facing errors |
+| Data | Merging the today and live feeds and setting match status, the stream-data cleanup, the 60-second caches, and each failure-isolation path in both repositories |
+| Domain / player | The `embed.st` URL builder, the WebView navigation and ad rules, and choosing HLS or embed |
+| Presentation logic | Filtering, search with aliases, the Saved filter, the spotlight pick, related matches, the default stream, and time labels |
+| ViewModels | `CatalogViewModel` (sport filter, search, saving matches) and `WatchViewModel` (default stream, stream picker, switching match, missing match, failed sources, favourites) |
+| UI (Robolectric) | Tapping a sport pill filters the rendered list; search narrows it; tapping a stream chip makes it the selected stream |
+
+## Release builds
+
+`assembleRelease` shrinks the code and resources with R8. Media3, Coil, OkHttp, Retrofit, kotlinx.serialization and Koin all ship their own keep rules. `app/proguard-rules.pro` adds only the app-specific ones: the generated serializers, the Retrofit service, and keeping line numbers so crash traces can be mapped back.
+
+**Signing.** Set `SPORTZFY_KEYSTORE_FILE`, `SPORTZFY_KEYSTORE_PASSWORD`, `SPORTZFY_KEY_ALIAS` and `SPORTZFY_KEY_PASSWORD` to sign with your own key. Without them, the release APK is signed with the debug key so it can still be installed for testing.
+
+**CI.** CI builds the release APK the same way. To sign with your own key there, add these repository secrets:
+- `SPORTZFY_KEYSTORE_BASE64` (the base64-encoded `.jks` file)
+- `SPORTZFY_KEYSTORE_PASSWORD`
+- `SPORTZFY_KEY_ALIAS`
+- `SPORTZFY_KEY_PASSWORD`
+
+Each run uploads three artifacts: `sportzfy-release-apk` (the release APK plus `mapping.txt`), `sportzfy-debug-apk`, and, if the run fails, `test-reports`.
