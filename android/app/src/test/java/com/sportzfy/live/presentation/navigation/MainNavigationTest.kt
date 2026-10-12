@@ -36,13 +36,12 @@ import com.sportzfy.live.testing.FakeClock
 import com.sportzfy.live.testing.FakeFavoritesRepository
 import com.sportzfy.live.testing.FakeMatchRepository
 import com.sportzfy.live.testing.FakeSettingsRepository
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.context.GlobalContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
@@ -69,6 +68,11 @@ class MainNavigationTest {
             testMatch("today-live", LIVE, title = "Live Derby"),
             testMatch("tomorrow", UPCOMING, start = noon + 20 * hour, title = "Tomorrow Classic"),
         )
+        // Started once per test JVM and never stopped: Koin's Compose helpers keep
+        // a reference to the first root scope, so a stopped-and-restarted Koin
+        // fails the next test with "Scope '_root_' is closed". The definitions
+        // are identical for every test and build fresh fakes per ViewModel.
+        if (GlobalContext.getOrNull() != null) return
         startKoin {
             modules(
                 module {
@@ -89,8 +93,6 @@ class MainNavigationTest {
         }
     }
 
-    @After
-    fun tearDown() = stopKoin()
 
     // Infinite animations (live dot, spinners): advance the clock by hand.
     private fun settle() {

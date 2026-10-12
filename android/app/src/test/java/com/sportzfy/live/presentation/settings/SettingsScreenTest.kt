@@ -30,13 +30,11 @@ class SettingsScreenTest {
     private var clockFormat: ClockFormat? = null
     private var clearCalls = 0
 
-    private fun settle() {
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.waitForIdle()
-    }
+    // Nothing on Settings animates forever, so the clock runs normally;
+    // dialogs open in their own window and need real frames to appear.
+    private fun settle() = compose.waitForIdle()
 
     private fun show(savedCount: Int = 0, settings: UserSettings = UserSettings()) {
-        compose.mainClock.autoAdvance = false
         compose.setContent {
             SportzfyTheme {
                 SettingsContent(

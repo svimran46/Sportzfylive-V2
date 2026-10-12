@@ -196,6 +196,7 @@ class CatalogViewModelTest {
 
     @Test
     fun `drawer filters replace each other and reset clears them`() = runTest {
+        collectState(DayScope.TODAY)
         collectState(DayScope.ALL)
         val all = { viewModel.state(DayScope.ALL).value }
 
