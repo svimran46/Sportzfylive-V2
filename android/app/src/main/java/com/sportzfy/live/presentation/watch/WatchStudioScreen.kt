@@ -167,6 +167,8 @@ fun WatchStudioContent(
                     )
                 }
             } else {
+                // Read here: inside Column, BoxWithConstraints' maxHeight isn't an implicit receiver.
+                val playerMaxHeight = maxHeight * 0.55f
                 Column(Modifier.fillMaxSize()) {
                     // The player stays pinned while the details scroll beneath it,
                     // capped so the picker below always stays reachable.
@@ -174,7 +176,7 @@ fun WatchStudioContent(
                         playerUrl,
                         Modifier
                             .align(Alignment.CenterHorizontally)
-                            .heightIn(max = maxHeight * 0.55f)
+                            .heightIn(max = playerMaxHeight)
                             .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
                     )
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
