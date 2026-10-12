@@ -1,0 +1,104 @@
+package com.sportzfy.live.presentation.watch
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
+import com.sportzfy.live.domain.model.Match
+import com.sportzfy.live.domain.model.StreamItem
+import com.sportzfy.live.domain.repository.MatchRepository
+import com.sportzfy.live.domain.repository.StreamRepository
+import com.sportzfy.live.presentation.model.WatchLogic
+import com.sportzfy.live.presentation.navigation.WatchRoute
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+data class WatchUiState(
+    val match: Match? = null,
+    val isMatchMissing: Boolean = false,
+    val streams: List<StreamItem> = emptyList(),
+    val isResolvingStreams: Boolean = true,
+    val failedSourceCount: Int = 0,
+    val selectedStreamKey: String? = null,
+    val related: List<Match> = emptyList(),
+) {
+    val selectedStream: StreamItem?
+        get() = streams.firstOrNull { it.key == selectedStreamKey }
+}
+
+class WatchViewModel(
+    savedStateHandle: SavedStateHandle,
+    private val matchRepository: MatchRepository,
+    private val streamRepository: StreamRepository,
+) : ViewModel() {
+
+    private data class StreamLoad(
+        val isLoading: Boolean = true,
+        val streams: List<StreamItem> = emptyList(),
+        val failedSources: Int = 0,
+        val matchMissing: Boolean = false,
+    )
+
+    private val matchId = MutableStateFlow(savedStateHandle.toRoute<WatchRoute>().matchId)
+    private val streamLoad = MutableStateFlow(StreamLoad())
+    private val chosenKey = MutableStateFlow<String?>(null)
+    private var loadJob: Job? = null
+
+    val uiState: StateFlow<WatchUiState> =
+        combine(matchRepository.feed, matchId, streamLoad, chosenKey) { feed, id, load, chosen ->
+            val match = feed.matches.firstOrNull { it.id == id }
+            // Keep the user's pick while it exists; otherwise fall back to the best stream.
+            val selected = chosen?.takeIf { key -> load.streams.any { it.key == key } }
+                ?: WatchLogic.preferredStream(load.streams)?.key
+            WatchUiState(
+                match = match,
+                isMatchMissing = load.matchMissing && match == null,
+                streams = load.streams,
+                isResolvingStreams = load.isLoading,
+                failedSourceCount = load.failedSources,
+                selectedStreamKey = selected,
+                related = WatchLogic.related(feed.matches, match),
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WatchUiState())
+
+    init {
+        load(matchId.value)
+    }
+
+    fun selectStream(key: String) {
+        chosenKey.value = key
+    }
+
+    /** Switches to another match in place, keeping the player mounted. */
+    fun selectMatch(id: String) {
+        if (id == matchId.value) return
+        matchId.value = id
+        chosenKey.value = null
+        load(id)
+    }
+
+    fun retryStreams() = load(matchId.value)
+
+    private fun load(id: String) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            streamLoad.value = StreamLoad(isLoading = true)
+            val match = matchRepository.getMatch(id)
+            if (match == null) {
+                streamLoad.value = StreamLoad(isLoading = false, matchMissing = true)
+                return@launch
+            }
+            val resolution = streamRepository.resolveStreams(match.sources)
+            streamLoad.value = StreamLoad(
+                isLoading = false,
+                streams = resolution.streams,
+                failedSources = resolution.failedSources.size,
+            )
+        }
+    }
+}

@@ -4,14 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.sportzfy.live.core.theme.SportzfyTheme
+import com.sportzfy.live.presentation.navigation.SportzfyNavHost
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,11 +17,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SportzfyTheme {
-                // Placeholder until the catalog and navigation land in Phase 4.
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("Sportzfy", style = MaterialTheme.typography.headlineSmall)
-                    }
+                    SportzfyNavHost()
                 }
             }
         }
