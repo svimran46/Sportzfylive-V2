@@ -28,8 +28,8 @@ class EmbedFrameTest {
     @Test
     fun `player config follows the remote config`() {
         // Ads play by default: the stream sites need them to serve the stream.
-        // Embeds load directly, like a browser tab, with no referer.
-        assertEquals(PlayerConfig(PlayerMode.DIRECT, emptySet(), referer = null), PlayerConfig.from(AppConfig.Default))
+        // Embeds load directly, like a browser tab, referred by streamed.pk like its own embed.
+        assertEquals(PlayerConfig(PlayerMode.DIRECT, emptySet(), referer = "https://streamed.pk/"), PlayerConfig.from(AppConfig.Default))
         assertTrue(PlayerConfig.from(AppConfig(adBlocking = true)).blockedHosts.containsAll(AdHosts.DEFAULT))
         val noAds = PlayerConfig.from(AppConfig(adBlocking = false, extraBlockedHosts = setOf("bad.com"), playerMode = PlayerMode.IFRAME))
         assertEquals(PlayerMode.IFRAME, noAds.mode)

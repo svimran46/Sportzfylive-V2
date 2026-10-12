@@ -1,5 +1,6 @@
 package com.sportzfy.live.core.player
 
+import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.PlayerMode
 
@@ -15,10 +16,10 @@ data class PlayerConfig(
     /** Browser-like navigation (see [PlayerUrlPolicy] openWeb): on for every stream. */
     val openWeb: Boolean = true,
     /**
-     * Referer sent when the page is loaded directly; null sends none, like a
-     * browser tab and like the website's no-referrer iframe.
+     * Referer sent when the page is loaded directly; null sends none. Matches
+     * send streamed.pk's, as its own embed iframe does; Live TV sends none.
      */
-    val referer: String? = null,
+    val referer: String? = StreamedEndpoints.REFERER,
 ) {
     companion object {
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(
