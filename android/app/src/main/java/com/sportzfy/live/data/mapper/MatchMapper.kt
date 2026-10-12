@@ -92,11 +92,17 @@ object MatchMapper {
             }
             .distinct()
 
-    /** Live, then started, then upcoming by kick-off, then ended (most recent first). */
+    /**
+     * Live, then started, then upcoming by kick-off (no announced time last),
+     * then ended (most recent first).
+     */
     private val catalogOrder = Comparator<Match> { a, b ->
         val byStatus = a.status.ordinal.compareTo(b.status.ordinal)
+        val aUntimed = a.startTimeMillis <= 0L
+        val bUntimed = b.startTimeMillis <= 0L
         when {
             byStatus != 0 -> byStatus
+            aUntimed != bUntimed -> if (aUntimed) 1 else -1
             a.status == MatchStatus.ENDED -> b.startTimeMillis.compareTo(a.startTimeMillis)
             else -> a.startTimeMillis.compareTo(b.startTimeMillis)
         }

@@ -31,14 +31,24 @@ data class DayWindow(
 
     companion object {
         fun at(nowMillis: Long, zone: TimeZone): DayWindow {
-            val calendar = calendarAt(nowMillis, zone)
-            val today = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_MONTH, -1)
-            val yesterday = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_MONTH, 2)
-            val tomorrow = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_MONTH, 1)
-            return DayWindow(today, tomorrow, calendar.timeInMillis, yesterday, zone)
+            val today = calendarAt(nowMillis, zone)
+            // Each boundary is found from its own date: where DST skips
+            // midnight (Chile, Cairo, Havana) a day starts at 01:00, and that
+            // hour must not carry over to the neighbouring days.
+            fun dayStart(offset: Int): Long = (today.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_MONTH, offset)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            return DayWindow(
+                todayStart = today.timeInMillis,
+                tomorrowStart = dayStart(1),
+                dayAfterStart = dayStart(2),
+                yesterdayStart = dayStart(-1),
+                zone = zone,
+            )
         }
 
         private fun calendarAt(millis: Long, zone: TimeZone): Calendar = Calendar.getInstance(zone).apply {

@@ -108,6 +108,12 @@ class MatchMapperTest {
     }
 
     @Test
+    fun `matches without an announced time come after timed kick-offs`() {
+        val today = decode("""[{"id":"tba","title":"tba"}, ${match("soon", now + 10 * 60_000L)}, ${match("later", now + hour)}]""")
+        assertEquals(listOf("soon", "later", "tba"), MatchMapper.merge(today, emptyList(), now).map { it.id })
+    }
+
+    @Test
     fun `de-duplicates repeated ids`() {
         val today = decode("""[${match("a", now + hour)}, ${match("a", now + 2 * hour)}]""")
         val merged = MatchMapper.merge(today, emptyList(), now)

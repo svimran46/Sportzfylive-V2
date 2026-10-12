@@ -68,6 +68,14 @@ data class CatalogUiState(
         get() = hero == null && sections.isEmpty()
 
     companion object {
+        /**
+         * Status comes from the last fetch. A match fetched as upcoming whose
+         * kick-off has since passed is no longer upcoming, but only the live
+         * feed may call it live, so it reads as started until the next refresh.
+         */
+        private fun Match.withKickOffPassed(nowMillis: Long): Match =
+            if (status == MatchStatus.UPCOMING && startTimeMillis in 1..nowMillis) copy(status = MatchStatus.STARTED) else this
+
         /** The sports with their own drawer entry; "Other sports" is the rest. */
         val MAIN_SPORTS = setOf(SportCategory.FOOTBALL, SportCategory.CRICKET)
 
@@ -84,8 +92,11 @@ data class CatalogUiState(
             homeView: HomeView? = null,
             otherSports: Boolean = false,
             searchActive: Boolean = false,
+            nowMillis: Long? = null,
         ): CatalogUiState {
-            val visible = feed.matches.filter { it.category !in config.hiddenCategories }
+            val visible = feed.matches
+                .filter { it.category !in config.hiddenCategories }
+                .map { if (nowMillis != null) it.withKickOffPassed(nowMillis) else it }
             // The Live | Upcoming | All switch only exists on Home (Today).
             val view = homeView?.takeIf { scope == DayScope.TODAY }
             // Pills, counts and the list all describe the scope's day (and Home's

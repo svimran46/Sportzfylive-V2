@@ -65,6 +65,9 @@ class MatchRepositoryImpl(
             val last = lastSuccessMillis
             if (!force && last != null && clock.nowMillis() - last < ttlMillis) return
 
+            // The cache age counts from when the fetch started, so a 60s poll
+            // isn't skipped just because the previous fetch took a moment.
+            val startedAt = clock.nowMillis()
             state.update { it.copy(isLoading = true) }
             val (today, all, live) = coroutineScope {
                 val today = async { fetchList(api::getMatchesToday) }
@@ -79,13 +82,27 @@ class MatchRepositoryImpl(
             val allList = all.getOrNull()
             val liveList = live.getOrNull()
             if (todayList == null && allList == null && liveList == null) {
-                state.update { it.copy(isLoading = false, error = today.exceptionOrNull().toDataError()) }
+                val error = today.exceptionOrNull().toDataError()
+                val liveStale = lastLiveMillis?.let { now - it > LIVE_REUSE_MILLIS } ?: true
+                if (liveStale && state.value.liveStatusKnown && state.value.updatedAtMillis != null) {
+                    // Offline for a while: the last live list no longer proves
+                    // anything is on air, so stop showing LIVE badges.
+                    val known = lastTodayPayload.orEmpty() + lastAllPayload.orEmpty() + lastLivePayload.orEmpty()
+                    state.value = state.value.copy(
+                        matches = MatchMapper.merge(known, live = null, nowMillis = now),
+                        isLoading = false,
+                        error = error,
+                        liveStatusKnown = false,
+                    )
+                } else {
+                    state.update { it.copy(isLoading = false, error = error) }
+                }
                 return
             }
 
             if (todayList != null) {
                 lastTodayPayload = todayList
-                lastSuccessMillis = now
+                lastSuccessMillis = startedAt
             }
             if (allList != null) lastAllPayload = allList
             if (liveList != null) {

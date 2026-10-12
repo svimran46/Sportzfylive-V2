@@ -58,11 +58,16 @@ class CatalogViewModel(
 
     private val filters = MutableStateFlow(Filters())
 
-    /** Re-evaluates the day boundaries every minute, so tabs roll over at midnight. */
+    /**
+     * Re-evaluates day boundaries and kick-offs every minute, and exactly at
+     * local midnight, so tabs roll over on time.
+     */
     private val minuteTicks = flow {
         while (true) {
-            emit(clock.nowMillis())
-            delay(60_000)
+            val now = clock.nowMillis()
+            emit(now)
+            val untilMidnight = DayWindow.at(now, zones.zone()).tomorrowStart - now
+            delay(untilMidnight.coerceIn(1L, 60_000L))
         }
     }
 
@@ -149,6 +154,7 @@ class CatalogViewModel(
         config = config,
         scope = scope,
         window = DayWindow.at(nowMillis, zones.zone()),
+        nowMillis = nowMillis,
         homeView = filters.homeView,
         otherSports = filters.otherSports,
         searchActive = filters.searchActive,

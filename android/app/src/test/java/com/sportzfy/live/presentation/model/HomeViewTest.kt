@@ -72,6 +72,17 @@ class HomeViewTest {
     }
 
     @Test
+    fun `a kick-off that passed since the last fetch leaves Upcoming without turning live`() {
+        val stale = feed.copy(matches = listOf(testMatch("kicked-off", UPCOMING, start = noon - 60_000L)))
+        val upcoming = CatalogUiState.from(stale, null, "", scope = DayScope.TODAY, window = window, homeView = HomeView.UPCOMING, nowMillis = noon)
+        val live = CatalogUiState.from(stale, null, "", scope = DayScope.TODAY, window = window, homeView = HomeView.LIVE, nowMillis = noon)
+        val all = CatalogUiState.from(stale, null, "", scope = DayScope.TODAY, window = window, homeView = HomeView.ALL, nowMillis = noon)
+        assertEquals(emptySet<String>(), upcoming.ids())
+        assertEquals(emptySet<String>(), live.ids())
+        assertEquals(listOf("Started"), all.sections.map { it.title })
+    }
+
+    @Test
     fun `the switch only applies to Home`() {
         val state = home(HomeView.LIVE, scope = DayScope.TOMORROW)
         assertEquals(setOf("tomorrow"), state.ids())

@@ -83,6 +83,7 @@ import com.sportzfy.live.presentation.model.userMessage
 import com.sportzfy.live.presentation.settings.LocalUserSettings
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
+import java.util.TimeZone
 
 private const val AUTO_REFRESH_MILLIS = 60_000L
 
@@ -564,7 +565,12 @@ internal fun rememberMatchTimeFormatter(): MatchTimeFormatter {
         ClockFormat.H24 -> true
         ClockFormat.SYSTEM -> DateFormat.is24HourFormat(context)
     }
-    return remember(use24Hour) { MatchTimeFormatter(use24Hour = use24Hour) }
+    // Read on every recomposition (the screens tick every 30s), so labels
+    // follow a timezone change the same way the day sections do.
+    val zoneId = TimeZone.getDefault().id
+    return remember(use24Hour, zoneId) {
+        MatchTimeFormatter(timeZone = TimeZone.getTimeZone(zoneId), use24Hour = use24Hour)
+    }
 }
 
 /** Wall clock that ticks every 30s, for countdowns and status labels. */

@@ -102,6 +102,41 @@ class MatchRepositoryImplTest {
     }
 
     @Test
+    fun `going offline drops LIVE badges once the live list is too old to trust`() = runTest {
+        api.today = { json("""[${match("a", -hour)}]""") }
+        api.live = { json("""[${match("a", -hour)}]""") }
+        repository.refresh()
+        assertEquals(MatchStatus.LIVE, repository.feed.value.matches.single().status)
+
+        api.today = { FakeStreamedApi.networkDown() }
+        api.all = { FakeStreamedApi.networkDown() }
+        api.live = { FakeStreamedApi.networkDown() }
+
+        clock.advance(2 * 60_000L)
+        repository.refresh(force = true)
+        assertEquals(MatchStatus.LIVE, repository.feed.value.matches.single().status)
+
+        clock.advance(MatchRepositoryImpl.LIVE_REUSE_MILLIS)
+        repository.refresh(force = true)
+        val feed = repository.feed.value
+        assertEquals(MatchStatus.STARTED, feed.matches.single().status)
+        assertFalse(feed.liveStatusKnown)
+        assertEquals(DataError.NETWORK, feed.error)
+    }
+
+    @Test
+    fun `a 60 second poll refetches even when the fetch itself took time`() = runTest {
+        api.today = {
+            clock.advance(2_000) // the request takes two seconds
+            json("[]")
+        }
+        repository.refresh()
+        clock.advance(58_000) // next poll, 60s after the first one started
+        repository.refresh()
+        assertEquals(2, api.todayCalls)
+    }
+
+    @Test
     fun `forced refreshes that queue behind a running one are dropped`() = runTest {
         repository.refresh()
         List(3) { async { repository.refresh(force = true) } }.awaitAll()

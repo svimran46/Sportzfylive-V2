@@ -67,6 +67,25 @@ class MatchDaysTest {
     }
 
     @Test
+    fun `a DST change that skips midnight doesn't shift the neighbouring days`() {
+        // Chile springs forward at 00:00 on Sunday 2026-09-06: that day starts at 01:00.
+        val santiago = TimeZone.getTimeZone("America/Santiago")
+        fun at(day: Int, hourOfDay: Int, minute: Int = 0) = Calendar.getInstance(santiago).apply {
+            clear()
+            set(2026, Calendar.SEPTEMBER, day, hourOfDay, minute)
+        }.timeInMillis
+
+        val window = DayWindow.at(at(6, 12), santiago)
+        assertEquals(at(7, 0), window.tomorrowStart)
+        assertEquals(at(8, 0), window.dayAfterStart)
+        assertEquals(at(5, 0), window.yesterdayStart)
+
+        val justAfterMidnight = testMatch("late", UPCOMING, start = at(7, 0, 30))
+        assertEquals(listOf("late"), MatchDays.tomorrow(listOf(justAfterMidnight), window).map { it.id })
+        assertEquals(emptyList<String>(), MatchDays.today(listOf(justAfterMidnight), window).map { it.id })
+    }
+
+    @Test
     fun `today is live now, kicking off today, or with no announced time`() {
         assertEquals(
             listOf("live-old", "ended-today", "later-today", "tba"),
