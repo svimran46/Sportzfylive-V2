@@ -9,8 +9,11 @@ import com.sportzfy.live.data.repository.MatchRepositoryImpl
 import com.sportzfy.live.data.repository.StreamRepositoryImpl
 import com.sportzfy.live.domain.repository.MatchRepository
 import com.sportzfy.live.domain.repository.StreamRepository
+import com.sportzfy.live.presentation.catalog.CatalogViewModel
+import com.sportzfy.live.presentation.watch.WatchViewModel
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 import retrofit2.Retrofit
 import retrofit2.create
@@ -28,4 +31,9 @@ val dataModule = module {
     single<StreamRepository> { StreamRepositoryImpl(get(), get(), get()) }
 }
 
-val appModules = listOf(networkModule, dataModule)
+val presentationModule = module {
+    viewModelOf(::CatalogViewModel)
+    viewModelOf(::WatchViewModel)
+}
+
+val appModules = listOf(networkModule, dataModule, presentationModule)

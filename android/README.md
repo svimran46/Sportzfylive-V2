@@ -27,8 +27,13 @@ app/src/main/java/com/sportzfy/live/
 ├── data/repository/ cached match feed, per-source stream resolver
 ├── domain/model/   Match, Team, StreamItem, SportCategory, EmbedUrl, MatchFeed
 ├── domain/repository/
-├── presentation/watch/player/  StreamPlayer: sandboxed WebView + Media3 HLS
-├── presentation/   catalog, watch, components (Phase 4)
+├── presentation/
+│   ├── catalog/      MatchCatalogScreen + CatalogViewModel
+│   ├── watch/        WatchStudioScreen + WatchViewModel
+│   │   └── player/   StreamPlayer: sandboxed WebView + Media3 HLS
+│   ├── components/   MatchCard, HeroSpotlight, CategoryPills, StreamChip, LiveBadge, TeamCrest
+│   ├── model/        UI state + pure logic (filtering, labels, related matches)
+│   └── navigation/   type-safe routes and NavHost
 └── SportzfyApp.kt
 ```
 
@@ -63,3 +68,18 @@ Requires JDK 17+ and the Android SDK (platform 36).
 - **Dialogs and permissions:** JavaScript dialogs, permission requests, downloads, file access and long-press menus are all disabled.
 - **Fullscreen:** `onShowCustomView` and `onHideCustomView` move the video into a fullscreen landscape view with the system bars hidden. Back exits fullscreen.
 - **Renderer crashes:** if the renderer dies, the player rebuilds its WebView instead of crashing the app.
+
+## Screens
+
+- **Catalog**
+  - **Header:** the Sportzfy wordmark, a live-match counter with a pulsing dot, and instant search over team names and sports.
+  - **Spotlight banner:** shows the featured match, preferring popular live matches, with a Watch button.
+  - **Sport pills:** All, Football, Cricket, Basketball, Tennis and Motorsport, plus any other sport in today's feed. Each pill shows its match count.
+  - **Match list:** an adaptive grid with Live now, Upcoming and Earlier today sections. Pull down to refresh; the list also refreshes every 60 seconds while the screen is on.
+- **Watch Studio**
+  - **Top bar:** Back, plus the sport and match title.
+  - **Player:** a 16:9 player that stays pinned above the rest of the screen.
+  - **Match details:** both teams with their crests.
+  - **Stream pills:** labelled like "Stream 1 HD • English". Picking a pill reloads only the player. The screen also shows how many pop-ups were blocked.
+  - **More matches:** a rail of other live and upcoming matches, which switch in place.
+  - **Wide screens:** on screens 840dp or wider, the rail becomes a side column. The player instance is kept when the layout changes, so rotating the device doesn't restart the stream.
