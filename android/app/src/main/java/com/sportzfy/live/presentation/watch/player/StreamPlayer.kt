@@ -21,12 +21,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sportzfy.live.core.player.PlaybackSource
 import com.sportzfy.live.core.player.PlayerConfig
+import com.sportzfy.live.domain.model.StreamFormat
 import com.sportzfy.live.presentation.components.tvFocus
 
 /**
- * Dual-engine player: Media3 for `.m3u8` URLs, the sandboxed WebView for
- * everything else (the `embed.st` pages). Fills [modifier]; the caller
- * decides the aspect ratio.
+ * Dual-engine player: Media3 for media streams (HLS, DASH, MPEG-TS, MP4…),
+ * the sandboxed WebView for web pages (the `embed.st` players, channel
+ * sites). [format] (a channel's `type`) overrides the guess from the URL's
+ * extension. Fills [modifier]; the caller decides the aspect ratio.
  */
 @Composable
 fun StreamPlayer(
@@ -34,8 +36,11 @@ fun StreamPlayer(
     modifier: Modifier = Modifier,
     state: StreamPlayerState = rememberStreamPlayerState(),
     config: PlayerConfig = PlayerConfig(),
+    format: StreamFormat? = null,
 ) {
-    val source = remember(url) { url?.let(PlaybackSource::from) }
+    val source = remember(url, format, config.allowHttpStreams, config.extendedFormats) {
+        url?.let { PlaybackSource.from(it, format, config.allowHttpStreams, config.extendedFormats) }
+    }
 
     LaunchedEffect(source) {
         if (source != null) state.onSourceChanged()
@@ -43,10 +48,10 @@ fun StreamPlayer(
 
     Box(modifier = modifier.background(Color.Black)) {
         when (source) {
-            is PlaybackSource.Hls -> HlsPlayerView(source.url, state, Modifier.fillMaxSize())
+            is PlaybackSource.Media -> MediaPlayerView(source.url, source.format, state, Modifier.fillMaxSize())
             is PlaybackSource.Embed -> EmbedPlayerView(source.url, state, Modifier.fillMaxSize(), config)
             null -> PlayerMessage(
-                text = if (url == null) "Pick a stream to start watching" else "This stream can't be played",
+                text = if (url == null) "Pick a stream to start watching" else unplayableMessage(url, format, config),
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -56,7 +61,7 @@ fun StreamPlayer(
             error != null -> PlayerMessage(
                 text = error.message,
                 modifier = Modifier.align(Alignment.Center),
-                actionLabel = if (error == PlayerError.WEBVIEW_UNAVAILABLE) null else "Retry",
+                actionLabel = if (error in PERMANENT_ERRORS) null else "Retry",
                 onAction = state::retry,
             )
             source != null && state.isLoading -> CircularProgressIndicator(
@@ -67,12 +72,29 @@ fun StreamPlayer(
     }
 }
 
+/** Errors a retry can't fix, so no Retry button is offered. */
+private val PERMANENT_ERRORS = setOf(PlayerError.WEBVIEW_UNAVAILABLE, PlayerError.UNSUPPORTED_FORMAT, PlayerError.DRM_PROTECTED)
+
 private val PlayerError.message: String
     get() = when (this) {
         PlayerError.LOAD_FAILED -> "Couldn't load this stream. Try another one."
         PlayerError.PLAYBACK_FAILED -> "Playback stopped. The feed may be offline."
         PlayerError.WEBVIEW_UNAVAILABLE -> "This device has no web player. Install or update Android System WebView."
+        PlayerError.UNSUPPORTED_FORMAT -> "This device can't play this stream's format. Try another one."
+        PlayerError.DRM_PROTECTED -> "This stream is copy-protected (DRM) and can't play in the app."
     }
+
+/** Why [url] got no engine, when the reason is a switch the owner turned off. */
+private fun unplayableMessage(url: String, format: StreamFormat?, config: PlayerConfig): String {
+    val trimmed = url.trim()
+    return when {
+        !config.allowHttpStreams && trimmed.startsWith("http://", ignoreCase = true) ->
+            "Plain-HTTP streams are turned off right now."
+        !config.extendedFormats && (format ?: StreamFormat.fromUrl(trimmed)).let { it == StreamFormat.DASH || it == StreamFormat.PROGRESSIVE } ->
+            "This stream's format is turned off right now."
+        else -> "This stream can't be played"
+    }
+}
 
 @Composable
 private fun PlayerMessage(

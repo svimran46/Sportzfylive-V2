@@ -119,6 +119,7 @@ fun ChannelPlayerScreen(
                     ) {
                         StreamPlayer(
                             url = channel.streamUrl,
+                            format = channel.streamFormat,
                             // No fillMaxWidth: it would force the full width and
                             // break the ratio once the height cap applies.
                             modifier = Modifier

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain-http streams: many IPTV feeds (HLS, MPEG-TS) and some channel pages are
+  served without TLS, so cleartext is allowed app-wide. The app's own calls
+  (APIs, remote config, images) still use https only; whether an http stream
+  may play is decided by PlayerConfig.allowHttpStreams.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
