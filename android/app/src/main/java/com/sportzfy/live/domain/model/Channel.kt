@@ -9,6 +9,8 @@ data class Channel(
     val category: ChannelCategory,
     /** https page or `.m3u8` stream, played by the existing player. */
     val streamUrl: String,
+    /** Set by `"sandbox": true` in channels.json: the page runs in a sandboxed frame. */
+    val sandboxed: Boolean = false,
 ) {
     /** Host serving the stream, shown as the channel's source. */
     val sourceHost: String

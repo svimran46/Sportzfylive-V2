@@ -5,8 +5,14 @@ import com.sportzfy.live.domain.model.ChannelCategory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
-/** One entry of `channels.json`. `category` is optional and overrides name-based grouping. */
+/**
+ * One entry of `channels.json`. `category` is optional and overrides name-based grouping.
+ * `sandbox` is read loosely: any value other than true (boolean or the string "true")
+ * leaves the channel unsandboxed, and a wrong type never drops the channel.
+ */
 @Serializable
 internal data class ChannelDto(
     val name: String? = null,
@@ -14,7 +20,11 @@ internal data class ChannelDto(
     val genre: String? = null,
     val url: String? = null,
     val category: String? = null,
+    val sandbox: JsonElement? = null,
 )
+
+private fun JsonElement?.isTrue(): Boolean =
+    (this as? JsonPrimitive)?.content?.equals("true", ignoreCase = true) == true
 
 /**
  * Reads the channel directory. The file is a JavaScript snippet
@@ -59,6 +69,7 @@ object ChannelParser {
                 logoUrl = dto.logo?.let(::decodeEntities)?.trim()?.takeIf { isHttps(it) },
                 category = categoryOf(dto.category, name),
                 streamUrl = url,
+                sandboxed = dto.sandbox.isTrue(),
             )
         }
     }
