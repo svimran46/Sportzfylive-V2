@@ -132,9 +132,10 @@ Kids, News, Movies) come from a channel's `category` field or its name —
 upstream marks every channel `genre: "Sports"`, cartoons included.
 
 The public channel list never contains stream URLs. The player frames
-`/api/play/tv/:id`, which redirects to the channel; embed pages run in a
-sandboxed iframe (no pop-ups, no top-level navigation) and `.m3u8` streams play
-in `player.html` with hls.js (native HLS on Safari/iOS). Streams an admin
+`/api/play/tv/:id`, which redirects to the channel. Channels marked
+`"sandbox": true` in the playlist run in a sandboxed iframe (no pop-ups, no
+top-level navigation), others load directly, and `.m3u8` streams play in
+`player.html` with hls.js (native HLS on Safari/iOS). Streams an admin
 attaches to a match play the same way on the match's watch view, ahead of the
 Streamed sources.
 
@@ -191,7 +192,7 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 ## Security
 
 - **XSS Prevention**: All user data is sanitized and rendered safely using DOM methods
-- **Embeds**: Streamed match embeds are not sandboxed (those players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. Live TV channels — on the website, in the Android app, and when attached to a match — run in a sandboxed iframe (no pop-ups, no top-level navigation)
+- **Embeds**: Streamed match embeds are not sandboxed (those players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. A Live TV channel marked `"sandbox": true` in `channels.json` runs in a sandboxed iframe (no pop-ups, no top-level navigation) — on the website, in the Android app, and when attached to a match; other channels load directly, because some render a black frame inside a sandbox. Admins can flip the flag per channel or per stream
 - **Playback URLs**: public JSON never carries TV channel or admin stream URLs; `/api/play/*` redirects to them (errors answer as sandboxed plain text), and `player.html` only plays those `/api/play/*` paths
 - **Admin password**: `ADMIN_TOKEN` signs sessions and is the bootstrap login. A password set in Settings is stored as a salted PBKDF2 hash in KV and replaces it for logins until reset; logins and password changes share the per-IP failure throttle. Locked out? Delete the `admin_credential` key in the KV namespace
 - **Input Validation**: All data is validated before rendering

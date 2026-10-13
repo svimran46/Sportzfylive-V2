@@ -266,9 +266,10 @@
     ? location.origin
     : "https://sportzfylive.svimranmy.workers.dev";
 
-  // Channel pages run sandboxed: no pop-ups and no top-level navigation.
-  // Scripts and same-origin stay on so the player works; channels live on
-  // other origins, so they cannot lift the sandbox.
+  // Channels marked "sandbox": true in channels.json run sandboxed: no
+  // pop-ups and no top-level navigation. Scripts and same-origin stay on so
+  // the player works; channels live on other origins, so they cannot lift the
+  // sandbox. Other channels load directly — some render a black frame in one.
   const SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation";
 
   const $ = (id) => document.getElementById(id);
@@ -355,7 +356,7 @@
       // .m3u8 streams play in the first-party HLS player page.
       frame.src = PROXY_URL + "/player.html?src=" + encodeURIComponent(path);
     } else {
-      frame.setAttribute("sandbox", SANDBOX);
+      if (channel.sandbox) frame.setAttribute("sandbox", SANDBOX);
       frame.src = PROXY_URL + path;
     }
     frame.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";

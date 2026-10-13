@@ -2202,10 +2202,10 @@
             "/" + encodeURIComponent(id) + "/" + encodeURIComponent(no);
     }
 
-    // Channel pages framed for admin-attached streams run sandboxed: no
-    // pop-ups and no top-level navigation (scripts and same-origin stay on so
-    // the player works; the page is on another origin, so it cannot lift the
-    // sandbox).
+    // Admin-attached streams marked as sandboxed (Live TV channels flagged
+    // "sandbox": true in channels.json) run with no pop-ups and no top-level
+    // navigation. Scripts and same-origin stay on so the player works; the
+    // page is on another origin, so it cannot lift the sandbox.
     const MANUAL_STREAM_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation";
 
     function collectPlayableStreams(match) {
@@ -2227,7 +2227,7 @@
                     source: String(stream.name || "Stream")
                 },
                 url: hls ? PROXY_URL + "/player.html?src=" + encodeURIComponent(path) : PROXY_URL + path,
-                sandbox: !hls
+                sandbox: !hls && stream.sandbox === true
             });
         }
         const groups = (match && match.streamed && Array.isArray(match.streamed.sources))
