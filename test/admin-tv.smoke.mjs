@@ -326,9 +326,11 @@ console.log("# android app config");
   assert.equal(fresh.minVersionCode, 0);
   assert.equal(fresh.playerMode, "direct");
   assert.ok(!("streamProxyUrl" in fresh), "app default proxy applies when nothing is set");
+  assert.deepEqual(fresh.features, { httpStreams: true, extendedFormats: true }, "every feature starts on");
 
   const settings = await (await admin("/api/admin/settings")).json();
   assert.ok(settings.appSports.some(sport => sport.key === "motor-sports"), "dashboard lists the app's sports");
+  assert.deepEqual(settings.appFeatures.map(feature => feature.key), ["httpStreams", "extendedFormats"], "dashboard lists the app's features");
 
   const bad = (body) => admin("/api/admin/settings/app", "PUT", body);
   assert.equal((await bad({ hiddenCategories: ["quidditch"] })).status, 400);
@@ -345,7 +347,8 @@ console.log("# android app config");
     featuredMatchId: "match-1", hiddenCategories: ["Fight", "motor_sports", "fight"],
     adBlocking: true, extraBlockedHosts: "*.Bad-Ads.com.\nevil.net evil.net",
     playerMode: "iframe", channelsUrl: "https://example.com/channels.json",
-    streamProxyEnabled: false
+    streamProxyEnabled: false,
+    features: { httpStreams: "false", unknownFlag: true }
   });
   assert.equal(saved.status, 200);
 
@@ -361,12 +364,15 @@ console.log("# android app config");
     updateUrl: "https://example.com/sportzfy.apk",
     maintenance: { enabled: true, message: "Back at 9pm" },
     channelsUrl: "https://example.com/channels.json",
+    features: { httpStreams: false, extendedFormats: true },
     streamProxyUrl: ""
   });
 
-  // Partial saves keep the other fields, and a custom proxy is passed through.
+  // Partial saves keep the other fields (feature flags included), and a custom proxy is passed through.
   await admin("/api/admin/settings/app", "PUT", { maintenanceEnabled: false, streamProxyEnabled: true, streamProxyUrl: "https://proxy.example.com" });
+  await admin("/api/admin/settings/app", "PUT", { features: { extendedFormats: false } });
   const after = await (await call("/api/app/config")).json();
+  assert.deepEqual(after.features, { httpStreams: false, extendedFormats: false }, "a flag save keeps the flags it doesn't name");
   assert.equal(after.maintenance.enabled, false);
   assert.equal(after.announcement.message, "Final tonight!");
   assert.equal(after.streamProxyUrl, "https://proxy.example.com/");

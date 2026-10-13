@@ -1531,6 +1531,12 @@ async function renderApp() {
         '<div class="field"><label for="ap-upd">Update link</label><input id="ap-upd" name="updateUrl" class="input mono" placeholder="https://… (download or store page)" value="' + esc(a.updateUrl) + '"></div></div>' +
         saveRow("Save availability", "app") + "</form>") +
 
+    '<div class="group-label">FEATURES</div>' +
+    card("app-features", "check", "Features", "Switch app features on or off for every install, with no update. A build that doesn’t know a feature yet ignores it.",
+      '<form data-submit="app-features">' +
+        data.appFeatures.map(feature => switchRow("ft_" + feature.key, feature.label, esc(feature.description), a.features[feature.key] !== false)).join("") +
+        saveRow("Save features", "app") + "</form>") +
+
     '<div class="group-label">CONTENT</div>' +
     card("app-announcement", "megaphone", "Announcement", "A banner above the match list. Leave the message blank to hide it.",
       '<form data-submit="app-announcement">' +
@@ -1586,7 +1592,8 @@ async function refreshAppLive() {
       (maintenance ? "App is in maintenance mode" : "App is live") + "</b>" +
       (maintenance ? "Every install shows the maintenance screen." : "Installed apps are serving normally.") +
       (forced ? " Builds below version code " + esc(config.minVersionCode) + " are forced to update." : "") +
-      (config.announcement?.message ? " An announcement is showing." : "") + "</div></div>";
+      (config.announcement?.message ? " An announcement is showing." : "") +
+      (Object.values(config.features || {}).includes(false) ? " Some features are switched off." : "") + "</div></div>";
   } catch (error) {
     host.innerHTML = '<div class="error-box">Could not load the config: ' + esc(error.message) + "</div>";
   }
@@ -1699,6 +1706,9 @@ const SETTINGS_SUBMIT = {
   "app-availability": (f) => saveAppSection(f, {
     maintenanceEnabled: f.elements.maintenanceEnabled.checked, maintenanceMessage: f.elements.maintenanceMessage.value,
     minVersionCode: f.elements.minVersionCode.value, updateUrl: f.elements.updateUrl.value.trim()
+  }),
+  "app-features": (f) => saveAppSection(f, {
+    features: Object.fromEntries($$('input[name^="ft_"]', f).map(input => [input.name.slice(3), input.checked]))
   }),
   "app-announcement": (f) => saveAppSection(f, {
     announcementMessage: f.elements.announcementMessage.value, announcementUrl: f.elements.announcementUrl.value.trim()

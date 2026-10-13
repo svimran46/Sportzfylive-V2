@@ -34,9 +34,9 @@ data class PlayerConfig(
      * open pop-ups or move the app's page. Live TV channels use it.
      */
     val sandboxed: Boolean = false,
-    /** Plain-http streams and pages may play. Cleartext is allowed app-wide; this is the switch. */
+    /** Plain-http streams and pages may play (feature flag `httpStreams`). Cleartext is allowed app-wide; this is the switch. */
     val allowHttpStreams: Boolean = true,
-    /** DASH and progressive (MPEG-TS, MP4…) streams play in Media3. HLS and web pages always do. */
+    /** DASH and progressive (MPEG-TS, MP4…) streams play in Media3 (feature flag `extendedFormats`). HLS and web pages always do. */
     val extendedFormats: Boolean = true,
 ) {
     companion object {
@@ -45,6 +45,8 @@ data class PlayerConfig(
             blockedHosts = (if (config.adBlocking) AdHosts.DEFAULT else emptySet()) + config.extraBlockedHosts,
             blockedResourceHosts = config.extraBlockedHosts,
             dropPopups = BuildConfig.DROP_POPUPS,
+            allowHttpStreams = config.features.httpStreams,
+            extendedFormats = config.features.extendedFormats,
         )
     }
 }

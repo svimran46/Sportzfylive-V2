@@ -72,7 +72,7 @@ Requires JDK 17+ and the Android SDK (platform 36).
 | Web page | anything else, or `"type": "embed"` | WebView |
 
 - Media3 fetches everything through the app's OkHttp client, so it carries the same browser headers as API calls.
-- Streams may be **http or https**. Cleartext is allowed app-wide (`res/xml/network_security_config.xml`) because many IPTV feeds have no TLS; the app's own calls (APIs, remote config, images) stay https. `PlayerConfig.allowHttpStreams` is the switch for http streams.
+- Streams may be **http or https**. Cleartext is allowed app-wide (`res/xml/network_security_config.xml`) because many IPTV feeds have no TLS; the app's own calls (APIs, remote config, images) stay https. The `httpStreams` feature flag is the switch for http streams, and `extendedFormats` for DASH and progressive ones (see [Remote control](#remote-control)).
 - A live stream that falls behind its window jumps back to the live edge on its own.
 - Errors say what happened: a feed that stopped offers **Retry**; a stream the device can't decode, or one that is DRM-protected, says so with no Retry, since it won't help.
 
@@ -184,7 +184,9 @@ The page edits the fields below, and the Worker serves them in this shape. [`rem
 | `updateUrl` | Where that screen's button sends the user (https only). |
 | `maintenance.enabled` / `maintenance.message` | `true` replaces the whole app with a maintenance screen showing the message. |
 | `streamProxyUrl` | The website's Worker, which the app asks for a match's streams when streamed.pk blocks the phone (it sits behind DDoS-Guard). Defaults to `https://sportzfylive.svimranmy.workers.dev`; `""` turns the fallback off. |
-| `channelsUrl` | Where Live TV loads its channel list from (https only). Defaults to `channels.json` in the playlist repo. |
+| `channelsUrl` | Where Live TV loads its channel list from (https only): `channels.json` format or an M3U playlist. Defaults to `channels.json` in the playlist repo. |
+| `features.httpStreams` | `false` stops streams and channel pages served over plain http from playing ("Plain-HTTP streams are turned off right now"). Default `true`. |
+| `features.extendedFormats` | `false` stops DASH and progressive streams (MPEG-TS, MP4…) from playing; HLS and web pages still play. Default `true`. |
 
 ## Testing
 

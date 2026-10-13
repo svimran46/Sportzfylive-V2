@@ -34,6 +34,8 @@ data class AppConfig(
     val channelsUrl: String = DEFAULT_CHANNELS_URL,
     /** The website's Worker, used for streams when streamed.pk blocks the phone; null turns it off. */
     val streamProxyUrl: String? = DEFAULT_STREAM_PROXY_URL,
+    /** Owner-controlled switches for app features. */
+    val features: FeatureFlags = FeatureFlags(),
 ) {
     fun requiresUpdate(versionCode: Int): Boolean = versionCode < minVersionCode
 

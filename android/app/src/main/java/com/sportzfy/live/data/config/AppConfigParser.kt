@@ -2,10 +2,14 @@ package com.sportzfy.live.data.config
 
 import com.sportzfy.live.domain.model.Announcement
 import com.sportzfy.live.domain.model.AppConfig
+import com.sportzfy.live.domain.model.FeatureFlags
 import com.sportzfy.live.domain.model.PlayerMode
 import com.sportzfy.live.domain.model.SportCategory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** Wire shape of `remote-config.json`. Every field is optional. */
 @Serializable
@@ -21,6 +25,8 @@ internal data class RemoteConfigDto(
     val maintenance: MaintenanceDto? = null,
     val channelsUrl: String? = null,
     val streamProxyUrl: String? = null,
+    /** Read loosely: a wrong type here must not throw away the rest of the config. */
+    val features: JsonElement? = null,
 )
 
 @Serializable
@@ -69,6 +75,22 @@ object AppConfigParser {
                 "" -> null
                 else -> httpsOrNull(raw) ?: AppConfig.DEFAULT_STREAM_PROXY_URL
             },
+            features = featureFlags(dto.features as? JsonObject),
+        )
+    }
+
+    /** Each flag is true/false (or "true"/"false"); anything else keeps its default. */
+    private fun featureFlags(flags: JsonObject?): FeatureFlags {
+        val defaults = FeatureFlags()
+        fun flag(key: String, default: Boolean): Boolean =
+            when ((flags?.get(key) as? JsonPrimitive)?.content?.trim()?.lowercase()) {
+                "true" -> true
+                "false" -> false
+                else -> default
+            }
+        return FeatureFlags(
+            httpStreams = flag("httpStreams", defaults.httpStreams),
+            extendedFormats = flag("extendedFormats", defaults.extendedFormats),
         )
     }
 

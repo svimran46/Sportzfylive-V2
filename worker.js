@@ -209,6 +209,24 @@ const APP_SPORTS = [
   { key: "other", label: "Other" }
 ];
 
+// Switches for Android app features, flipped on the admin "Android app" page.
+// Keys match the app's FeatureFlags; an app build that doesn't know a flag
+// ignores it, and a flag missing from the config takes the app's default.
+const APP_FEATURES = [
+  {
+    key: "httpStreams",
+    label: "Plain-HTTP streams",
+    description: "Play streams and channel pages served over plain http, as many IPTV feeds are. Off: only https plays.",
+    default: true
+  },
+  {
+    key: "extendedFormats",
+    label: "DASH, MPEG-TS and MP4 playback",
+    description: "Play DASH manifests and progressive streams (MPEG-TS, MP4, MKV and similar) in the app's native player. Off: only HLS and web pages play.",
+    default: true
+  }
+];
+
 const DEFAULT_SETTINGS = {
   ingest: { autoSync: true, resolveBudget: MAX_SYNC_RESOLVE_OPS },
   tvSource: { url: DEFAULT_TV_SOURCE_URL, timeoutSec: 120, concurrency: 6, autoSync: true },
@@ -248,7 +266,8 @@ const DEFAULT_SETTINGS = {
     maintenanceMessage: "",
     channelsUrl: "",
     streamProxyEnabled: true,
-    streamProxyUrl: ""
+    streamProxyUrl: "",
+    features: Object.fromEntries(APP_FEATURES.map(feature => [feature.key, feature.default]))
   }
 };
 
@@ -398,7 +417,12 @@ const SETTINGS_SECTIONS = {
       maintenanceMessage: cleanText(input.maintenanceMessage, 300),
       channelsUrl: optionalUrl(input.channelsUrl, "Channel list URL", options),
       streamProxyEnabled: input.streamProxyEnabled !== false && input.streamProxyEnabled !== "false",
-      streamProxyUrl: optionalUrl(input.streamProxyUrl, "Stream proxy URL", options)
+      streamProxyUrl: optionalUrl(input.streamProxyUrl, "Stream proxy URL", options),
+      // Known flags only; anything else is dropped.
+      features: Object.fromEntries(APP_FEATURES.map(feature => {
+        const value = input.features && typeof input.features === "object" ? input.features[feature.key] : undefined;
+        return [feature.key, value === undefined ? feature.default : truthy(value)];
+      }))
     };
   }
 };
@@ -440,7 +464,12 @@ async function saveSettingsSection(env, section, input) {
   const clean = SETTINGS_SECTIONS[section];
   if (!clean) throw new InputError("Unknown settings section");
   const settings = await readSettings(env);
-  settings[section] = clean({ ...settings[section], ...(input || {}) }, { lenient: false });
+  const merged = { ...settings[section], ...(input || {}) };
+  // App feature flags are one object; a save that names some keeps the rest.
+  if (section === "app" && input?.features && typeof input.features === "object") {
+    merged.features = { ...settings.app.features, ...input.features };
+  }
+  settings[section] = clean(merged, { lenient: false });
   settings.updated[section] = new Date().toISOString();
   await env.SPORTZFY_DB.put(SETTINGS_KEY, JSON.stringify(settings));
   return settings;
@@ -471,7 +500,8 @@ function appConfigPayload(settings) {
     minVersionCode: app.minVersionCode,
     updateUrl: app.updateUrl,
     maintenance: { enabled: app.maintenanceEnabled, message: app.maintenanceMessage },
-    channelsUrl: app.channelsUrl
+    channelsUrl: app.channelsUrl,
+    features: { ...app.features }
   };
   // Left out, the app uses the default Worker; "" switches the fallback off.
   if (!app.streamProxyEnabled) payload.streamProxyUrl = "";
@@ -2269,6 +2299,7 @@ async function handleAdminSystem(request, env, url, ctx) {
       settings,
       sportCategories: SPORT_CATEGORIES,
       appSports: APP_SPORTS,
+      appFeatures: APP_FEATURES,
       tvCategories: TV_CATEGORIES,
       security: {
         passwordSource: credential ? "custom" : "env",

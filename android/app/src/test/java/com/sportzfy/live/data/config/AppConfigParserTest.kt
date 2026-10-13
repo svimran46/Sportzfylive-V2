@@ -3,6 +3,7 @@ package com.sportzfy.live.data.config
 import com.sportzfy.live.core.network.NetworkJson
 import com.sportzfy.live.domain.model.Announcement
 import com.sportzfy.live.domain.model.AppConfig
+import com.sportzfy.live.domain.model.FeatureFlags
 import com.sportzfy.live.domain.model.PlayerMode
 import com.sportzfy.live.domain.model.SportCategory
 import org.junit.Assert.assertEquals
@@ -83,6 +84,29 @@ class AppConfigParserTest {
         assertEquals(null, parse("""{"streamProxyUrl":""}""")!!.streamProxyUrl)
         assertEquals("https://proxy.example", parse("""{"streamProxyUrl":"https://proxy.example"}""")!!.streamProxyUrl)
         assertEquals(AppConfig.DEFAULT_STREAM_PROXY_URL, parse("""{"streamProxyUrl":"http://insecure.example"}""")!!.streamProxyUrl)
+    }
+
+    @Test
+    fun `feature flags default to on and can be switched off`() {
+        assertEquals(FeatureFlags(httpStreams = true, extendedFormats = true), parse("{}")!!.features)
+        assertEquals(
+            FeatureFlags(httpStreams = false, extendedFormats = true),
+            parse("""{"features":{"httpStreams":false,"futureFlag":false}}""")!!.features,
+        )
+        assertEquals(
+            FeatureFlags(httpStreams = false, extendedFormats = false),
+            parse("""{"features":{"httpStreams":"false","extendedFormats":" FALSE "}}""")!!.features,
+        )
+    }
+
+    @Test
+    fun `odd feature values keep the default and never drop the config`() {
+        val config = parse("""{"features":{"httpStreams":0,"extendedFormats":null},"maintenance":{"enabled":true,"message":"Down"}}""")!!
+        assertEquals(FeatureFlags(), config.features)
+        assertEquals("Down", config.maintenanceMessage)
+        val wrongType = parse("""{"features":["httpStreams"],"featuredMatchId":"m1"}""")!!
+        assertEquals(FeatureFlags(), wrongType.features)
+        assertEquals("m1", wrongType.featuredMatchId)
     }
 
     @Test
