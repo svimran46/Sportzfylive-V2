@@ -25,6 +25,7 @@ A modern, responsive web application for streaming live sports matches and 24/7 
 Streamed API ──▶ Cloudflare Worker (worker.js)
 channels.json ─▶ ├─ 10-min cron sync + source resolution (SWR cache in KV) + live-window cleanup
                  ├─ Live TV catalog: playlist sync (cron every 6 h + on demand), manual channels
+                 ├─ Android app config: /api/app/config (edited on the admin "Android app" page)
                  ├─ Public API: /api/matches/all-today, /api/site-content, /api/tv/channels
                  │    (sanitized: no embedUrl, no stream URLs, no admin fields)
                  ├─ Playback redirects: /api/play/tv/:id, /api/play/stream/:matchId/:streamId
@@ -105,6 +106,7 @@ a hash-routed single page app, so the browser Back button and bookmarks work:
 | Create / edit match | `#/matches/new`, `#/matches/:id/edit` | Event, kickoff (your time zone, with the UK time shown), competition, sport (or Auto from the event text), teams, featured image, featured/active flags, status, live-window override |
 | Match detail | `#/matches/:id` | Everything about the match plus its streams: add one from the Live TV catalog (search, or **Bulk add** several), edit, copy, reorder (arrows or drag) — changes save immediately |
 | Live TV | `#/tv` | All channels with status toggles, filters and bulk actions; **Sync Playlist**, **Import from URL** (M3U or JSON; every new stream is health-checked first), **Add Channel**, Delete All |
+| Android app | `#/app` | Remote control for the Android app: maintenance mode, forced updates (minimum version + update link), announcement banner, featured match, hidden sports, player mode and ad blocking, channel list and stream proxy URLs, plus the exact JSON installed apps receive (`GET /api/app/config`). Changes reach installed apps within a minute |
 | Fetch Logs | `#/logs` | The last 30 schedule fetches (manual or cron) with counts, duration and errors, plus the last Live TV playlist sync |
 | Settings | `#/settings` | Schedule ingest, TV source, live windows, site notice, analytics + house banner, site identity, maintenance (fetch / playlist sync / cleanup), admin password, data storage report |
 

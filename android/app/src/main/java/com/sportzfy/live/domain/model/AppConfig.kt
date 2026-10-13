@@ -1,8 +1,10 @@
 package com.sportzfy.live.domain.model
 
 /**
- * Settings the owner controls remotely by editing `android/remote-config.json`
- * on GitHub. Every installed app picks changes up without an update.
+ * Settings the owner controls remotely from the admin "Android app" page; the
+ * Worker serves them at `/api/app/config`. Every installed app picks changes up
+ * without an update. `android/remote-config.json` has the same shape; builds
+ * from before the Worker config shipped still read that file from GitHub.
  */
 data class AppConfig(
     /** Banner shown above the catalog; null hides it. */

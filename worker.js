@@ -189,6 +189,26 @@ const SPORT_CATEGORIES = [
   { key: "OTHER", label: "Other" }
 ];
 
+// The sports the Android app knows, keyed exactly as its SportCategory.apiKey.
+// "Hide a sport" in the app dashboard stores these keys.
+const APP_SPORTS = [
+  { key: "football", label: "Football" },
+  { key: "cricket", label: "Cricket" },
+  { key: "basketball", label: "Basketball" },
+  { key: "tennis", label: "Tennis" },
+  { key: "motor-sports", label: "Motorsport" },
+  { key: "american-football", label: "American Football" },
+  { key: "hockey", label: "Hockey" },
+  { key: "baseball", label: "Baseball" },
+  { key: "fight", label: "Fight" },
+  { key: "rugby", label: "Rugby" },
+  { key: "golf", label: "Golf" },
+  { key: "darts", label: "Darts" },
+  { key: "billiards", label: "Billiards" },
+  { key: "afl", label: "AFL" },
+  { key: "other", label: "Other" }
+];
+
 const DEFAULT_SETTINGS = {
   ingest: { autoSync: true, resolveBudget: MAX_SYNC_RESOLVE_OPS },
   tvSource: { url: DEFAULT_TV_SOURCE_URL, timeoutSec: 120, concurrency: 6, autoSync: true },
@@ -213,7 +233,23 @@ const DEFAULT_SETTINGS = {
   notice: { enabled: false, text: "", link: "", newTab: false, bg: "", marquee: false, image: "", imageMobile: "" },
   banner: { enabled: false, image: "", link: "", alt: "" },
   analytics: { gaEnabled: false, gaId: "" },
-  identity: { siteName: "", tagline: "", contactEmail: "" }
+  identity: { siteName: "", tagline: "", contactEmail: "" },
+  app: {
+    announcementMessage: "",
+    announcementUrl: "",
+    featuredMatchId: "",
+    hiddenCategories: [],
+    adBlocking: false,
+    extraBlockedHosts: [],
+    playerMode: "direct",
+    minVersionCode: 0,
+    updateUrl: "",
+    maintenanceEnabled: false,
+    maintenanceMessage: "",
+    channelsUrl: "",
+    streamProxyEnabled: true,
+    streamProxyUrl: ""
+  }
 };
 
 const truthy = (value) => value === true || value === "true" || value === 1 || value === "1" || value === "on";
@@ -317,6 +353,53 @@ const SETTINGS_SECTIONS = {
       tagline: cleanText(input.tagline, 160),
       contactEmail
     };
+  },
+
+  app(input, options) {
+    const lenient = Boolean(options.lenient);
+    const items = (value) => (Array.isArray(value) ? value : String(value ?? "").split(/[\s,]+/));
+    const knownSports = new Set(APP_SPORTS.map(sport => sport.key));
+    const hiddenCategories = [];
+    for (const raw of items(input.hiddenCategories)) {
+      const key = cleanText(raw, 40).toLowerCase().replace(/_/g, "-");
+      if (!key) continue;
+      if (!knownSports.has(key)) {
+        if (lenient) continue;
+        throw new InputError("Unknown sport: " + key);
+      }
+      if (!hiddenCategories.includes(key)) hiddenCategories.push(key);
+    }
+    const extraBlockedHosts = [];
+    for (const raw of items(input.extraBlockedHosts)) {
+      const host = cleanText(raw, 100).toLowerCase().replace(/^\*\./, "").replace(/\.$/, "");
+      if (!host) continue;
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) {
+        if (lenient) continue;
+        throw new InputError(host + " is not a valid host name (use something like ads.example.com)");
+      }
+      if (!extraBlockedHosts.includes(host)) extraBlockedHosts.push(host);
+    }
+    const minVersionCode = Math.round(clampNumber(input.minVersionCode, 0, 100000000, 0));
+    const updateUrl = optionalUrl(input.updateUrl, "Update link", options);
+    if (minVersionCode > 0 && !updateUrl && !lenient) {
+      throw new InputError("Add an update link, or the forced-update screen has nowhere to send people");
+    }
+    return {
+      announcementMessage: cleanText(input.announcementMessage, 300),
+      announcementUrl: optionalUrl(input.announcementUrl, "Announcement link", { ...options, max: 1000 }),
+      featuredMatchId: cleanText(input.featuredMatchId, 120),
+      hiddenCategories: hiddenCategories.slice(0, APP_SPORTS.length),
+      adBlocking: truthy(input.adBlocking),
+      extraBlockedHosts: extraBlockedHosts.slice(0, 200),
+      playerMode: String(input.playerMode ?? "").trim().toLowerCase() === "iframe" ? "iframe" : "direct",
+      minVersionCode,
+      updateUrl,
+      maintenanceEnabled: truthy(input.maintenanceEnabled),
+      maintenanceMessage: cleanText(input.maintenanceMessage, 300),
+      channelsUrl: optionalUrl(input.channelsUrl, "Channel list URL", options),
+      streamProxyEnabled: input.streamProxyEnabled !== false && input.streamProxyEnabled !== "false",
+      streamProxyUrl: optionalUrl(input.streamProxyUrl, "Stream proxy URL", options)
+    };
   }
 };
 
@@ -372,6 +455,28 @@ function publicSettings(settings) {
     identity: settings.identity,
     analytics: { gaId: settings.analytics.gaEnabled ? settings.analytics.gaId : "" }
   };
+}
+
+// What the Android app reads: the shape of android/remote-config.json, built
+// from the "app" settings section. Empty means off or the app's own default.
+function appConfigPayload(settings) {
+  const app = settings.app;
+  const payload = {
+    announcement: { message: app.announcementMessage, url: app.announcementUrl },
+    featuredMatchId: app.featuredMatchId,
+    hiddenCategories: app.hiddenCategories,
+    adBlocking: app.adBlocking,
+    extraBlockedHosts: app.extraBlockedHosts,
+    playerMode: app.playerMode,
+    minVersionCode: app.minVersionCode,
+    updateUrl: app.updateUrl,
+    maintenance: { enabled: app.maintenanceEnabled, message: app.maintenanceMessage },
+    channelsUrl: app.channelsUrl
+  };
+  // Left out, the app uses the default Worker; "" switches the fallback off.
+  if (!app.streamProxyEnabled) payload.streamProxyUrl = "";
+  else if (app.streamProxyUrl) payload.streamProxyUrl = app.streamProxyUrl;
+  return payload;
 }
 
 /*
@@ -2163,6 +2268,7 @@ async function handleAdminSystem(request, env, url, ctx) {
     return adminJson({
       settings,
       sportCategories: SPORT_CATEGORIES,
+      appSports: APP_SPORTS,
       tvCategories: TV_CATEGORIES,
       security: {
         passwordSource: credential ? "custom" : "env",
@@ -2452,6 +2558,11 @@ async function apiHandler(request, env, ctx) {
 
   const publicTv = await handlePublicTv(request, env, url);
   if (publicTv) return publicTv;
+
+  // The Android app's remote config, edited from the admin "App" page.
+  if (request.method === "GET" && url.pathname === "/api/app/config") {
+    return cachedJson(appConfigPayload(await readSettings(env)), 30);
+  }
 
   if (url.pathname === "/api/site-content" && request.method === "GET") {
     const [settings, legacyFeaturedId, snapshot] = await Promise.all([

@@ -314,6 +314,74 @@ console.log("# settings");
 }
 ok("settings validate per section and publish only the public parts");
 
+console.log("# android app config");
+
+{
+  // Untouched, the app gets exactly what android/remote-config.json ships.
+  const res = await call("/api/app/config");
+  assert.equal(res.status, 200);
+  assert.match(res.headers["Cache-Control"], /max-age=30/);
+  const fresh = await res.json();
+  assert.equal(fresh.maintenance.enabled, false);
+  assert.equal(fresh.minVersionCode, 0);
+  assert.equal(fresh.playerMode, "direct");
+  assert.ok(!("streamProxyUrl" in fresh), "app default proxy applies when nothing is set");
+
+  const settings = await (await admin("/api/admin/settings")).json();
+  assert.ok(settings.appSports.some(sport => sport.key === "motor-sports"), "dashboard lists the app's sports");
+
+  const bad = (body) => admin("/api/admin/settings/app", "PUT", body);
+  assert.equal((await bad({ hiddenCategories: ["quidditch"] })).status, 400);
+  assert.equal((await bad({ extraBlockedHosts: "not a host!" })).status, 400);
+  assert.equal((await bad({ updateUrl: "http://insecure.example/app.apk" })).status, 400);
+  assert.equal((await bad({ minVersionCode: 5, updateUrl: "" })).status, 400, "a forced update needs somewhere to go");
+  assert.equal((await bad({ announcementUrl: "javascript:alert(1)" })).status, 400);
+  assert.equal((await bad({ channelsUrl: "http://x.example/c.json" })).status, 400);
+
+  const saved = await admin("/api/admin/settings/app", "PUT", {
+    maintenanceEnabled: true, maintenanceMessage: "Back at 9pm",
+    minVersionCode: "7", updateUrl: "https://example.com/sportzfy.apk",
+    announcementMessage: "  Final tonight!  ", announcementUrl: "https://t.me/sportzfy",
+    featuredMatchId: "match-1", hiddenCategories: ["Fight", "motor_sports", "fight"],
+    adBlocking: true, extraBlockedHosts: "*.Bad-Ads.com.\nevil.net evil.net",
+    playerMode: "iframe", channelsUrl: "https://example.com/channels.json",
+    streamProxyEnabled: false
+  });
+  assert.equal(saved.status, 200);
+
+  const config = await (await call("/api/app/config")).json();
+  assert.deepEqual(config, {
+    announcement: { message: "Final tonight!", url: "https://t.me/sportzfy" },
+    featuredMatchId: "match-1",
+    hiddenCategories: ["fight", "motor-sports"],
+    adBlocking: true,
+    extraBlockedHosts: ["bad-ads.com", "evil.net"],
+    playerMode: "iframe",
+    minVersionCode: 7,
+    updateUrl: "https://example.com/sportzfy.apk",
+    maintenance: { enabled: true, message: "Back at 9pm" },
+    channelsUrl: "https://example.com/channels.json",
+    streamProxyUrl: ""
+  });
+
+  // Partial saves keep the other fields, and a custom proxy is passed through.
+  await admin("/api/admin/settings/app", "PUT", { maintenanceEnabled: false, streamProxyEnabled: true, streamProxyUrl: "https://proxy.example.com" });
+  const after = await (await call("/api/app/config")).json();
+  assert.equal(after.maintenance.enabled, false);
+  assert.equal(after.announcement.message, "Final tonight!");
+  assert.equal(after.streamProxyUrl, "https://proxy.example.com/");
+
+  const content = await (await call("/api/site-content")).json();
+  assert.ok(!("app" in content) && !JSON.stringify(content).includes("Final tonight"), "app config never leaks into the website's content");
+  assert.equal((await call("/api/app/config", { method: "POST" })).status, 404);
+
+  // Put the shared KV back so later suites see the defaults.
+  const reset = JSON.parse(kv.store.get("site_settings"));
+  delete reset.app;
+  kv.store.set("site_settings", JSON.stringify(reset));
+}
+ok("app config validates, publishes the app's wire shape and stays off the website");
+
 // ---------------------------------------------------------------------------
 // Matches: auto sport, featured image, active/featured flags, manual stream
 // playback, live windows and cleanup.
