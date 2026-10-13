@@ -26,7 +26,7 @@ const CANONICAL = "https://sportzfylive.svimranmy.workers.dev";
 
 console.log("# published assets");
 
-const MIRRORED = ["index.html", "admin.html", "admin.js", "og-card.png"];
+const MIRRORED = ["index.html", "live-tv.html", "player.html", "admin.html", "admin.js", "og-card.png"];
 for (const file of MIRRORED) {
   assert.ok(existsSync(repoFile(file)), file + " exists at the repo root");
   assert.ok(existsSync(repoFile("public/" + file)), "public/" + file + " exists");
@@ -99,7 +99,20 @@ ok("robots.txt published with sitemap + API disallow");
 
 const sitemap = read("public/sitemap.xml").toString("utf8");
 assert.ok(sitemap.includes("<loc>" + CANONICAL + "/</loc>"), "sitemap lists the canonical origin");
+assert.ok(sitemap.includes("<loc>" + CANONICAL + "/live-tv</loc>"), "sitemap lists the Live TV page");
 ok("sitemap.xml published for the canonical origin");
+
+// Live TV: linked from the homepage, framed channels are sandboxed, and the
+// HLS player page only plays the Worker's own /api/play redirects.
+const liveTv = read("live-tv.html").toString("utf8");
+assert.ok(liveTv.includes('<link rel="canonical" href="' + CANONICAL + '/live-tv">'), "Live TV canonical URL");
+assert.ok(liveTv.includes("/api/tv/channels") && liveTv.includes("/api/play/tv/"), "Live TV reads the catalog and plays through /api/play");
+assert.ok(liveTv.includes('"allow-scripts allow-same-origin allow-forms allow-modals allow-presentation"'), "channel frames are sandboxed");
+assert.ok(!/allow-popups|allow-top-navigation/.test(liveTv), "channel frames cannot open pop-ups or navigate the page");
+assert.ok((html.match(/href="\/live-tv"/g) || []).length >= 5, "the homepage links to Live TV from its menus");
+const player = read("player.html").toString("utf8");
+assert.ok(player.includes("/^\\/api\\/play\\/(tv\\/[^/?#]+|stream\\/[^/?#]+\\/[^/?#]+)$/"), "the HLS player only accepts /api/play paths");
+ok("Live TV page and HLS player published and linked");
 
 // ---------------------------------------------------------------------------
 // 4. Header rules and the deploy workflow.

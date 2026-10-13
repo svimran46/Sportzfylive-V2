@@ -487,16 +487,23 @@
       background:linear-gradient(90deg,rgba(8,9,12,.92),rgba(14,17,23,.6) 55%,rgba(8,9,12,.95));
     }
 
+    /* Site notice: a full-width bar under the header (text, or an image
+       banner with an optional mobile crop), edited in the admin Settings. */
     .sfy-site-notice{
-      display:none;align-items:center;justify-content:center;gap:8px;
-      padding:9px 16px;background:var(--surface);border:1px solid var(--border);color:var(--ink-muted);
-      font-size:12.5px;font-weight:600;text-align:center;
-      border-radius:0 0 16px 16px;
+      display:none;align-items:center;justify-content:center;gap:8px;overflow:hidden;
+      padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);color:var(--ink);
+      font-size:13px;font-weight:600;text-align:center;
     }
     .sfy-site-notice.show{display:flex}
-    .sfy-site-notice span{color:var(--accent);font-size:9px}
-    .sfy-site-notice a{text-decoration:underline;text-underline-offset:2px}
+    .sfy-site-notice .sfy-notice-dot{color:var(--accent);font-size:9px}
+    .sfy-site-notice a{color:inherit;text-decoration:underline;text-underline-offset:2px}
     .sfy-site-notice a:hover{color:var(--accent)}
+    .sfy-site-notice.marquee{justify-content:flex-start;white-space:nowrap}
+    .sfy-site-notice.marquee .sfy-notice-track{display:inline-block;padding-left:100%;animation:sfy-notice-scroll 18s linear infinite}
+    @keyframes sfy-notice-scroll{to{transform:translateX(-100%)}}
+    .sfy-site-notice.image{padding:0;background:transparent;border:0}
+    .sfy-site-notice.image a,.sfy-site-notice.image picture{display:block;width:100%;text-decoration:none}
+    .sfy-site-notice.image img{display:block;width:100%;height:auto;max-height:180px;object-fit:cover}
     .sfy-site-banner{display:none;margin-top:14px}
     .sfy-site-banner.show{display:block}
     .sfy-site-banner img{width:100%;border-radius:14px;border:1px solid var(--border)}
@@ -1274,8 +1281,6 @@
 </head>
 <body>
 
-<div id="sfy-site-notice" class="sfy-site-notice" role="status"></div>
-
 <!-- ============================= HEADER ============================= -->
 <header class="sfy-header">
   <div class="site-container">
@@ -1299,6 +1304,7 @@
         <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
         <a href="#" data-nav="CRICKET"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg>Cricket</a>
         <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
+        <a href="/live-tv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg>Live TV</a>
       </nav>
 
       <div class="sfy-header-actions">
@@ -1313,6 +1319,7 @@
     <div class="sfy-header-sports scrollbar-hide" aria-label="Quick sports">
       <button class="sfy-header-sport-chip active" type="button" data-nav="ALL">All</button>
       <button class="sfy-header-sport-chip" type="button" data-nav="LIVE">Live</button>
+      <a class="sfy-header-sport-chip" href="/live-tv">Live TV</a>
       <button class="sfy-header-sport-chip" type="button" data-nav="FOOTBALL">Football</button>
       <button class="sfy-header-sport-chip" type="button" data-nav="CRICKET">Cricket</button>
       <button class="sfy-header-sport-chip" type="button" data-nav="BASKETBALL">Basketball</button>
@@ -1324,6 +1331,7 @@
   <nav class="sfy-mobile-nav" id="sfy-mobile-nav" aria-label="Mobile navigation">
     <a href="#" data-nav="ALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home</a>
     <a href="#" data-nav="LIVE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>Live</a>
+    <a href="/live-tv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg>Live TV</a>
     <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
     <a href="#" data-nav="AMERICAN FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6.5" transform="rotate(-45 12 12)"/><path d="m8.5 8.5 7 7"/></svg>American Football</a>
     <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
@@ -1338,6 +1346,7 @@
   </nav>
 </header>
 
+<div id="sfy-site-notice" class="sfy-site-notice" role="status"></div>
 <div id="sfy-site-banner" class="site-container sfy-site-banner"></div>
 
 <main class="site-container">
@@ -1395,6 +1404,7 @@
   <div class="sfy-chips scrollbar-hide" id="sfy-chips" aria-label="Sport filters">
     <button class="sfy-chip active" type="button" data-nav="ALL">All</button>
     <button class="sfy-chip" type="button" data-nav="LIVE">Live</button>
+    <a class="sfy-chip" href="/live-tv">Live TV</a>
     <button class="sfy-chip" type="button" data-nav="FOOTBALL">Football</button>
     <button class="sfy-chip" type="button" data-nav="AMERICAN FOOTBALL">NFL</button>
     <button class="sfy-chip" type="button" data-nav="BASKETBALL">Basketball</button>
@@ -1440,9 +1450,9 @@
         <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg></span>
         <span>Cricket</span>
       </a>
-      <a href="#" class="sfy-tile" data-nav="ALL">
-        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg></span>
-        <span>All Sports</span>
+      <a href="/live-tv" class="sfy-tile">
+        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg></span>
+        <span>Live TV</span>
       </a>
     </div>
   </section>
@@ -1460,6 +1470,7 @@
   <nav class="sfy-sidebar-nav" aria-label="Sidebar navigation">
     <a href="#" data-nav="ALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home</a>
     <a href="#" data-nav="LIVE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>Live</a>
+    <a href="/live-tv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg>Live TV</a>
     <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
     <a href="#" data-nav="AMERICAN FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6.5" transform="rotate(-45 12 12)"/><path d="m8.5 8.5 7 7"/></svg>NFL</a>
     <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
@@ -1485,6 +1496,7 @@
       <nav class="sfy-footer-nav" aria-label="Footer navigation">
         <a href="#" data-nav="ALL">Home</a>
         <a href="#" data-nav="LIVE">Live</a>
+        <a href="/live-tv">Live TV</a>
         <a href="#" data-nav="FOOTBALL">Football</a>
         <a href="#" data-nav="CRICKET">Cricket</a>
         <a href="#" data-nav="BASKETBALL">Basketball</a>
@@ -1549,9 +1561,15 @@
 
 <!-- ============================= JAVASCRIPT ============================= -->
 <script>
-    const PROXY_URL = "https://sportzfylive.svimranmy.workers.dev";
+    // Same origin when the Worker serves this page (workers.dev, or `wrangler
+    // dev` on its default port); the deployed Worker otherwise (static preview).
+    const PROXY_URL = (typeof location !== "undefined" && location.hostname &&
+        (location.hostname.endsWith("workers.dev") || location.port === "8787"))
+        ? location.origin
+        : "https://sportzfylive.svimranmy.workers.dev";
 
     const CATEGORY_ORDER = [
+        "FEATURED",
         "LIVE",
         "TODAYS MATCHES",
         "FOOTBALL",
@@ -1746,22 +1764,95 @@
         }
     }
 
+    // Admin-set links and images are https URLs or same-site paths (the Worker
+    // validates both); anything else is dropped instead of rendered.
+    function safeLink(value) {
+        const url = String(value || "").trim();
+        return /^https:\/\//i.test(url) || (url.startsWith("/") && !url.startsWith("//")) ? url : "";
+    }
+
+    // Site notice from the admin Settings: a text bar (colour, optional link,
+    // optional marquee) or an image banner with an optional mobile crop.
+    function renderSiteNotice(notice) {
+        const host = document.getElementById("sfy-site-notice");
+        if (!host) return;
+        const n = notice || {};
+        const image = safeLink(n.image);
+        const mobile = safeLink(n.imageMobile);
+        const link = safeLink(n.link);
+        const text = String(n.text || "");
+        const show = Boolean(n.enabled && (image || text));
+        host.className = "sfy-site-notice" + (show ? " show" : "") + (image ? " image" : (n.marquee ? " marquee" : ""));
+        host.style.background = !image && /^#[0-9a-f]{6}$/i.test(n.bg || "") ? n.bg : "";
+        if (!show) {
+            host.innerHTML = "";
+            return;
+        }
+        const target = link && n.newTab ? ' target="_blank" rel="noopener"' : "";
+        if (image) {
+            const picture = '<picture>' +
+                (mobile ? '<source media="(max-width:640px)" srcset="' + esc(mobile) + '">' : "") +
+                '<img src="' + esc(image) + '" alt="' + esc(text || "Announcement") + '" decoding="async"></picture>';
+            host.innerHTML = link ? '<a href="' + esc(link) + '"' + target + '>' + picture + '</a>' : picture;
+            return;
+        }
+        const body = link
+            ? '<a href="' + esc(link) + '"' + target + '>' + esc(text) + '</a>'
+            : '<span>' + esc(text) + '</span>';
+        host.innerHTML = n.marquee
+            ? '<span class="sfy-notice-track">' + body + '</span>'
+            : '<span class="sfy-notice-dot" aria-hidden="true">●</span>' + body;
+    }
+
+    // Site name, tagline and contact address from the admin Settings.
+    function applySiteIdentity(identity) {
+        const name = String(identity?.siteName || "").trim();
+        const email = String(identity?.contactEmail || "").trim();
+        if (name) {
+            const tagline = String(identity?.tagline || "").trim();
+            document.title = name + (tagline ? " - " + tagline : "");
+            const split = name.lastIndexOf(" ");
+            const markup = split > 0
+                ? esc(name.slice(0, split)) + "<span>" + esc(name.slice(split + 1)) + "</span>"
+                : esc(name);
+            document.querySelectorAll(".sfy-brand-text").forEach(el => { el.innerHTML = markup; });
+        }
+        const copy = document.querySelector(".sfy-footer-copy");
+        if (copy && (name || email)) {
+            copy.innerHTML = "© " + new Date().getFullYear() + " " + esc(name || "Sportzfylive") + ". All rights reserved." +
+                (/^[^\s@<>"']+@[^\s@<>"']+$/.test(email) ? ' · <a href="mailto:' + esc(email) + '">' + esc(email) + "</a>" : "");
+        }
+    }
+
+    function loadAnalytics(analytics) {
+        const id = String(analytics?.gaId || "");
+        if (!/^G-[A-Z0-9]{4,20}$/.test(id) || window.__sfyAnalytics) return;
+        window.__sfyAnalytics = true;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag("js", new Date());
+        window.gtag("config", id);
+        const script = document.createElement("script");
+        script.async = true;
+        script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(id);
+        document.head.appendChild(script);
+    }
+
     async function loadSiteContent() {
         try {
             const data = await fetchJson(PROXY_URL + "/api/site-content");
-            const notice = document.getElementById("sfy-site-notice");
-            if (notice) {
-                notice.classList.toggle("show", Boolean(data.notice?.enabled && data.notice?.text));
-                notice.innerHTML = data.notice?.link
-                    ? '<span>●</span><a href="' + esc(data.notice.link) + '" target="_blank" rel="noopener">' + esc(data.notice.text) + '</a>'
-                    : '<span>●</span><span>' + esc(data.notice?.text || "") + '</span>';
-            }
+            renderSiteNotice(data.notice);
+            applySiteIdentity(data.identity);
+            loadAnalytics(data.analytics);
             const banner = document.getElementById("sfy-site-banner");
+            const bannerImage = safeLink(data.banner?.image);
+            const bannerLink = safeLink(data.banner?.link);
             if (banner) {
-                banner.classList.toggle("show", Boolean(data.banner?.enabled && data.banner?.image));
-                banner.innerHTML = data.banner?.link
-                    ? '<a href="' + esc(data.banner.link) + '" target="_blank" rel="noopener"><img src="' + esc(data.banner.image) + '" alt="' + esc(data.banner.alt || "Banner") + '" loading="lazy" decoding="async"></a>'
-                    : '<img src="' + esc(data.banner?.image || "") + '" alt="' + esc(data.banner?.alt || "Banner") + '" loading="lazy" decoding="async">';
+                banner.classList.toggle("show", Boolean(data.banner?.enabled && bannerImage));
+                const img = '<img src="' + esc(bannerImage) + '" alt="' + esc(data.banner?.alt || "Banner") + '" loading="lazy" decoding="async">';
+                banner.innerHTML = bannerLink
+                    ? '<a href="' + esc(bannerLink) + '"' + (bannerLink.startsWith("/") ? "" : ' target="_blank" rel="noopener"') + '>' + img + '</a>'
+                    : img;
             }
             const featured = document.getElementById("sfy-featured"), match = data.featuredMatch;
             if (featured) {
@@ -1907,6 +1998,9 @@
 
             const date = safeDate(match.date ?? match.timestamp);
 
+            // Matches the admin starred are pinned in their own row too.
+            if (match.featured) groups.FEATURED.push(match);
+
             if (isLive(match)) {
                 groups.LIVE.push(match);
                 continue;
@@ -1934,7 +2028,7 @@
             if (!list.length) continue;
 
             const sectionId = "category-" + category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            const heading = category === "TODAYS MATCHES" ? "Today's Matches" : category;
+            const heading = category === "TODAYS MATCHES" ? "Today's Matches" : category === "FEATURED" ? "Featured Matches" : category;
             output += `
                 <section class="category-section" data-category="${esc(category)}" data-carousel-category="${esc(category)}">
                     <div class="category-heading-row">
@@ -2013,8 +2107,10 @@
             ? matchDate.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })
             : "";
 
-        const streamChip = match.streamed?.streamCount
-            ? `<span class="sfy-stream-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M2 12h3"/><path d="m8 8 8 8"/><path d="M12 2v3"/><path d="m16 8-8 8"/><path d="M19 12h3"/></svg>${match.streamed.streamCount} stream${match.streamed.streamCount === 1 ? "" : "s"}</span>`
+        const streamTotal = (Number(match.streamed?.streamCount) || 0) +
+            (Array.isArray(match.manual?.streams) ? match.manual.streams.length : 0);
+        const streamChip = streamTotal
+            ? `<span class="sfy-stream-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M2 12h3"/><path d="m8 8 8 8"/><path d="M12 2v3"/><path d="m16 8-8 8"/><path d="M19 12h3"/></svg>${streamTotal} stream${streamTotal === 1 ? "" : "s"}</span>`
             : "";
 
         // A crest the Streamed feed does not carry (most teams ship an empty
@@ -2070,10 +2166,12 @@
             </article>`;
     }
     /*
-     * STREAMED SOURCES ONLY
+     * WATCH VIEW
      *
-     * The public site displays only Streamed-origin source metadata.
-     * No manual/admin-added stream section is rendered on the public site.
+     * Streams come from two places: Streamed-origin source metadata (played
+     * through embed.st) and streams the admin attached to the match (played
+     * through the Worker's /api/play redirect). Neither carries a playback
+     * URL in the public match list.
      */
     let activeMatch = null;
     // True while the watch view has claimed its own history entry, so the
@@ -2104,8 +2202,34 @@
             "/" + encodeURIComponent(id) + "/" + encodeURIComponent(no);
     }
 
+    // Channel pages framed for admin-attached streams run sandboxed: no
+    // pop-ups and no top-level navigation (scripts and same-origin stay on so
+    // the player works; the page is on another origin, so it cannot lift the
+    // sandbox).
+    const MANUAL_STREAM_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation";
+
     function collectPlayableStreams(match) {
         const playable = [];
+        // Streams the admin attached (often from the Live TV catalog) come
+        // first, in the admin's order. The public list carries ids only; the
+        // Worker redirects /api/play/stream/... to the stream itself.
+        const manual = match && match.manual && Array.isArray(match.manual.streams) ? match.manual.streams : [];
+        for (const stream of manual) {
+            if (!stream || !stream.id) continue;
+            const path = "/api/play/stream/" + encodeURIComponent(String(match.id || "")) + "/" + encodeURIComponent(String(stream.id));
+            const hls = stream.kind === "hls";
+            playable.push({
+                group: { source: String(stream.name || "Stream"), id: String(stream.id) },
+                stream: {
+                    streamNo: 0,
+                    language: String(stream.language || "English"),
+                    hd: /^(HD|FHD|4K)$/i.test(String(stream.quality || "")),
+                    source: String(stream.name || "Stream")
+                },
+                url: hls ? PROXY_URL + "/player.html?src=" + encodeURIComponent(path) : PROXY_URL + path,
+                sandbox: !hls
+            });
+        }
         const groups = (match && match.streamed && Array.isArray(match.streamed.sources))
             ? match.streamed.sources : [];
         for (const group of groups) {
@@ -2135,7 +2259,7 @@
         let flatIndex = 0;
         return playable.map(function (item) {
             flatIndex += 1;
-            const url = streamEmbedUrl(item.group, item.stream.streamNo);
+            const url = item.url || streamEmbedUrl(item.group, item.stream.streamNo);
             const language = String(item.stream.language || "Default");
             const rawProvider = String(item.group.source || "Streamed");
             const networkClean = (function() {
@@ -2164,6 +2288,7 @@
 
             return '<button class="stream-toggle" type="button" role="radio" aria-checked="false"' +
                 multiAttr +
+                (item.sandbox ? ' data-sandbox="1"' : '') +
                 ' data-embed-url="' + esc(url) + '"' +
                 ' data-stream-label="' + esc(label) + '"' +
                 ' aria-label="' + esc(tip) + '">' +
@@ -2218,6 +2343,7 @@
                 frame.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
                 frame.allowFullscreen = true;
                 frame.referrerPolicy = "no-referrer";
+                if (chip.dataset.sandbox === "1") frame.setAttribute("sandbox", MANUAL_STREAM_SANDBOX);
                 frame.title = chip.dataset.streamLabel || "Match stream";
 
                 frame.onload = function() {

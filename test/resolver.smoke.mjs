@@ -335,7 +335,7 @@ assert.ok(!("url" in publicValencia));
 assert.ok(!("streams" in publicValencia));
 const manualPublic = allToday.find((match) => match.id === globalThis.manualMatchId);
 assert.deepEqual(Object.keys(manualPublic).sort(), [
-  "category", "competition", "description", "externalId", "id", "manual",
+  "category", "competition", "description", "externalId", "featured", "id", "manual",
   "popular", "poster", "source", "sources", "startTime", "status", "streamed", "teams", "title"
 ]);
 assert.equal(manualPublic.manual.streamCount, 1);
