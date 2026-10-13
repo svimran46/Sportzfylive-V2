@@ -22,6 +22,7 @@ import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.sportzfy.live.core.player.ChromeUserAgent
+import com.sportzfy.live.core.player.EmbedFrame
 import com.sportzfy.live.core.player.PlayerUrlPolicy
 import java.io.ByteArrayInputStream
 
@@ -191,7 +192,11 @@ private class SandboxedWebViewClient(
     }
 
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-        if (request.isForMainFrame) listener.onMainFrameError()
+        // A sandboxed channel loads in an iframe, so its failure is a subframe
+        // error. Count the framed page itself as the main frame, nothing else.
+        val framed = (view.tag as? LoadRequest)?.takeIf { it.sandboxed }?.url
+        val isFramedPage = framed != null && EmbedFrame.isFramedPage(request.url.toString(), framed)
+        if (request.isForMainFrame || isFramedPage) listener.onMainFrameError()
     }
 
     // Without this override a crashed or killed renderer takes the app down.

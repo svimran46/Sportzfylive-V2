@@ -27,11 +27,27 @@ class EmbedFrameTest {
     }
 
     @Test
-    fun `sandboxed frame drops pop-up and top-navigation rights`() {
+    fun `sandboxed frame drops pop-up and top-navigation rights but keeps dialogs`() {
         val html = EmbedFrame.html("https://channel.example/live", EmbedFrame.SANDBOX)
         assertTrue(html.contains("""sandbox="${EmbedFrame.SANDBOX}" """))
         assertFalse(EmbedFrame.SANDBOX.contains("allow-popups"))
         assertFalse(EmbedFrame.SANDBOX.contains("allow-top-navigation"))
+        assertTrue(EmbedFrame.SANDBOX.contains("allow-modals"))
+    }
+
+    @Test
+    fun `sandboxed wrapper runs under an origin no channel can use`() {
+        // A channel on the wrapper's origin would be same-origin with it and could drop the sandbox.
+        assertFalse(EmbedFrame.SANDBOX_BASE_URL.contains("streamed.pk"))
+        assertFalse(EmbedFrame.SANDBOX_BASE_URL.contains("embed.st"))
+        assertTrue(EmbedFrame.SANDBOX_BASE_URL.endsWith(".invalid/"))
+    }
+
+    @Test
+    fun `framed page is matched ignoring a trailing slash only`() {
+        assertTrue(EmbedFrame.isFramedPage("https://channel.example/", "https://channel.example"))
+        assertTrue(EmbedFrame.isFramedPage("https://channel.example/live/", "https://channel.example/live"))
+        assertFalse(EmbedFrame.isFramedPage("https://channel.example/ad.js", "https://channel.example/live"))
     }
 
     @Test

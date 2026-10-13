@@ -12,12 +12,22 @@ object EmbedFrame {
     const val BASE_URL = "https://streamed.pk/"
 
     /**
-     * Sandbox for a framed channel page. Scripts and same-origin are allowed so
-     * the player runs. Pop-ups and top-level navigation are not, so the frame
-     * cannot open windows or move the app's page. Same-origin is safe here
-     * because the page is cross-origin to the wrapper.
+     * Origin of the wrapper for a sandboxed channel. No channel can live on
+     * this host, so a framed page is never same-origin with the wrapper and
+     * cannot reach its frame element to drop the sandbox.
      */
-    const val SANDBOX = "allow-scripts allow-same-origin allow-forms allow-presentation"
+    const val SANDBOX_BASE_URL = "https://sandbox.sportzfy.invalid/"
+
+    /**
+     * Sandbox for a framed channel page. Scripts, same-origin, forms and dialogs
+     * are allowed so the player runs. Pop-ups and top-level navigation are not,
+     * so the frame cannot open windows or move the app's page.
+     */
+    const val SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation"
+
+    /** True when [requestUrl] is the framed page itself, ignoring a trailing slash. */
+    fun isFramedPage(requestUrl: String, framedUrl: String): Boolean =
+        requestUrl.trimEnd('/') == framedUrl.trimEnd('/')
 
     /** [sandbox] adds a `sandbox` attribute to the iframe; null leaves it off. */
     fun html(embedUrl: String, sandbox: String? = null): String {
