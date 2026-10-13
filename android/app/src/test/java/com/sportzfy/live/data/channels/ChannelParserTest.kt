@@ -28,6 +28,20 @@ class ChannelParserTest {
     }
 
     @Test
+    fun `sandbox flag is off unless the channel sets it to true`() {
+        val raw = """[
+          {"name":"Plain","url":"https://tv.example/plain"},
+          {"name":"Boxed","url":"https://tv.example/boxed","sandbox":true},
+          {"name":"Quoted","url":"https://tv.example/quoted","sandbox":"true"},
+          {"name":"Odd","url":"https://tv.example/odd","sandbox":1},
+          {"name":"Off","url":"https://tv.example/off","sandbox":false}
+        ]"""
+        val channels = parse(raw)!!
+        assertEquals(listOf("Plain", "Boxed", "Quoted", "Odd", "Off"), channels.map { it.name })
+        assertEquals(listOf(false, true, true, false, false), channels.map { it.sandboxed })
+    }
+
+    @Test
     fun `unreadable input is rejected rather than read as empty`() {
         assertNull(parse("<html>rate limited</html>"))
         assertNull(parse("const channels = [ {broken ];"))
