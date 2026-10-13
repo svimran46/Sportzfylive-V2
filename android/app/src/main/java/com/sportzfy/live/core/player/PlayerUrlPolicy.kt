@@ -14,11 +14,15 @@ import com.sportzfy.live.domain.model.EmbedUrl
  * - Any scheme other than https is refused (`intent:`, `market:`, `tel:`,
  *   plain http and so on). The only exceptions are `about:blank` and
  *   `about:srcdoc`.
- * - Sub-resources (scripts, XHR, images) from [blockedHosts] are refused.
+ * - Sub-resources (scripts, XHR, images) from [blockedResourceHosts] are
+ *   refused. By default that is [blockedHosts]; the app narrows it so the
+ *   ad list stops pop-ups and redirects without starving the embed's own
+ *   scripts, whose failure makes the stream page refuse to play.
  */
 class PlayerUrlPolicy(
     private val trustedHosts: Set<String> = setOf(EmbedUrl.HOST),
     private val blockedHosts: Set<String> = AdHosts.DEFAULT,
+    private val blockedResourceHosts: Set<String> = blockedHosts,
     /**
      * Browser-like mode, used by the app: stream sites are paid for by ads
      * and only play once the viewer has been sent to them. The page may go
@@ -57,7 +61,7 @@ class PlayerUrlPolicy(
 
     fun resource(url: String): Decision {
         val host = parse(url)?.host ?: return Decision.ALLOW
-        return if (host.matchesAny(blockedHosts)) Decision.BLOCK else Decision.ALLOW
+        return if (host.matchesAny(blockedResourceHosts)) Decision.BLOCK else Decision.ALLOW
     }
 
     private class ParsedUrl(val scheme: String, val host: String?, val rest: String)

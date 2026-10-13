@@ -9,6 +9,12 @@ data class PlayerConfig(
     val mode: PlayerMode = PlayerMode.DIRECT,
     val blockedHosts: Set<String> = AdHosts.DEFAULT,
     /**
+     * Hosts whose scripts and other sub-resources are refused. Only the
+     * owner's extra hosts: the default ad list stays on navigations, so the
+     * embed's own checks still see their scripts load.
+     */
+    val blockedResourceHosts: Set<String> = AdHosts.DEFAULT,
+    /**
      * Hosts the page itself may live on besides `embed.st`. Live TV adds the
      * channel's own host, so direct mode can open that channel's page.
      */
@@ -25,6 +31,7 @@ data class PlayerConfig(
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(
             mode = config.playerMode,
             blockedHosts = (if (config.adBlocking) AdHosts.DEFAULT else emptySet()) + config.extraBlockedHosts,
+            blockedResourceHosts = config.extraBlockedHosts,
         )
     }
 }

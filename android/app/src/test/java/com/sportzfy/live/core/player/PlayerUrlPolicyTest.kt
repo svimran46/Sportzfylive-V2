@@ -79,6 +79,15 @@ class PlayerUrlPolicyTest {
     }
 
     @Test
+    fun `resource blocking can be narrower than navigation blocking`() {
+        val narrow = PlayerUrlPolicy(blockedHosts = AdHosts.DEFAULT, blockedResourceHosts = setOf("bad.test"))
+        assertEquals(ALLOW, narrow.resource("https://a.exosrv.com/ad-provider.js"))
+        assertEquals(BLOCK, narrow.resource("https://x.bad.test/a.js"))
+        assertEquals(BLOCK, narrow.navigation("https://ads.popads.net/r", isMainFrame = true))
+        assertEquals(BLOCK, narrow.navigation("https://a.exosrv.com/frame", isMainFrame = false))
+    }
+
+    @Test
     fun `open web mode browses like a browser so the sites' ads work`() {
         val open = PlayerUrlPolicy(blockedHosts = emptySet(), openWeb = true)
         assertEquals(ALLOW, open.navigation("https://ads.example/landing", isMainFrame = true))

@@ -29,11 +29,27 @@ class EmbedFrameTest {
     fun `player config follows the remote config`() {
         // Ads play by default: the stream sites need them to serve the stream.
         // Embeds load directly, like a browser tab, referred by streamed.pk like its own embed.
-        assertEquals(PlayerConfig(PlayerMode.DIRECT, emptySet(), referer = "https://streamed.pk/"), PlayerConfig.from(AppConfig.Default))
+        assertEquals(
+            PlayerConfig(PlayerMode.DIRECT, blockedHosts = emptySet(), blockedResourceHosts = emptySet(), referer = "https://streamed.pk/"),
+            PlayerConfig.from(AppConfig.Default),
+        )
         assertTrue(PlayerConfig.from(AppConfig(adBlocking = true)).blockedHosts.containsAll(AdHosts.DEFAULT))
         val noAds = PlayerConfig.from(AppConfig(adBlocking = false, extraBlockedHosts = setOf("bad.com"), playerMode = PlayerMode.IFRAME))
         assertEquals(PlayerMode.IFRAME, noAds.mode)
         assertEquals(setOf("bad.com"), noAds.blockedHosts)
         assertTrue(PlayerConfig.from(AppConfig(adBlocking = true, extraBlockedHosts = setOf("bad.com"))).blockedHosts.containsAll(AdHosts.DEFAULT + "bad.com"))
+    }
+
+    @Test
+    fun `default ad list does not block scripts, owner's extra hosts do`() {
+        // Blocking the ad scripts made the embed refuse to play ("remove sandbox attributes").
+        val config = PlayerConfig.from(AppConfig(adBlocking = true, extraBlockedHosts = setOf("bad.com")))
+        assertTrue(config.blockedResourceHosts == setOf("bad.com"))
+        val policy = PlayerUrlPolicy(blockedHosts = config.blockedHosts, blockedResourceHosts = config.blockedResourceHosts)
+        assertEquals(PlayerUrlPolicy.Decision.ALLOW, policy.resource("https://a.exosrv.com/ad-provider.js"))
+        assertEquals(PlayerUrlPolicy.Decision.BLOCK, policy.resource("https://x.bad.com/a.js"))
+        // Pop-ups and ad subframes are still refused.
+        assertEquals(PlayerUrlPolicy.Decision.BLOCK, policy.navigation("https://ads.popads.net/r", isMainFrame = true))
+        assertEquals(PlayerUrlPolicy.Decision.BLOCK, policy.navigation("https://a.exosrv.com/frame", isMainFrame = false))
     }
 }
