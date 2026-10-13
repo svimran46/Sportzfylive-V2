@@ -114,9 +114,9 @@ const admin = (path, method = "GET", body) =>
 const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
 const channelsJs = (list) => "const channels = " + JSON.stringify(list, null, 2) + ";\n";
 const UPSTREAM = [
-  { name: "ESPN", logo: "https://img.example/espn.png?a=1&amp;amp;b=2", genre: "Sports", url: "https://tv.example/espn" },
-  { name: "Willow Cricket", logo: "https://img.example/willow.png", genre: "Sports", url: "https://tv.example/willow" },
-  { name: "Sky Sports Premier League", logo: "", genre: "Sports", url: "https://tv.example/skypl" },
+  { name: "ESPN", logo: "https://img.example/espn.png?a=1&amp;amp;b=2", genre: "Sports", url: "https://tv.example/espn", sandbox: true },
+  { name: "Willow Cricket", logo: "https://img.example/willow.png", genre: "Sports", url: "https://tv.example/willow", sandbox: "true" },
+  { name: "Sky Sports Premier League", logo: "", genre: "Sports", url: "https://tv.example/skypl", sandbox: 1 },
   { name: "Cartoon Network", logo: "http://insecure.example/cn.png", genre: "Sports", url: "https://tv.example/cn" },
   { name: "Duplicate ESPN", logo: "", genre: "Sports", url: "https://tv.example/espn" },
   { name: "Plain HTTP", logo: "", genre: "Sports", url: "http://tv.example/plain" },
@@ -137,6 +137,8 @@ routes[PLAYLIST_URL] = reply(200, channelsJs(UPSTREAM));
   assert.equal(data.channels[0].logo, "https://img.example/espn.png?a=1&b=2", "&amp; chains decoded");
   assert.equal(data.channels[3].logo, "", "non-https logos dropped");
   assert.equal(data.channels[0].kind, "embed");
+  assert.deepEqual(data.channels.map(c => c.sandbox), [true, true, false, false],
+    "only \"sandbox\": true (or \"true\") sandboxes a channel, as in the Android app");
   assert.ok(!JSON.stringify(data).includes("tv.example"), "public channel list never carries stream URLs");
   assert.deepEqual(data.categories, ["Sports", "Football", "Cricket", "Kids"]);
   const stored = JSON.parse(kv.store.get("tv_channels"));
@@ -166,6 +168,7 @@ ok("/api/play/tv/:id redirects to the stream; unknown ids get a sandboxed 404");
   assert.equal(channel.id, "bein-sports-fifa");
   assert.equal(channel.origin, "manual");
   assert.equal(channel.kind, "hls", ".m3u8 streams are played as HLS");
+  assert.equal(channel.sandbox, false, "manual channels are not sandboxed unless asked");
 
   const dup = await admin("/api/admin/tv/channels", "POST", { name: "Copy", url: "https://cdn.example/bein/index.m3u8" });
   assert.equal(dup.status, 409);
@@ -191,7 +194,7 @@ ok("admin channel CRUD validates https URLs, rejects duplicates, locks categorie
 // survive; admin status/order/category on synced channels survive.
 {
   routes[PLAYLIST_URL] = reply(200, channelsJs([
-    { name: "ESPN", logo: "", url: "https://tv.example/espn" },
+    { name: "ESPN", logo: "", url: "https://tv.example/espn", sandbox: false },
     { name: "Willow Cricket", logo: "", url: "https://tv.example/willow-v2" },
     { name: "NBA TV", logo: "", url: "https://tv.example/nba" }
   ]));
@@ -206,6 +209,7 @@ ok("admin channel CRUD validates https URLs, rejects duplicates, locks categorie
   assert.equal(byId.espn.active, false, "admin deactivation survives a sync");
   assert.equal(byId.espn.category, "News", "locked category survives a sync");
   assert.equal(byId.espn.sort, 1);
+  assert.equal(byId.espn.sandbox, false, "the playlist's sandbox flag is followed on every sync");
   assert.equal(byId["willow-cricket"].url, "https://tv.example/willow-v2", "URL refreshed, id kept (matched by name)");
   assert.ok(byId["bein-sports-fifa"], "manual channel survives a sync");
   assert.equal(list[0].id, "espn", "explicit sort order comes first");
@@ -328,7 +332,7 @@ let oldId;
     image: "https://img.example/banner.jpg",
     featured: true,
     streams: [
-      { id: "s1", name: "Stream 1", language: "English", quality: "HD", url: "https://tv.example/ufc" },
+      { id: "s1", name: "Stream 1", language: "English", quality: "HD", url: "https://tv.example/ufc", sandbox: true },
       { id: "s2", name: "Stream 2", language: "English", quality: "SD", url: "https://cdn.example/ufc.m3u8" },
       { id: "s3", name: "Notes only", language: "English", quality: "SD" }
     ]
@@ -355,7 +359,7 @@ let oldId;
   assert.equal(fight.status, "live", "auto status is live inside the window");
   assert.equal(fight.poster, "https://img.example/banner.jpg", "featured image replaces the feed poster");
   assert.equal(fight.featured, true);
-  assert.deepEqual(fight.manual.streams.map(s => [s.id, s.kind]), [["s1", "embed"], ["s2", "hls"]]);
+  assert.deepEqual(fight.manual.streams.map(s => [s.id, s.kind, s.sandbox]), [["s1", "embed", true], ["s2", "hls", false]]);
   assert.ok(!JSON.stringify(list).includes("tv.example"), "manual stream URLs stay private");
   assert.ok(!list.some(m => m.id === oldId), "matches past their live window are hidden publicly");
 

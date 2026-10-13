@@ -1208,7 +1208,8 @@ function enrichMatchForPublic(match, now = Date.now()) {
           name: String(stream.name ?? ""),
           language: String(stream.language ?? ""),
           quality: String(stream.quality ?? ""),
-          kind: streamKind(stream.url)
+          kind: streamKind(stream.url),
+          sandbox: Boolean(stream.sandbox)
         }))
     };
   }
@@ -1412,7 +1413,8 @@ function cleanStreams(list) {
       league: cleanText(stream?.league, 80),
       quality: STREAM_QUALITIES.includes(quality) ? quality : "HD",
       url,
-      channelId: cleanText(stream?.channelId, 120)
+      channelId: cleanText(stream?.channelId, 120),
+      sandbox: sandboxFlag(stream?.sandbox)
     };
   });
 }
@@ -1586,8 +1588,17 @@ function parsePlaylist(raw) {
     name: entry?.name ?? entry?.title ?? "",
     logo: entry?.logo ?? entry?.tvg_logo ?? entry?.image ?? "",
     url: entry?.url ?? entry?.stream ?? entry?.link ?? "",
-    category: entry?.category ?? entry?.group ?? ""
+    category: entry?.category ?? entry?.group ?? "",
+    sandbox: entry?.sandbox
   }));
+}
+
+// `"sandbox": true` in channels.json marks a channel whose page must run in a
+// sandboxed frame (no pop-ups, no top-level navigation). Read loosely, like
+// the Android app: only true or "true" count; anything else leaves the channel
+// unsandboxed, because some channels render a black frame inside a sandbox.
+function sandboxFlag(value) {
+  return value === true || (typeof value === "string" && value.trim().toLowerCase() === "true");
 }
 
 // Entries without a name or an https stream URL are skipped, as are repeated
@@ -1613,7 +1624,8 @@ function cleanPlaylistEntries(entries) {
       name,
       logo: safeHttpsUrl(decodeEntities(entry?.logo)),
       url,
-      category: channelCategory(entry?.category, name)
+      category: channelCategory(entry?.category, name),
+      sandbox: sandboxFlag(entry?.sandbox)
     });
   }
   return { entries: out, skipped };
@@ -1724,7 +1736,7 @@ async function syncTvChannels(env, tvSource, options = {}) {
     taken.add(id);
     const category = previous?.categoryLocked ? previous.category : entry.category;
     const changed = !previous || previous.name !== entry.name || previous.url !== entry.url ||
-      previous.logo !== entry.logo || previous.category !== category;
+      previous.logo !== entry.logo || previous.category !== category || Boolean(previous.sandbox) !== entry.sandbox;
     if (!previous) added++;
     else if (changed) updated++;
 
@@ -1735,6 +1747,7 @@ async function syncTvChannels(env, tvSource, options = {}) {
       url: entry.url,
       category,
       categoryLocked: Boolean(previous?.categoryLocked),
+      sandbox: entry.sandbox,
       sort: Number.isFinite(previous?.sort) ? previous.sort : null,
       active: previous ? previous.active !== false : true,
       origin: "synced",
@@ -1813,7 +1826,8 @@ function publicChannel(channel) {
     name: String(channel.name ?? ""),
     logo: String(channel.logo ?? ""),
     category: TV_CATEGORIES.includes(channel.category) ? channel.category : channelCategory("", channel.name),
-    kind: streamKind(channel.url)
+    kind: streamKind(channel.url),
+    sandbox: Boolean(channel.sandbox)
   };
 }
 
@@ -1858,6 +1872,7 @@ function editableChannelFields(body, current = {}) {
     category,
     categoryLocked,
     sort,
+    sandbox: has("sandbox") ? sandboxFlag(body.sandbox) : Boolean(current.sandbox),
     active: has("active") ? body.active !== false && body.active !== "false" : current.active !== false
   };
 }
@@ -2119,6 +2134,7 @@ async function handleAdminTv(request, env, url) {
         url: entry.url,
         category: entry.category,
         categoryLocked: false,
+        sandbox: entry.sandbox,
         sort: null,
         active: true,
         origin: "manual",

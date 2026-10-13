@@ -457,8 +457,9 @@ windowStub.__SPORTZFY_MATCHES.set("manual-1", {
   manual: {
     streamCount: 2,
     streams: [
-      { id: "s1", name: "Sky Sports Football", language: "English", quality: "HD", kind: "embed" },
-      { id: "s2", name: "Backup", language: "Spanish", quality: "SD", kind: "hls" }
+      { id: "s1", name: "Sky Sports Football", language: "English", quality: "HD", kind: "embed", sandbox: true },
+      { id: "s2", name: "Backup", language: "Spanish", quality: "SD", kind: "hls" },
+      { id: "s3", name: "Direct", language: "English", quality: "HD", kind: "embed" }
     ]
   }
 });
@@ -469,9 +470,10 @@ windowStub.__SPORTZFY_MATCHES.set("manual-1", {
     selector === ".sfy-match-item" || selector === "[data-match-id]" ? manualCard : null;
   documentStub.dispatch("keydown", { key: "Enter", target: manualCard, preventDefault() {} });
   const manualChips = documentStub.getElementById("stream-picker").children;
-  assert.equal(manualChips.length, 2, "both admin-attached streams render as chips");
+  assert.equal(manualChips.length, 3, "every admin-attached stream renders as a chip");
   assert.equal(manualChips[0].dataset.embedUrl, "https://sportzfylive.svimranmy.workers.dev/api/play/stream/manual-1/s1");
-  assert.equal(manualChips[0].dataset.sandbox, "1", "embed streams are marked for the sandbox");
+  assert.equal(manualChips[0].dataset.sandbox, "1", "streams flagged sandbox are marked for the sandbox");
+  assert.ok(!manualChips[2].dataset.sandbox, "unflagged embed streams load directly");
   assert.equal(
     manualChips[1].dataset.embedUrl,
     "https://sportzfylive.svimranmy.workers.dev/player.html?src=" + encodeURIComponent("/api/play/stream/manual-1/s2"),
@@ -484,6 +486,6 @@ windowStub.__SPORTZFY_MATCHES.set("manual-1", {
   assert.equal(frame.getAttribute("sandbox"), "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation");
   context.navigateBack();
 }
-ok("admin-attached streams: listed first, played via /api/play, embeds sandboxed");
+ok("admin-attached streams: listed first, played via /api/play, sandboxed when flagged");
 
 console.log("\nAll " + passed + " DOM assertions passed.");

@@ -924,7 +924,7 @@ function moveStream(from, to) {
 /* ---------- Stream modal with the Live TV catalog picker ---------- */
 
 async function openStreamModal(index = -1) {
-  const stream = index >= 0 ? manualStreams(state.currentMatch)[index] : { name: "", language: "English", url: "", quality: "HD", channelId: "" };
+  const stream = index >= 0 ? manualStreams(state.currentMatch)[index] : { name: "", language: "English", url: "", quality: "HD", channelId: "", sandbox: false };
   state.streamModal = { index, bulk: false, picked: new Set(), query: "" };
   const languages = LANGUAGES.includes(stream.language) ? LANGUAGES : [stream.language, ...LANGUAGES];
   openModal(
@@ -940,6 +940,7 @@ async function openStreamModal(index = -1) {
         '<div class="field"><label for="s-quality">Quality</label><select id="s-quality" name="quality" class="select">' +
         QUALITIES.map(q => "<option" + (q === stream.quality ? " selected" : "") + ">" + q + "</option>").join("") + "</select></div></div>" +
       '<div class="field"><label for="s-url">URL</label><input id="s-url" name="url" class="input mono" inputmode="url" placeholder="https://…" value="' + esc(stream.url || "") + '"><div class="hint">https only — an embed page or an .m3u8 manifest.</div></div>' +
+      '<label class="check"><input type="checkbox" name="sandbox"' + (stream.sandbox ? " checked" : "") + '><span>Run in a sandbox <small>— blocks pop-ups and redirects; some pages show a black frame inside one. Set from the channel when you pick one above.</small></span></label>' +
       '<input type="hidden" name="channelId" value="' + esc(stream.channelId || "") + '">' +
     "</div>" +
     '<div class="modal-foot" id="streamFoot"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save Stream</button></div></form>'
@@ -984,6 +985,7 @@ function pickCatalogChannel(id) {
   form.elements.name.value = channel.name;
   form.elements.url.value = channel.url;
   form.elements.channelId.value = channel.id;
+  form.elements.sandbox.checked = Boolean(channel.sandbox);
   $$(".catalog-item.picked").forEach(el => el.classList.remove("picked"));
   $$('.catalog-item[data-id="' + CSS.escape(id) + '"]').forEach(el => el.classList.add("picked"));
 }
@@ -1001,7 +1003,8 @@ async function saveStreamFromModal(form) {
     quality: form.elements.quality.value,
     league: current?.league || "",
     url,
-    channelId: url === current?.url || form.elements.channelId.value ? form.elements.channelId.value : ""
+    channelId: url === current?.url || form.elements.channelId.value ? form.elements.channelId.value : "",
+    sandbox: form.elements.sandbox.checked
   };
   if (modal.index >= 0) streams[modal.index] = item;
   else streams.push(item);
@@ -1019,7 +1022,7 @@ async function bulkAddStreams(button) {
   if (!channels.length) return;
   const streams = manualStreams(state.currentMatch).slice();
   for (const c of channels) {
-    streams.push({ id: crypto.randomUUID(), name: c.name, language: form.elements.language.value, quality: form.elements.quality.value, league: "", url: c.url, channelId: c.id });
+    streams.push({ id: crypto.randomUUID(), name: c.name, language: form.elements.language.value, quality: form.elements.quality.value, league: "", url: c.url, channelId: c.id, sandbox: Boolean(c.sandbox) });
   }
   state.currentMatch.streams = streams;
   await busy(button, "Adding…", async () => {
@@ -1105,7 +1108,7 @@ function renderChannelTable() {
       '<td class="cb"><input type="checkbox" aria-label="Select ' + esc(c.name) + '" data-action="tv-select" data-id="' + esc(c.id) + '"' + (state.tvSelection.has(c.id) ? " checked" : "") + "></td>" +
       '<td><div class="logo-cell"><span class="logo-box">' + (c.logo ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-initials="' + esc(c.name.slice(0, 2).toUpperCase()) + '" onerror="this.replaceWith(document.createTextNode(this.dataset.initials))">' : esc(c.name.slice(0, 2).toUpperCase())) + "</span>" +
         '<span><a class="row-title" href="#/tv/' + encodeURIComponent(c.id) + '">' + esc(c.name) + "</a>" +
-        '<div class="row-meta">' + esc(c.category || "") + " · " + (c.origin === "synced" ? "synced" : "manual") + (c.kind === "hls" ? " · HLS" : "") + (Number.isFinite(c.sort) ? " · order " + c.sort : "") + "</div></span></div></td>" +
+        '<div class="row-meta">' + esc(c.category || "") + " · " + (c.origin === "synced" ? "synced" : "manual") + (c.kind === "hls" ? " · HLS" : "") + (c.sandbox ? " · sandboxed" : "") + (Number.isFinite(c.sort) ? " · order " + c.sort : "") + "</div></span></div></td>" +
       '<td><button type="button" class="pill' + (c.active === false ? " grey" : "") + '" data-action="tv-toggle-active" data-id="' + esc(c.id) + '" title="Click to ' + (c.active === false ? "activate" : "deactivate") + '">' + (c.active === false ? "Inactive" : "Active") + "</button></td>" +
       '<td><div class="row-actions">' +
         '<button type="button" class="text-btn" data-action="tv-test" data-id="' + esc(c.id) + '">Test</button>' +
@@ -1295,6 +1298,8 @@ async function renderChannelForm(id) {
         (tv.categories || []).map(cat => '<option value="' + esc(cat) + '"' + (c.categoryLocked && c.category === cat ? " selected" : "") + ">" + esc(cat) + "</option>").join("") + "</select>" +
         (channel && !c.categoryLocked ? '<div class="hint">Currently ' + esc(c.category) + ".</div>" : "") + "</div>" +
         '<div class="field"><label for="c-sort">Sort order</label><input id="c-sort" name="sort" type="number" class="input" placeholder="Auto" value="' + esc(Number.isFinite(c.sort) ? c.sort : "") + '"><div class="hint">Lower numbers show first. Auto keeps playlist order.</div></div></div>' +
+      '<label class="check"><input type="checkbox" name="sandbox"' + (c.sandbox ? " checked" : "") + "><span>Run in a sandbox <small>— blocks the page's pop-ups and redirects. Some channels show a black frame inside one, so leave it off unless a channel misbehaves." +
+        (synced ? " Synced channels follow <code>\"sandbox\": true</code> in the playlist on every sync." : "") + "</small></span></label>" +
       '<label class="check"><input type="checkbox" name="active"' + (c.active !== false ? " checked" : "") + "><span>Active on Live TV</span></label>" +
       '<div class="form-actions"><button class="btn primary" type="submit">' + (channel ? "Save changes" : "Create Channel") + "</button>" +
         (channel
@@ -1311,7 +1316,7 @@ async function saveChannel(form) {
   const v = (name) => form.elements[name].value.trim();
   if (!v("name")) return void ($("#formStatus").textContent = "Channel name is required.");
   if (!/^https:\/\//i.test(v("url"))) return void ($("#formStatus").textContent = "Stream URL must start with https://");
-  const body = { name: v("name"), logo: v("logo"), url: v("url"), category: v("category"), sort: v("sort"), active: form.elements.active.checked };
+  const body = { name: v("name"), logo: v("logo"), url: v("url"), category: v("category"), sort: v("sort"), sandbox: form.elements.sandbox.checked, active: form.elements.active.checked };
   const button = form.querySelector("button[type=submit]");
   await busy(button, "Saving…", async () => {
     try {
