@@ -103,7 +103,7 @@ internal fun createSandboxedWebView(
     }
 
     webViewClient = SandboxedWebViewClient(policy, listener)
-    webChromeClient = SandboxedChromeClient(listener)
+    webChromeClient = SandboxedChromeClient(listener, policy)
 }
 
 /**
@@ -203,16 +203,19 @@ private class SandboxedWebViewClient(
 
 private class SandboxedChromeClient(
     private val listener: SandboxListener,
+    private val policy: () -> PlayerUrlPolicy,
 ) : WebChromeClient() {
 
     /**
      * Pop-ups (window.open, target=_blank) are how the stream sites show
      * their ads, and the stream only plays once the viewer has been sent
-     * there. Each one opens in the phone's browser like a new tab, while the
-     * stream stays loaded here: a throwaway WebView catches the pop-up's
-     * first URL and hands it over.
+     * there. By default each one opens in the phone's browser like a new tab,
+     * while the stream stays loaded here: a throwaway WebView catches the
+     * pop-up's first URL and hands it over. With [PlayerUrlPolicy.dropPopups]
+     * the window is refused and nothing opens.
      */
     override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+        if (policy().dropPopups) return false
         val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
         val popup = WebView(view.context)
         var handedOff = false

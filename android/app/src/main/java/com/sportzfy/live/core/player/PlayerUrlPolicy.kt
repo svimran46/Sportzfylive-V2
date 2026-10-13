@@ -30,6 +30,12 @@ class PlayerUrlPolicy(
      * other apps (`intent:`, `market:` and the like) are handed to Android.
      */
     private val openWeb: Boolean = false,
+    /**
+     * Pop-up windows are refused outright instead of opened in the phone's
+     * browser. Nothing leaves the app, and the stream may not start if its
+     * page needs the pop-up.
+     */
+    val dropPopups: Boolean = false,
 ) {
 
     /** [EXTERNAL]: open with another app (browser, Play Store) instead of the player. */
