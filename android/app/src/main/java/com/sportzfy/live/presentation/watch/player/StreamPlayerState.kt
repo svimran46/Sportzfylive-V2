@@ -12,8 +12,14 @@ enum class PlayerError {
     /** The embed page failed to load (network, DNS, TLS). */
     LOAD_FAILED,
 
-    /** Media3 could not play the HLS stream. */
+    /** Media3 could not play the stream (network, server, broken feed). */
     PLAYBACK_FAILED,
+
+    /** The device can't decode the stream, or Media3 can't read its container. Retrying won't help. */
+    UNSUPPORTED_FORMAT,
+
+    /** The stream is DRM-encrypted; the app has no licence to play it. Retrying won't help. */
+    DRM_PROTECTED,
 
     /** No WebView provider is installed (seen on some TV devices). */
     WEBVIEW_UNAVAILABLE,

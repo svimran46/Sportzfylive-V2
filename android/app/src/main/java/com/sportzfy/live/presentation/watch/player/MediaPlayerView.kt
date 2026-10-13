@@ -19,18 +19,25 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.compose.PlayerSurface
+import com.sportzfy.live.domain.model.StreamFormat
 import okhttp3.OkHttpClient
 import org.koin.compose.koinInject
 
 /**
- * Plays a native HLS (`.m3u8`) feed with Media3. Segments are fetched
- * through the app's OkHttp client, so they carry the same browser headers
- * as API calls.
+ * Plays a media stream with Media3: HLS (`.m3u8`), DASH (`.mpd`) or a
+ * progressive file/stream (MPEG-TS, MP4, Matroska/WebM, FLV, MP3, AAC), over
+ * http or https. Everything is fetched through the app's OkHttp client, so
+ * it carries the same browser headers as API calls.
+ *
+ * A live stream that falls behind its window (the device paused or stalled
+ * past the oldest segment still listed) jumps back to the live edge on its
+ * own instead of showing an error.
  */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun HlsPlayerView(
+internal fun MediaPlayerView(
     url: String,
+    format: StreamFormat,
     state: StreamPlayerState,
     modifier: Modifier = Modifier,
     okHttpClient: OkHttpClient = koinInject(),
@@ -52,8 +59,13 @@ internal fun HlsPlayerView(
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    player.seekToDefaultPosition()
+                    player.prepare()
+                    return
+                }
                 state.isLoading = false
-                state.error = PlayerError.PLAYBACK_FAILED
+                state.error = playerErrorFor(error.errorCode)
             }
         }
         player.addListener(playerListener)
@@ -75,11 +87,11 @@ internal fun HlsPlayerView(
         onDispose { lifecycleOwner.lifecycle.removeObserver(lifecycleObserver) }
     }
 
-    LaunchedEffect(player, url, state.reloadToken) {
+    LaunchedEffect(player, url, format, state.reloadToken) {
         player.setMediaItem(
             MediaItem.Builder()
                 .setUri(url)
-                .setMimeType(MimeTypes.APPLICATION_M3U8)
+                .setMimeType(format.mimeType())
                 .build()
         )
         player.prepare()
@@ -87,4 +99,15 @@ internal fun HlsPlayerView(
     }
 
     PlayerSurface(player = player, modifier = modifier)
+}
+
+/**
+ * HLS and DASH are named outright, so a manifest URL without the usual
+ * extension still plays. Progressive streams pass no type: Media3 sniffs the
+ * container (TS, MP4, Matroska…) from the bytes.
+ */
+private fun StreamFormat.mimeType(): String? = when (this) {
+    StreamFormat.HLS -> MimeTypes.APPLICATION_M3U8
+    StreamFormat.DASH -> MimeTypes.APPLICATION_MPD
+    StreamFormat.PROGRESSIVE, StreamFormat.EMBED -> null
 }

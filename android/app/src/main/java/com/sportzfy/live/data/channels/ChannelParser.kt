@@ -2,6 +2,7 @@ package com.sportzfy.live.data.channels
 
 import com.sportzfy.live.domain.model.Channel
 import com.sportzfy.live.domain.model.ChannelCategory
+import com.sportzfy.live.domain.model.StreamFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -11,7 +12,9 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * One entry of `channels.json`. `category` is optional and overrides name-based grouping.
  * `sandbox` is read loosely: any value other than true (boolean or the string "true")
- * leaves the channel unsandboxed, and a wrong type never drops the channel.
+ * leaves the channel unsandboxed, and a wrong type never drops the channel. `type`
+ * (`"hls"`, `"dash"`, `"ts"`, `"embed"`…) says how to play a URL whose extension
+ * doesn't, like an IPTV feed at `http://host:8080/user/pass/123`.
  */
 @Serializable
 internal data class ChannelDto(
@@ -21,17 +24,32 @@ internal data class ChannelDto(
     val url: String? = null,
     val category: String? = null,
     val sandbox: JsonElement? = null,
+    val type: JsonElement? = null,
 )
 
 private fun JsonElement?.isTrue(): Boolean =
     (this as? JsonPrimitive)?.content?.equals("true", ignoreCase = true) == true
 
+private fun JsonElement?.text(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+/** A channel as read from either list format, before validation. */
+private class RawChannel(
+    val name: String?,
+    val logo: String?,
+    val url: String?,
+    val category: String?,
+    val sandboxed: Boolean = false,
+    val format: StreamFormat? = null,
+)
+
 /**
- * Reads the channel directory. The file is a JavaScript snippet
+ * Reads the channel directory. `channels.json` is a JavaScript snippet
  * (`const channels = [...];`), so the outermost JSON array is cut out of it
- * first; a plain JSON array works too.
+ * first; a plain JSON array works too. An M3U playlist (`#EXTM3U` with
+ * `#EXTINF` entries, as IPTV providers publish) is read as well: the title,
+ * `tvg-logo` and `group-title` (or `#EXTGRP`) of each entry.
  *
- * Entries without a name or an https stream URL are skipped, as are repeated
+ * Entries without a name or an http(s) stream URL are skipped, as are repeated
  * stream URLs. `genre` is "Sports" for every channel upstream (cartoons
  * included), so it can't group channels: [categoryOf] uses an explicit
  * `category` field when present, otherwise the channel name.
@@ -43,21 +61,91 @@ object ChannelParser {
         """\b(football|fussball|fußball|soccer|laliga|la liga|bundesliga|premier league|serie a|ligue 1|eredivisie)\b"""
     )
 
-    /** Returns null when [raw] holds no readable JSON array. */
+    private val M3U_ATTRIBUTE = Regex("""([A-Za-z0-9_-]+)="([^"]*)"""")
+
+    /** Returns null when [raw] is neither an M3U playlist nor holds a readable JSON array. */
     fun parse(json: Json, raw: String): List<Channel>? {
+        val entries = if (isM3u(raw)) parseM3u(raw) else parseJson(json, raw) ?: return null
+        return build(entries)
+    }
+
+    private fun parseJson(json: Json, raw: String): List<RawChannel>? {
         val start = raw.indexOf('[')
         val end = raw.lastIndexOf(']')
         if (start < 0 || end <= start) return null
         val array = runCatching { json.parseToJsonElement(raw.substring(start, end + 1)) }.getOrNull() as? JsonArray
             ?: return null
-
-        val seenUrls = HashSet<String>()
-        val idCounts = HashMap<String, Int>()
         return array.mapNotNull { entry ->
             val dto = runCatching { json.decodeFromJsonElement(ChannelDto.serializer(), entry) }.getOrNull()
                 ?: return@mapNotNull null
-            val name = dto.name?.let(::decodeEntities)?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-            val url = dto.url?.trim()?.takeIf { isHttps(it) } ?: return@mapNotNull null
+            RawChannel(
+                name = dto.name,
+                logo = dto.logo,
+                url = dto.url,
+                category = dto.category,
+                sandboxed = dto.sandbox.isTrue(),
+                format = StreamFormat.fromHint(dto.type.text()),
+            )
+        }
+    }
+
+    private fun isM3u(raw: String): Boolean {
+        val first = raw.trimStart('\uFEFF').lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: return false
+        return first.startsWith("#EXTM3U", ignoreCase = true) || first.startsWith("#EXTINF", ignoreCase = true)
+    }
+
+    private fun parseM3u(raw: String): List<RawChannel> {
+        val entries = ArrayList<RawChannel>()
+        var info: String? = null
+        var group: String? = null
+        for (line in raw.trimStart('\uFEFF').lineSequence().map { it.trim() }) {
+            when {
+                line.isEmpty() -> Unit
+                line.startsWith("#EXTINF", ignoreCase = true) -> {
+                    info = line.substringAfter(':', "")
+                    group = null
+                }
+                line.startsWith("#EXTGRP:", ignoreCase = true) -> group = line.substringAfter(':').trim()
+                line.startsWith("#") -> Unit
+                else -> {
+                    // A URL line closes the entry it belongs to; one without #EXTINF has no name.
+                    val current = info ?: continue
+                    val comma = titleComma(current)
+                    val attributes = M3U_ATTRIBUTE.findAll(if (comma >= 0) current.substring(0, comma) else current)
+                        .associate { it.groupValues[1].lowercase() to it.groupValues[2] }
+                    val title = if (comma >= 0) current.substring(comma + 1) else null
+                    entries += RawChannel(
+                        name = title?.takeIf { it.isNotBlank() } ?: attributes["tvg-name"],
+                        logo = attributes["tvg-logo"],
+                        url = line,
+                        category = attributes["group-title"]?.takeIf { it.isNotBlank() } ?: group,
+                    )
+                    info = null
+                    group = null
+                }
+            }
+        }
+        return entries
+    }
+
+    /** Index of the comma that starts an `#EXTINF` title: the first one outside quoted attributes, or -1. */
+    private fun titleComma(info: String): Int {
+        var quoted = false
+        info.forEachIndexed { index, char ->
+            when {
+                char == '"' -> quoted = !quoted
+                char == ',' && !quoted -> return index
+            }
+        }
+        return -1
+    }
+
+    private fun build(entries: List<RawChannel>): List<Channel> {
+        val seenUrls = HashSet<String>()
+        val idCounts = HashMap<String, Int>()
+        return entries.mapNotNull { entry ->
+            val name = entry.name?.let(::decodeEntities)?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val url = entry.url?.trim()?.takeIf { isHttpUrl(it) } ?: return@mapNotNull null
             if (!seenUrls.add(url)) return@mapNotNull null
 
             val base = slug(name).ifEmpty { "channel" }
@@ -66,26 +154,32 @@ object ChannelParser {
             Channel(
                 id = if (count == 1) base else "$base-$count",
                 name = name,
-                logoUrl = dto.logo?.let(::decodeEntities)?.trim()?.takeIf { isHttps(it) },
-                category = categoryOf(dto.category, name),
+                logoUrl = entry.logo?.let(::decodeEntities)?.trim()?.takeIf { isHttps(it) },
+                category = categoryOf(entry.category, name),
                 streamUrl = url,
-                sandboxed = dto.sandbox.isTrue(),
+                sandboxed = entry.sandboxed,
+                streamFormat = entry.format,
             )
         }
     }
 
+    /**
+     * An exact `category` wins; otherwise the channel name, then the category
+     * text (an M3U `group-title` like "UK Football"), is matched for keywords.
+     */
     fun categoryOf(explicit: String?, name: String): ChannelCategory {
         when (explicit?.trim()?.lowercase()) {
             "football", "soccer" -> return ChannelCategory.FOOTBALL
             "cricket" -> return ChannelCategory.CRICKET
             "other", "others" -> return ChannelCategory.OTHERS
         }
-        val lower = name.lowercase()
-        return when {
-            CRICKET.containsMatchIn(lower) -> ChannelCategory.CRICKET
-            FOOTBALL.containsMatchIn(lower) -> ChannelCategory.FOOTBALL
-            else -> ChannelCategory.OTHERS
+        for (text in listOfNotNull(name.lowercase(), explicit?.lowercase())) {
+            when {
+                CRICKET.containsMatchIn(text) -> return ChannelCategory.CRICKET
+                FOOTBALL.containsMatchIn(text) -> return ChannelCategory.FOOTBALL
+            }
         }
+        return ChannelCategory.OTHERS
     }
 
     /** Undoes HTML escaping, including the repeated `&amp;amp;…` chains upstream logos carry. */
@@ -98,6 +192,10 @@ object ChannelParser {
 
     private fun isHttps(url: String): Boolean =
         url.startsWith("https://", ignoreCase = true) && url.length > "https://".length && url.none(Char::isWhitespace)
+
+    /** Streams may be plain http (IPTV feeds often are); whether they play is the player's call. */
+    private fun isHttpUrl(url: String): Boolean =
+        isHttps(url) || (url.startsWith("http://", ignoreCase = true) && url.length > "http://".length && url.none(Char::isWhitespace))
 
     private fun slug(name: String): String =
         name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')

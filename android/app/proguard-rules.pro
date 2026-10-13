@@ -1,7 +1,7 @@
 # Sportzfy release (R8) rules.
 #
 # Most libraries ship their own consumer rules, which R8 applies automatically:
-# Media3 (ExoPlayer, HLS), Coil 3, OkHttp, Retrofit, kotlinx.serialization,
+# Media3 (ExoPlayer, HLS, DASH), Coil 3, OkHttp, Retrofit, kotlinx.serialization,
 # Koin, Navigation and Compose. The rules below cover only what is specific
 # to this app.
 

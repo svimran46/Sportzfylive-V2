@@ -1557,7 +1557,7 @@ async function renderApp() {
         saveRow("Save player settings", "app") + "</form>") +
     card("app-sources", "inbox", "Data sources", "Where the app loads its channel list and falls back to when a stream host blocks the phone.",
       '<form data-submit="app-sources">' +
-        '<div class="field"><label for="ap-ch">Channel list URL</label><input id="ap-ch" name="channelsUrl" class="input mono" placeholder="Blank = the app’s built-in channels.json" value="' + esc(a.channelsUrl) + '"><div class="hint">https only. A JSON list in the channels.json format.</div></div>' +
+        '<div class="field"><label for="ap-ch">Channel list URL</label><input id="ap-ch" name="channelsUrl" class="input mono" placeholder="Blank = the app’s built-in channels.json" value="' + esc(a.channelsUrl) + '"><div class="hint">https only. A list in the channels.json format, or an M3U playlist. Streams in it may be http or https: HLS, DASH, MPEG-TS, MP4 or web pages.</div></div>' +
         switchRow("streamProxyEnabled", "Stream proxy fallback", "When streamed.pk blocks the phone, retry through a Worker. Off: no fallback.", a.streamProxyEnabled) +
         '<div class="field" style="margin-top:12px"><label for="ap-sp">Proxy URL</label><input id="ap-sp" name="streamProxyUrl" class="input mono" placeholder="Blank = this Worker" value="' + esc(a.streamProxyUrl) + '"></div>' +
         saveRow("Save sources", "app") + "</form>") +

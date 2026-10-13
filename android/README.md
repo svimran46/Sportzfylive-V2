@@ -12,14 +12,14 @@ A standalone Kotlin and Jetpack Compose client for live sports streams. It reads
 | DI | Koin |
 | Networking | Retrofit 3, OkHttp 4, kotlinx.serialization |
 | Images | Coil 3 |
-| Playback | Media3 ExoPlayer for HLS, sandboxed WebView for `embed.st` |
+| Playback | Media3 ExoPlayer for HLS, DASH and progressive streams (MPEG-TS, MP4…), sandboxed WebView for web pages |
 
 ## Layout
 
 ```
 app/src/main/java/com/sportzfy/live/
 ├── core/network/   Retrofit service, browser-header interceptor, error mapping
-├── core/player/    URL policy, ad-host list, HLS vs embed detection
+├── core/player/    URL policy, ad-host list, media vs embed detection
 ├── core/theme/     colors, typography, shapes
 ├── core/time/      injectable clock
 ├── data/model/     wire DTOs
@@ -30,7 +30,7 @@ app/src/main/java/com/sportzfy/live/
 ├── presentation/
 │   ├── catalog/      MatchCatalogScreen + CatalogViewModel
 │   ├── watch/        WatchStudioScreen + WatchViewModel
-│   │   └── player/   StreamPlayer: sandboxed WebView + Media3 HLS
+│   │   └── player/   StreamPlayer: sandboxed WebView + Media3 (HLS, DASH, progressive)
 │   ├── components/   MatchCard, HeroSpotlight, CategoryPills, StreamChip, LiveBadge, TeamCrest
 │   ├── model/        UI state + pure logic (filtering, labels, related matches)
 │   └── navigation/   type-safe routes and NavHost
@@ -62,7 +62,19 @@ Requires JDK 17+ and the Android SDK (platform 36).
 
 ## Playback
 
-`StreamPlayer(url)` chooses an engine from the URL. `.m3u8` links play in Media3 ExoPlayer, which fetches segments through the app's OkHttp client. Everything else, which means the `embed.st` pages, plays in a WebView.
+`StreamPlayer(url)` chooses an engine from the URL's extension, or from a channel's `type` when it has one:
+
+| Format | Recognised by | Engine |
+|---|---|---|
+| HLS | `.m3u8`, or `"type": "hls"` | Media3 |
+| MPEG-DASH | `.mpd`, or `"type": "dash"` | Media3 |
+| Progressive: MPEG-TS, MP4, Matroska/WebM, FLV, MP3, AAC | `.ts` `.mts` `.m2ts` `.mp4` `.m4v` `.mkv` `.webm` `.mov` `.flv` `.mp3` `.aac` `.m4a`, or `"type": "ts"` / `"mp4"` / `"progressive"` | Media3 (the container is sniffed from the bytes) |
+| Web page | anything else, or `"type": "embed"` | WebView |
+
+- Media3 fetches everything through the app's OkHttp client, so it carries the same browser headers as API calls.
+- Streams may be **http or https**. Cleartext is allowed app-wide (`res/xml/network_security_config.xml`) because many IPTV feeds have no TLS; the app's own calls (APIs, remote config, images) stay https. `PlayerConfig.allowHttpStreams` is the switch for http streams.
+- A live stream that falls behind its window jumps back to the live edge on its own.
+- Errors say what happened: a feed that stopped offers **Retry**; a stream the device can't decode, or one that is DRM-protected, says so with no Retry, since it won't help.
 
 By default (`playerMode: "direct"`), the embed page is loaded as the WebView's own page, like a browser tab, with streamed.pk as the referer (as streamed.pk's own embed iframe sends). Match streams use this, and it works for embeds that show only a black frame when nested in an iframe inside the WebView. Live TV channels run in a **sandboxed iframe** instead (`sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-presentation"`, no pop-ups, no top-level navigation, no referer), so a channel cannot move the app's page. With `playerMode: "iframe"`, the embed instead runs inside a **plain iframe with no `sandbox` attribute**, the same way the website plays it (`allow="autoplay; fullscreen; encrypted-media; picture-in-picture"`, `allowfullscreen`, `referrerpolicy="no-referrer"`). Each match also has an **Open in browser** button for a stream that won't play in the app.
 
@@ -126,18 +138,19 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
 ## Live TV
 
 - **Channel list:** loaded from [`channels.json`](https://github.com/svimran46/playlist.m3u/blob/main/channels.json) in the playlist repo. You can point the app at another file with `channelsUrl` in the remote config.
-  - The file can be the JavaScript snippet it is today (`const channels = [...];`) or a plain JSON array. Each entry needs a `name` and an https `url`. `logo` is optional.
-  - Entries without a name or an https stream are skipped, and so are repeated streams. Logo URLs have their repeated `&amp;` escaping undone, and non-https logos show the channel's initials instead.
+  - The file can be the JavaScript snippet it is today (`const channels = [...];`), a plain JSON array, or an **M3U playlist** (`#EXTM3U` with `#EXTINF` entries, as IPTV providers publish; the title, `tvg-logo` and `group-title`/`#EXTGRP` are read).
+  - Each JSON entry needs a `name` and an http(s) `url`. `logo` is optional. `type` (`hls`, `dash`, `ts`, `mp4`, `embed`) says how to play a URL whose extension doesn't, such as an IPTV feed at `http://host:8080/user/pass/123`.
+  - Entries without a name or an http(s) stream are skipped, and so are repeated streams. Logo URLs have their repeated `&amp;` escaping undone, and non-https logos show the channel's initials instead.
   - The list is kept for 30 minutes. If a reload fails, the last good list stays on screen with a banner.
 - **Groups:** **Football**, **Cricket** and **Others**. Every entry upstream has `"genre": "Sports"`, cartoon channels included, so genre can't be used to group them. Instead:
   - An entry's optional `category` field (`football`, `cricket` or `others`) decides its group.
-  - Otherwise the name decides. "Cricket" or "Willow" means Cricket. "Football", "Fussball", "LaLiga", "Bundesliga", "Premier League" and similar mean Football. Everything else is Others.
+  - Otherwise the name decides, then the category text (an M3U `group-title` like "UK Football"). "Cricket" or "Willow" means Cricket. "Football", "Fussball", "LaLiga", "Bundesliga", "Premier League" and similar mean Football. Everything else is Others.
   - A chip only appears for a group that has channels.
 - **Search:** matches every word you type against the channel's name and group.
 - **No LIVE badges:** the directory doesn't say whether a channel is on air, so the app doesn't claim it.
-- **Playback:** a channel opens like a browser tab.
+- **Playback:** a media stream (HLS, DASH, MPEG-TS…) plays in Media3, as above. A web page opens like a browser tab.
   - Its page is loaded directly, not inside a frame (many channel pages refuse to run in someone else's frame).
-  - It may hand off to its real player on another https site.
+  - It may hand off to its real player on another site.
   - No streamed.pk referrer is sent.
   - Pop-up windows and known ad hosts stay blocked, and fullscreen works as for matches.
   - The stream host is shown as the channel's source, with an **Open in browser** button as a fallback.
@@ -180,15 +193,15 @@ All tests run on the JVM with `./gradlew testDebugUnitTest`. No emulator is need
 | Layer | What is covered |
 |---|---|
 | Network | Request paths, URL encoding and browser headers, against MockWebServer; mapping error codes to user-facing errors |
-| Data | Merging the today and live feeds and setting match status, the stream-data cleanup, the 60-second caches, and each failure-isolation path in both repositories |
-| Domain / player | The `embed.st` URL builder, the WebView navigation and ad rules, and choosing HLS or embed |
+| Data | Merging the today and live feeds and setting match status, the stream-data cleanup, the 60-second caches, each failure-isolation path in both repositories, and reading channel lists (channels.json, plain JSON, M3U) |
+| Domain / player | The `embed.st` URL builder, the WebView navigation and ad rules, choosing the engine and format (extension, `type` hint, http switch) and the Media3 error messages |
 | Presentation logic | Filtering, search with aliases, the Saved filter, the spotlight pick, related matches, the default stream, and time labels |
 | ViewModels | `CatalogViewModel` (sport filter, search, saving matches) and `WatchViewModel` (default stream, stream picker, switching match, missing match, failed sources, favourites) |
 | UI (Robolectric) | Tapping a sport pill filters the rendered list; search narrows it; tapping a stream chip makes it the selected stream |
 
 ## Release builds
 
-`assembleRelease` shrinks the code and resources with R8. Media3, Coil, OkHttp, Retrofit, kotlinx.serialization and Koin all ship their own keep rules. `app/proguard-rules.pro` adds only the app-specific ones: the generated serializers, the Retrofit service, and keeping line numbers so crash traces can be mapped back.
+`assembleRelease` shrinks the code and resources with R8. Media3 (including the HLS and DASH modules it loads by reflection), Coil, OkHttp, Retrofit, kotlinx.serialization and Koin all ship their own keep rules. `app/proguard-rules.pro` adds only the app-specific ones: the generated serializers, the Retrofit service, and keeping line numbers so crash traces can be mapped back.
 
 **Signing.** Set `SPORTZFY_KEYSTORE_FILE`, `SPORTZFY_KEYSTORE_PASSWORD`, `SPORTZFY_KEY_ALIAS` and `SPORTZFY_KEY_PASSWORD` to sign with your own key. Without them, the release APK is signed with the debug key so it can still be installed for testing.
 

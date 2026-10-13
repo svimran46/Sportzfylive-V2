@@ -34,6 +34,10 @@ data class PlayerConfig(
      * open pop-ups or move the app's page. Live TV channels use it.
      */
     val sandboxed: Boolean = false,
+    /** Plain-http streams and pages may play. Cleartext is allowed app-wide; this is the switch. */
+    val allowHttpStreams: Boolean = true,
+    /** DASH and progressive (MPEG-TS, MP4…) streams play in Media3. HLS and web pages always do. */
+    val extendedFormats: Boolean = true,
 ) {
     companion object {
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(

@@ -2,6 +2,7 @@ package com.sportzfy.live.data.channels
 
 import com.sportzfy.live.core.network.NetworkJson
 import com.sportzfy.live.domain.model.ChannelCategory
+import com.sportzfy.live.domain.model.StreamFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -55,14 +56,64 @@ class ChannelParserTest {
     }
 
     @Test
-    fun `skips entries without a name or an https stream, and repeated streams`() {
+    fun `skips entries without a name or an http(s) stream, and repeated streams`() {
         val raw = """[
             ${entry("Good", "https://tv.example/good")},
             {"url":"https://tv.example/nameless"},
             ${entry("Plain http", "http://tv.example/http")},
+            ${entry("Not web", "rtmp://tv.example/live")},
+            ${entry("Script", "javascript:alert(1)")},
             ${entry("Copy", "https://tv.example/good")}
         ]"""
-        assertEquals(listOf("Good"), parse(raw)!!.map { it.name })
+        assertEquals(listOf("Good", "Plain http"), parse(raw)!!.map { it.name })
+    }
+
+    @Test
+    fun `a type field sets the stream format, read loosely`() {
+        val raw = """[
+            {"name":"IPTV","url":"http://iptv.example:8080/u/p/123","type":"ts"},
+            {"name":"Dash","url":"https://cdn.example/play?id=1","type":" DASH "},
+            {"name":"Odd","url":"https://tv.example/odd","type":5},
+            {"name":"Unknown","url":"https://tv.example/unknown","type":"rtmp"},
+            {"name":"None","url":"https://tv.example/none"}
+        ]"""
+        assertEquals(
+            listOf(StreamFormat.PROGRESSIVE, StreamFormat.DASH, null, null, null),
+            parse(raw)!!.map { it.streamFormat },
+        )
+    }
+
+    @Test
+    fun `reads M3U playlists`() {
+        val raw = "\uFEFF#EXTM3U x-tvg-url=\"https://epg.example/guide.xml\"\n" +
+            "#EXTINF:-1 tvg-id=\"sky.uk\" tvg-logo=\"https://img.example/sky.png\" group-title=\"UK Football\",Sky Sports Main Event\n" +
+            "#EXTVLCOPT:http-referrer=https://tv.example/\n" +
+            "http://iptv.example:8080/live/u/p/1.ts\n" +
+            "\n" +
+            "#EXTINF:-1 tvg-name=\"Willow\" tvg-logo=\"http://img.example/w.png\",\n" +
+            "#EXTGRP:Cricket\n" +
+            "https://cdn.example/willow/index.m3u8\r\n" +
+            "#EXTINF:-1 group-title=\"News, World\",BBC, One\n" +
+            "https://cdn.example/bbc/manifest.mpd\n" +
+            "https://cdn.example/orphan.m3u8\n" +
+            "#EXTINF:-1,No URL\n"
+        val channels = parse(raw)!!
+        assertEquals(listOf("Sky Sports Main Event", "Willow", "BBC, One"), channels.map { it.name })
+        assertEquals(
+            listOf("http://iptv.example:8080/live/u/p/1.ts", "https://cdn.example/willow/index.m3u8", "https://cdn.example/bbc/manifest.mpd"),
+            channels.map { it.streamUrl },
+        )
+        assertEquals(listOf("https://img.example/sky.png", null, null), channels.map { it.logoUrl })
+        assertEquals(
+            listOf(ChannelCategory.FOOTBALL, ChannelCategory.CRICKET, ChannelCategory.OTHERS),
+            channels.map { it.category },
+        )
+        assertEquals(listOf<StreamFormat?>(null, null, null), channels.map { it.streamFormat })
+    }
+
+    @Test
+    fun `an M3U playlist with no entries is an empty list, not an error`() {
+        assertEquals(emptyList<Any>(), parse("#EXTM3U\n"))
     }
 
     @Test
