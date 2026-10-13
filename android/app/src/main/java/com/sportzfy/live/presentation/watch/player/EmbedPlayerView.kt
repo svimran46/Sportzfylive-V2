@@ -131,18 +131,19 @@ internal fun EmbedPlayerView(
             },
             update = { view ->
                 val webView = view as? WebView ?: return@AndroidView
-                val request = LoadRequest(url, state.reloadToken, config.mode)
+                val request = LoadRequest(url, state.reloadToken, config.mode, config.sandboxed)
                 if (webView.tag != request) {
                     webView.tag = request
-                    when (config.mode) {
-                        PlayerMode.IFRAME -> webView.loadDataWithBaseURL(
+                    if (config.mode == PlayerMode.IFRAME || config.sandboxed) {
+                        webView.loadDataWithBaseURL(
                             EmbedFrame.BASE_URL,
-                            EmbedFrame.html(url),
+                            EmbedFrame.html(url, if (config.sandboxed) EmbedFrame.SANDBOX else null),
                             "text/html",
                             "utf-8",
                             null,
                         )
-                        PlayerMode.DIRECT -> webView.loadUrl(url, config.referer?.let { mapOf("Referer" to it) } ?: emptyMap())
+                    } else {
+                        webView.loadUrl(url, config.referer?.let { mapOf("Referer" to it) } ?: emptyMap())
                     }
                 }
             },
@@ -163,4 +164,4 @@ private class WebViewHolder {
     var deadWebView: WebView? = null
 }
 
-private data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode)
+private data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode, val sandboxed: Boolean)

@@ -27,6 +27,14 @@ class EmbedFrameTest {
     }
 
     @Test
+    fun `sandboxed frame drops pop-up and top-navigation rights`() {
+        val html = EmbedFrame.html("https://channel.example/live", EmbedFrame.SANDBOX)
+        assertTrue(html.contains("""sandbox="${EmbedFrame.SANDBOX}" """))
+        assertFalse(EmbedFrame.SANDBOX.contains("allow-popups"))
+        assertFalse(EmbedFrame.SANDBOX.contains("allow-top-navigation"))
+    }
+
+    @Test
     fun `player config follows the remote config`() {
         // Ads play by default: the stream sites need them to serve the stream.
         // Embeds load directly, like a browser tab, referred by streamed.pk like its own embed.
