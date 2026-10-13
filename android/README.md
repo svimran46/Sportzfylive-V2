@@ -154,7 +154,9 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
 
 ## Remote control
 
-Every installed app reads [`android/remote-config.json`](remote-config.json) from this repo's `main` branch when it starts, and again every 5 minutes while it is open. To change the app, edit that file on GitHub (the website or the GitHub mobile app both work) and commit. Installed apps pick the change up within a few minutes, with no new APK needed. The last good config is saved on each device, so settings like maintenance mode still apply when the user is offline. If a broken edit leaves the file as invalid JSON, apps ignore it and keep the previous config.
+Every installed app reads its config from the Worker (`GET /api/app/config`) when it starts, and again every 5 minutes while it is open. Change it from the admin panel's **Android app** page (`/admin#/app`): maintenance mode, forced updates, the announcement banner, the featured match, hidden sports, player options and data sources. Saves reach installed apps within a minute, with no new APK needed. The last good config is saved on each device, so settings like maintenance mode still apply when the user is offline. If the Worker can't be reached, apps keep the previous config.
+
+The page edits the fields below, and the Worker serves them in this shape. [`remote-config.json`](remote-config.json) holds the same shape. Builds released before the Worker config (version code 2 and earlier) still read that file from GitHub, so edit it too if you need to reach them.
 
 | Field | Effect |
 |---|---|

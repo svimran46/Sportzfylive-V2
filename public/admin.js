@@ -300,6 +300,7 @@ const NAV = [
   { route: "", page: "dashboard", text: "Dashboard", icon: "home" },
   { route: "matches", page: "matches", text: "Matches", icon: "calendar" },
   { route: "tv", page: "tv", text: "Live TV", icon: "tv" },
+  { route: "app", page: "app", text: "Android app", icon: "signal" },
   { route: "logs", page: "logs", text: "Fetch Logs", icon: "logs" },
   { route: "settings", page: "settings", text: "Settings", icon: "settings" },
   { label: "Public site" },
@@ -328,6 +329,7 @@ const ROUTES = [
   { re: /^tv$/, page: "tv", title: "Live TV", render: () => renderChannels() },
   { re: /^tv\/new$/, page: "tv", title: "Add TV Channel", render: () => renderChannelForm(null) },
   { re: /^tv\/([^/]+)$/, page: "tv", title: "Edit TV Channel", render: (id) => renderChannelForm(id) },
+  { re: /^app$/, page: "app", title: "Android app", render: () => renderApp() },
   { re: /^logs$/, page: "logs", title: "Fetch Logs", render: () => renderLogs() },
   { re: /^settings(?:\/([A-Za-z]+))?$/, page: "settings", title: "Settings", render: (section) => renderSettings(section) }
 ];
@@ -480,6 +482,7 @@ async function renderDashboard() {
           qa("#/matches", "edit", "Manage Matches", "View, edit, and delete matches and their streams") +
           qa("#/matches/new", "plus", "Add a Match", "Create a manual match and attach Live TV streams") +
           qa("#/tv", "tv", "Manage Live TV", "Add, edit, import and sync Live TV channels") +
+          qa("#/app", "signal", "Control the app", "Maintenance mode, forced updates, announcements and what the Android app shows") +
           qa("#/logs", "logs", "Fetch Logs", "View schedule fetch history and errors") +
           qa("#/settings", "settings", "Settings", "Stream delivery, live windows, site notice, and maintenance") +
         "</div>") +
@@ -1503,6 +1506,98 @@ async function renderSettings(section) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Android app control                                                 */
+/* ------------------------------------------------------------------ */
+
+async function renderApp() {
+  const renderId = state.renderId;
+  const [data, matches] = await Promise.all([loadSettings(true), loadMatches().catch(() => [])]);
+  if (stale(renderId)) return;
+  const a = data.settings.app;
+  const hidden = new Set(a.hiddenCategories);
+  const option = (value, label, current) => '<option value="' + value + '"' + (current === value ? " selected" : "") + ">" + label + "</option>";
+
+  setView(
+    pageHead("Android app", "Everything here reaches installed apps within a minute — no update to ship. The app keeps its last good copy when it is offline.") +
+    '<div id="appStatus"></div>' +
+
+    '<div class="group-label">AVAILABILITY</div>' +
+    card("app-availability", "wrench", "Maintenance & updates", "Maintenance mode replaces the whole app with your message. A minimum version blocks every older build with an “update required” screen until it is replaced.",
+      '<form data-submit="app-availability">' +
+        switchRow("maintenanceEnabled", "Maintenance mode", "Takes the app offline for everyone, immediately. Turn it back off to restore it.", a.maintenanceEnabled) +
+        '<div class="field" style="margin-top:12px"><label for="ap-mm">Maintenance message</label><textarea id="ap-mm" name="maintenanceMessage" class="textarea" maxlength="300" style="min-height:80px" placeholder="We’ll be back shortly.">' + esc(a.maintenanceMessage) + "</textarea></div>" +
+        '<div class="grid-2"><div class="field"><label for="ap-min">Minimum version code</label><input id="ap-min" name="minVersionCode" type="number" min="0" class="input" value="' + esc(a.minVersionCode) + '"><div class="hint">Builds below this are forced to update. 0 turns it off. Use the <code>versionCode</code> from <code>build.gradle.kts</code>.</div></div>' +
+        '<div class="field"><label for="ap-upd">Update link</label><input id="ap-upd" name="updateUrl" class="input mono" placeholder="https://… (download or store page)" value="' + esc(a.updateUrl) + '"></div></div>' +
+        saveRow("Save availability", "app") + "</form>") +
+
+    '<div class="group-label">CONTENT</div>' +
+    card("app-announcement", "megaphone", "Announcement", "A banner above the match list. Leave the message blank to hide it.",
+      '<form data-submit="app-announcement">' +
+        '<div class="field"><label for="ap-am">Message</label><textarea id="ap-am" name="announcementMessage" class="textarea" maxlength="300" style="min-height:80px">' + esc(a.announcementMessage) + "</textarea></div>" +
+        '<div class="field"><label for="ap-au">Link (optional)</label><input id="ap-au" name="announcementUrl" class="input mono" placeholder="https://…" value="' + esc(a.announcementUrl) + '"><div class="hint">Makes the banner tappable. https only.</div></div>' +
+        saveRow("Save announcement", "app") + "</form>") +
+    card("app-content", "calendar", "Catalog", "Pin a match into the spotlight and hide whole sports from the app.",
+      '<form data-submit="app-content">' +
+        '<div class="field"><label for="ap-fm">Featured match ID</label><input id="ap-fm" name="featuredMatchId" class="input mono" list="appMatchList" placeholder="Match ID (blank = automatic)" value="' + esc(a.featuredMatchId) + '">' +
+        '<datalist id="appMatchList">' + matches.slice(0, 200).map(m => '<option value="' + esc(m.id) + '">' + esc(m.title || "") + "</option>").join("") + "</datalist>" +
+        '<div class="hint">Shown in the spotlight while the match is in today’s feed. Start typing to pick from the site’s matches.</div></div>' +
+        '<h3 class="sub">Hidden sports</h3><p class="sub-desc">Ticked sports disappear from the app’s catalog.</p><div class="cat-grid">' +
+        data.appSports.map(sport => '<label class="check"><input type="checkbox" name="hide" value="' + esc(sport.key) + '"' + (hidden.has(sport.key) ? " checked" : "") + "><span>" + esc(sport.label) + "</span></label>").join("") + "</div>" +
+        saveRow("Save catalog", "app") + "</form>") +
+
+    '<div class="group-label">PLAYER &amp; SOURCES</div>' +
+    card("app-player", "tv", "Player", "How embedded streams load, and the ad-network block list.",
+      '<form data-submit="app-player">' +
+        '<div class="field"><label for="ap-pm">Embed mode</label><select id="ap-pm" name="playerMode" class="select">' +
+          option("direct", "Direct — page loads like a browser tab (recommended)", a.playerMode) +
+          option("iframe", "Iframe — embed inside a plain iframe, like the website", a.playerMode) + "</select></div>" +
+        switchRow("adBlocking", "Built-in ad blocking", "Off by default: most stream sites are paid for by their ads and refuse to play while they are blocked.", a.adBlocking) +
+        '<div class="field" style="margin-top:12px"><label for="ap-bh">Extra blocked hosts</label><textarea id="ap-bh" name="extraBlockedHosts" class="textarea mono" style="min-height:90px" placeholder="ads.example.com">' + esc(a.extraBlockedHosts.join("\n")) + "</textarea><div class=\"hint\">One host per line. Applies to pop-ups and sub-resources in the player.</div></div>" +
+        saveRow("Save player settings", "app") + "</form>") +
+    card("app-sources", "inbox", "Data sources", "Where the app loads its channel list and falls back to when a stream host blocks the phone.",
+      '<form data-submit="app-sources">' +
+        '<div class="field"><label for="ap-ch">Channel list URL</label><input id="ap-ch" name="channelsUrl" class="input mono" placeholder="Blank = the app’s built-in channels.json" value="' + esc(a.channelsUrl) + '"><div class="hint">https only. A JSON list in the channels.json format.</div></div>' +
+        switchRow("streamProxyEnabled", "Stream proxy fallback", "When streamed.pk blocks the phone, retry through a Worker. Off: no fallback.", a.streamProxyEnabled) +
+        '<div class="field" style="margin-top:12px"><label for="ap-sp">Proxy URL</label><input id="ap-sp" name="streamProxyUrl" class="input mono" placeholder="Blank = this Worker" value="' + esc(a.streamProxyUrl) + '"></div>' +
+        saveRow("Save sources", "app") + "</form>") +
+
+    '<div class="group-label">LIVE VIEW</div>' +
+    card("app-live", "logs", "What the app receives", "The exact JSON served to installed apps right now.",
+      '<div id="appLive"><div class="skeleton" style="height:120px"></div></div>' +
+      '<div class="form-actions"><button class="btn sm" type="button" data-action="app-refresh">Refresh</button><button class="btn sm" type="button" data-action="app-copy-url">Copy config URL</button></div>')
+  );
+  refreshAppLive();
+}
+
+async function refreshAppLive() {
+  const host = $("#appLive");
+  const status = $("#appStatus");
+  if (!host) return;
+  try {
+    const response = await fetch(API + "/api/app/config", { headers: { Accept: "application/json" }, cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const config = await response.json();
+    if (!$("#appLive")) return;
+    host.innerHTML = '<pre class="code-block">' + esc(JSON.stringify(config, null, 2)) + "</pre>";
+    const maintenance = config.maintenance?.enabled;
+    const forced = Number(config.minVersionCode) > 0;
+    status.innerHTML = '<div class="status-box' + (maintenance ? " bad" : "") + '"><span class="status-dot"></span><div><b>' +
+      (maintenance ? "App is in maintenance mode" : "App is live") + "</b>" +
+      (maintenance ? "Every install shows the maintenance screen." : "Installed apps are serving normally.") +
+      (forced ? " Builds below version code " + esc(config.minVersionCode) + " are forced to update." : "") +
+      (config.announcement?.message ? " An announcement is showing." : "") + "</div></div>";
+  } catch (error) {
+    host.innerHTML = '<div class="error-box">Could not load the config: ' + esc(error.message) + "</div>";
+  }
+}
+
+async function saveAppSection(form, body) {
+  const result = await saveSection("app", body, form);
+  if (result) refreshAppLive();
+  return result;
+}
+
 function setupScrollSpy() {
   if (!("IntersectionObserver" in window)) return;
   const tabs = new Map($$(".tab").map(t => [t.dataset.target, t]));
@@ -1601,6 +1696,23 @@ const SETTINGS_SUBMIT = {
       enabled: f.elements.bannerEnabled.checked, image: f.elements.bannerImage.value.trim(), link: f.elements.bannerLink.value.trim(), alt: f.elements.bannerAlt.value.trim()
     }, f);
   },
+  "app-availability": (f) => saveAppSection(f, {
+    maintenanceEnabled: f.elements.maintenanceEnabled.checked, maintenanceMessage: f.elements.maintenanceMessage.value,
+    minVersionCode: f.elements.minVersionCode.value, updateUrl: f.elements.updateUrl.value.trim()
+  }),
+  "app-announcement": (f) => saveAppSection(f, {
+    announcementMessage: f.elements.announcementMessage.value, announcementUrl: f.elements.announcementUrl.value.trim()
+  }),
+  "app-content": (f) => saveAppSection(f, {
+    featuredMatchId: f.elements.featuredMatchId.value.trim(),
+    hiddenCategories: $$('input[name="hide"]:checked', f).map(input => input.value)
+  }),
+  "app-player": (f) => saveAppSection(f, {
+    playerMode: f.elements.playerMode.value, adBlocking: f.elements.adBlocking.checked, extraBlockedHosts: f.elements.extraBlockedHosts.value
+  }),
+  "app-sources": (f) => saveAppSection(f, {
+    channelsUrl: f.elements.channelsUrl.value.trim(), streamProxyEnabled: f.elements.streamProxyEnabled.checked, streamProxyUrl: f.elements.streamProxyUrl.value.trim()
+  }),
   "settings-identity": (f) => saveSection("identity", {
     siteName: f.elements.siteName.value.trim(), tagline: f.elements.tagline.value.trim(), contactEmail: f.elements.contactEmail.value.trim()
   }, f)
@@ -1804,6 +1916,16 @@ const ACTIONS = {
     route();
   },
 
+  "app-refresh": () => refreshAppLive(),
+  "app-copy-url": async () => {
+    const link = (API || location.origin) + "/api/app/config";
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Config URL copied");
+    } catch (_) {
+      toast(link);
+    }
+  },
   "settings-tab": (el) => {
     const target = $("#set-" + el.dataset.target);
     if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });

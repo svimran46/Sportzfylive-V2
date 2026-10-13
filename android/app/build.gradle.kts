@@ -16,11 +16,12 @@ android {
         versionCode = 2
         versionName = "1.1.0"
 
-        // Owner-editable remote config (see README "Remote control").
+        // Owner-editable remote config, served by the Worker and edited from the
+        // admin "Android app" page (see README "Remote control").
         buildConfigField(
             "String",
             "REMOTE_CONFIG_URL",
-            "\"https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/android/remote-config.json\"",
+            "\"https://sportzfylive.svimranmy.workers.dev/api/app/config\"",
         )
 
         // Test switch for one player method at a time (see PlayerConfig.dropPopups).

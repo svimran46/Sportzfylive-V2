@@ -13,9 +13,9 @@ import okhttp3.Request
 import java.io.IOException
 
 /**
- * Fetches the config from GitHub. raw.githubusercontent.com caches files for
- * about five minutes; a per-minute query parameter keeps edits from waiting
- * out that cache.
+ * Fetches the config from the Worker (`/api/app/config`). The per-minute query
+ * parameter is ignored there; it keeps edits from waiting out a CDN cache, which
+ * mattered when the config was a raw GitHub file.
  */
 class HttpConfigSource(
     private val client: OkHttpClient,
