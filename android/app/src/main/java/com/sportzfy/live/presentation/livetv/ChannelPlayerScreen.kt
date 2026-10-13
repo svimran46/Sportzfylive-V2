@@ -97,14 +97,14 @@ fun ChannelPlayerScreen(
                 // Only this channel's own host joins embed.st as a page the
                 // player may open; every other rule stays as it is for matches.
                 val base = PlayerConfig.from(LocalAppConfig.current)
-                // Channel pages are opened like a browser tab: loaded directly
-                // (many refuse to run inside someone else's frame) and without
-                // the streamed.pk referer. Their ads, redirects and pop-ups work
-                // as in a browser, like every stream in the app.
+                // Channel pages run in a sandboxed frame with no referer. The
+                // sandbox refuses pop-ups and top-level redirects, so the channel
+                // cannot move the app's page. Only the page inside the frame plays.
                 val config = base.copy(
                     mode = PlayerMode.DIRECT,
                     trustedHosts = base.trustedHosts + channel.sourceHost,
                     referer = null,
+                    sandboxed = true,
                 )
                 BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
                     // Measured outside the scroll so the player can be capped to

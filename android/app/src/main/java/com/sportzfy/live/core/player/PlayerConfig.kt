@@ -29,6 +29,11 @@ data class PlayerConfig(
     val referer: String? = StreamedEndpoints.REFERER,
     /** Refuse pop-up windows instead of opening them in the browser. Debug-build switch for now. */
     val dropPopups: Boolean = false,
+    /**
+     * Frames the page in a sandboxed iframe ([EmbedFrame.SANDBOX]), so it cannot
+     * open pop-ups or move the app's page. Live TV channels use it.
+     */
+    val sandboxed: Boolean = false,
 ) {
     companion object {
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(
