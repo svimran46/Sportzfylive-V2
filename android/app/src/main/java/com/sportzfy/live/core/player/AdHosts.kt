@@ -2,9 +2,9 @@ package com.sportzfy.live.core.player
 
 /**
  * Ad, pop-under and redirect networks commonly injected into sports embeds.
- * Matched as a host or any of its subdomains. The main-frame lock in
- * [PlayerUrlPolicy] stops redirects from unlisted hosts; this list also stops
- * their scripts and subframes from loading at all.
+ * Matched as a host or any of its subdomains. Navigations, pop-ups and
+ * subframes from these hosts are refused. Their scripts are not refused by
+ * default, because the embed checks that they loaded (see [PlayerUrlPolicy]).
  */
 object AdHosts {
     val DEFAULT: Set<String> = setOf(
