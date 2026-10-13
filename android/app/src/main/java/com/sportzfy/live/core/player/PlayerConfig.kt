@@ -1,5 +1,6 @@
 package com.sportzfy.live.core.player
 
+import com.sportzfy.live.BuildConfig
 import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.PlayerMode
@@ -26,12 +27,15 @@ data class PlayerConfig(
      * send streamed.pk's, as its own embed iframe does; Live TV sends none.
      */
     val referer: String? = StreamedEndpoints.REFERER,
+    /** Refuse pop-up windows instead of opening them in the browser. Debug-build switch for now. */
+    val dropPopups: Boolean = false,
 ) {
     companion object {
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(
             mode = config.playerMode,
             blockedHosts = (if (config.adBlocking) AdHosts.DEFAULT else emptySet()) + config.extraBlockedHosts,
             blockedResourceHosts = config.extraBlockedHosts,
+            dropPopups = BuildConfig.DROP_POPUPS,
         )
     }
 }

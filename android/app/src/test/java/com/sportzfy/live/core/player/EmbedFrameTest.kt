@@ -1,5 +1,6 @@
 package com.sportzfy.live.core.player
 
+import com.sportzfy.live.BuildConfig
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.PlayerMode
 import org.junit.Assert.assertEquals
@@ -38,6 +39,12 @@ class EmbedFrameTest {
         assertEquals(PlayerMode.IFRAME, noAds.mode)
         assertEquals(setOf("bad.com"), noAds.blockedHosts)
         assertTrue(PlayerConfig.from(AppConfig(adBlocking = true, extraBlockedHosts = setOf("bad.com"))).blockedHosts.containsAll(AdHosts.DEFAULT + "bad.com"))
+    }
+
+    @Test
+    fun `pop-up switch is off unless a debug build sets it`() {
+        assertFalse(PlayerUrlPolicy().dropPopups)
+        assertEquals(BuildConfig.DROP_POPUPS, PlayerConfig.from(AppConfig.Default).dropPopups)
     }
 
     @Test
