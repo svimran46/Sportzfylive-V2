@@ -136,7 +136,7 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 ## Security
 
 - **XSS Prevention**: All user data is sanitized and rendered safely using DOM methods
-- **Embeds**: Iframe embeds are not sandboxed (embed players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need
+- **Embeds**: Match iframe embeds are not sandboxed (embed players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. The Android app's Live TV channels are the exception: they run in a sandboxed iframe (no pop-ups, no top-level navigation)
 - **Input Validation**: All data is validated before rendering
 
 ## Browser Support

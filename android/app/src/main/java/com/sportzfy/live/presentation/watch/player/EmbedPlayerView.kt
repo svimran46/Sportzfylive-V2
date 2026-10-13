@@ -136,7 +136,7 @@ internal fun EmbedPlayerView(
                     webView.tag = request
                     if (config.mode == PlayerMode.IFRAME || config.sandboxed) {
                         webView.loadDataWithBaseURL(
-                            EmbedFrame.BASE_URL,
+                            if (config.sandboxed) EmbedFrame.SANDBOX_BASE_URL else EmbedFrame.BASE_URL,
                             EmbedFrame.html(url, if (config.sandboxed) EmbedFrame.SANDBOX else null),
                             "text/html",
                             "utf-8",
@@ -164,4 +164,4 @@ private class WebViewHolder {
     var deadWebView: WebView? = null
 }
 
-private data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode, val sandboxed: Boolean)
+internal data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode, val sandboxed: Boolean)
