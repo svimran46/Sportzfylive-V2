@@ -60,7 +60,7 @@ class PlayerUrlPolicyTest {
     }
 
     @Test
-    fun `app links and other schemes never load`() {
+    fun `app links and other schemes never load at the top level`() {
         for (url in listOf(
             "intent://scan/#Intent;scheme=market;end",
             "market://details?id=com.casino",
@@ -74,10 +74,8 @@ class PlayerUrlPolicyTest {
             "",
         )) {
             assertEquals(url, BLOCK, main(url))
-            assertEquals(url, BLOCK, sub(url))
         }
         assertEquals(BLOCK, main("data:text/html,<script>"))
-        assertEquals(ALLOW, sub("blob:https://player.example/1234"))
     }
 
     @Test
@@ -87,35 +85,44 @@ class PlayerUrlPolicyTest {
     }
 
     @Test
-    fun `subframes may load any third-party player but not ad networks`() {
-        assertEquals(ALLOW, sub("https://other-player.example/embed/1"))
-        assertEquals(ALLOW, sub("http://iptv.example:8080/embed/1"))
-        assertEquals(BLOCK, sub("https://googleads.g.doubleclick.net/pagead"))
-        assertEquals(BLOCK, sub("https://www.propellerads.com/x"))
+    fun `subframes always load so nested cross-domain players work`() {
+        for (url in listOf(
+            "https://other-player.example/embed/1",
+            "http://iptv.example:8080/embed/1",
+            "https://googleads.g.doubleclick.net/pagead",
+            "https://www.propellerads.com/x",
+            "blob:https://player.example/1234",
+            "about:srcdoc",
+            "intent://scan/#Intent;scheme=market;end",
+        )) {
+            assertEquals(url, ALLOW, sub(url))
+        }
     }
 
     @Test
-    fun `resources from ad hosts are blocked`() {
-        assertEquals(BLOCK, policy.resource("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"))
-        assertEquals(BLOCK, policy.resource("https://a.exosrv.com/ad-provider.js"))
+    fun `scripts are not blocked by default, even from ad networks`() {
+        // Inline player setup calls into these; refusing them leaves the player black.
+        assertEquals(ALLOW, policy.resource("https://acscdn.com/script/aclib.js"))
+        assertEquals(ALLOW, policy.resource("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"))
         assertEquals(ALLOW, policy.resource("https://cdn.example/hls/master.m3u8"))
         assertEquals(ALLOW, policy.resource("data:image/png;base64,AAAA"))
     }
 
     @Test
-    fun `resource blocking can be narrower than navigation blocking`() {
+    fun `resource blocking covers only the hosts it is given`() {
         val narrow = PlayerUrlPolicy(blockedHosts = AdHosts.DEFAULT, blockedResourceHosts = setOf("bad.test"))
         assertEquals(ALLOW, narrow.resource("https://a.exosrv.com/ad-provider.js"))
         assertEquals(BLOCK, narrow.resource("https://x.bad.test/a.js"))
         assertEquals(BLOCK, narrow.navigation("https://ads.popads.net/r", isMainFrame = true))
-        assertEquals(BLOCK, narrow.navigation("https://a.exosrv.com/frame", isMainFrame = false))
+        assertEquals(ALLOW, narrow.navigation("https://a.exosrv.com/frame", isMainFrame = false))
     }
 
     @Test
     fun `trusted and blocked hosts are configurable`() {
-        val custom = PlayerUrlPolicy(trustedHosts = setOf("player.test"), blockedHosts = setOf("bad.test"))
+        val custom = PlayerUrlPolicy(trustedHosts = setOf("player.test"), blockedHosts = setOf("bad.test"), blockedResourceHosts = setOf("bad.test"))
         assertEquals(ALLOW, custom.navigation("https://player.test/x", isMainFrame = true))
         assertEquals(BLOCK, custom.navigation("https://embed.st/x", isMainFrame = true))
+        assertEquals(BLOCK, custom.navigation("https://bad.test/x", isMainFrame = true))
         assertEquals(BLOCK, custom.resource("https://x.bad.test/a.js"))
     }
 }

@@ -11,11 +11,10 @@ import com.sportzfy.live.domain.model.EmbedUrl
  *   redirects. Ads hijack the page with `top.location` or a pop-up; with
  *   pop-ups trapped by the WebView, both arrive here as main-frame
  *   navigations to another site and are cancelled.
- * - Subframes may load any http(s) page except [blockedHosts], because
- *   embeds nest their real player in third-party iframes.
- * - Other schemes (`intent:`, `market:`, `tel:`, `file:` and so on) never
- *   load. `about:blank` and `about:srcdoc` do, and `data:`/`blob:` do in
- *   subframes, where players use them.
+ * - Subframes always load, whatever their host or scheme: embeds nest their
+ *   real player in cross-domain iframes, and refusing one leaves it black.
+ * - At the top level, other schemes (`intent:`, `market:`, `tel:`, `file:`,
+ *   `data:` and so on) never load; `about:blank` does.
  * - Sub-resources (scripts, XHR, images) from [blockedResourceHosts] are
  *   refused; the WebView answers them with an empty success.
  */
@@ -23,7 +22,7 @@ class PlayerUrlPolicy(
     streamUrl: String? = null,
     private val trustedHosts: Set<String> = setOf(EmbedUrl.HOST),
     private val blockedHosts: Set<String> = AdHosts.DEFAULT,
-    private val blockedResourceHosts: Set<String> = blockedHosts,
+    private val blockedResourceHosts: Set<String> = emptySet(),
 ) {
 
     enum class Decision { ALLOW, BLOCK }
@@ -41,6 +40,7 @@ class PlayerUrlPolicy(
         pageHost: String? = null,
         landing: Boolean = false,
     ): Decision {
+        if (!isMainFrame) return Decision.ALLOW
         val parsed = parse(url) ?: return Decision.BLOCK
         return when (parsed.scheme) {
             "about" -> if (parsed.rest == "blank" || parsed.rest == "srcdoc") Decision.ALLOW else Decision.BLOCK
@@ -48,14 +48,12 @@ class PlayerUrlPolicy(
                 val host = parsed.host
                 when {
                     host == null || host.matchesAny(blockedHosts) -> Decision.BLOCK
-                    !isMainFrame -> Decision.ALLOW
                     // The stream's own server may send its first load elsewhere (a mirror, a CDN page).
                     landing && isRedirect -> Decision.ALLOW
                     host.matchesAny(mainFrameDomains(pageHost)) -> Decision.ALLOW
                     else -> Decision.BLOCK
                 }
             }
-            "data", "blob" -> if (isMainFrame) Decision.BLOCK else Decision.ALLOW
             else -> Decision.BLOCK
         }
     }
