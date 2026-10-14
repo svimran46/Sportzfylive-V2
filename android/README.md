@@ -78,12 +78,13 @@ Requires JDK 17+ and the Android SDK (platform 36).
 
 By default (`playerMode: "direct"`), the embed page is loaded as the WebView's own page, like a browser tab, with streamed.pk as the referer (as streamed.pk's own embed iframe sends). Match streams use this, and it works for embeds that show only a black frame when nested in an iframe inside the WebView. Live TV channels load the same way, with no referer. No page ever runs in a `sandbox` iframe: embeds detect one and refuse to play ("Remove sandbox attributes on the iframe tag"), and inside one their heartbeat scripts can't renew the stream's session cookies and tokens. With `playerMode: "iframe"`, the embed instead runs inside a **plain iframe with no `sandbox` attribute**, the same way the website plays it (`allow="autoplay; fullscreen; encrypted-media; picture-in-picture"`, `allowfullscreen`, `referrerpolicy="no-referrer"`). Each match also has an **Open in browser** button for a stream that won't play in the app.
 
-- **Pop-ups:** `setSupportMultipleWindows(true)` and `javaScriptCanOpenWindowsAutomatically = true`, as in a browser, so every `window.open` or `target=_blank` reaches `onCreateWindow`. There it gets a throwaway WebView that is never shown, refuses every load and is destroyed a few seconds later. `window.open` still returns a window, so pages that test for a pop-up blocker play, but nothing renders or leaves the app.
+- **Pop-ups:** `setSupportMultipleWindows(true)` and `javaScriptCanOpenWindowsAutomatically = true`, as in a browser, so every `window.open` or `target=_blank` reaches `onCreateWindow`. There it gets a throwaway WebView that is never shown, refuses every load and is destroyed a few seconds later. `window.open` still returns a live window (destroyed 1.5 s later), so the player's anti-sandbox check passes, but nothing renders or leaves the app. No JavaScript is injected, so `window.open` stays native.
 - **Navigation:** handled by `PlayerUrlPolicy`, keyed on the stream being played.
   - The outer page stays on the active stream URL's host (its subdomains and `www.`-less form count too), or `embed.st`. Server redirects of the first load are followed, and the host they land on is allowed from then on. Every other top-level navigation (`top.location` hijacks, ad redirects) is cancelled.
-  - Subframes can load any http(s) page except blocked ad networks.
-  - `intent:`, `market:`, `file:` and other schemes are refused.
-- **Ad networks:** every request to the pop-up networks in `AdHosts.ALWAYS_BLOCKED` (popads, popcash, adsterra, propellerads, doubleclick, googlesyndication, onclkds, acscdn, histats), plus any `extraBlockedHosts`, gets an empty `200` (with open CORS), so script `onload` and `fetch()` checks in the embed still pass. With `adBlocking` on, the wider `AdHosts.DEFAULT` list is also refused as pages and subframes.
+  - Subframes always load, whatever their host, so nested cross-domain players (JWPlayer, Clappr and the like) start.
+  - At the top level, `intent:`, `market:`, `file:` and other schemes are refused.
+- **Ad networks:** the page's scripts are never blocked, ad scripts included: inline player setup calls into them (`aclib.js` and the like), and refusing them leaves a black player. The top-level page can never go to the pop-up networks in `AdHosts.ALWAYS_BLOCKED` (popads, popcash, adsterra, propellerads, doubleclick, googlesyndication, onclkds, acscdn, histats), or to the wider `AdHosts.DEFAULT` list with `adBlocking` on. Only hosts in `extraBlockedHosts` have their requests answered with an empty `200`.
+- **Mixed content:** always allowed, so https embeds can pull http playlists and segments.
 - **Dialogs and permissions:** JavaScript dialogs, permission requests, downloads, file access and long-press menus are all disabled.
 - **Fullscreen:** `onShowCustomView` and `onHideCustomView` move the video into a fullscreen landscape view with the system bars hidden. Back exits fullscreen.
 - **Renderer crashes:** if the renderer dies, the player rebuilds its WebView instead of crashing the app.
@@ -177,7 +178,7 @@ The page edits the fields below, and the Worker serves them in this shape. [`rem
 | `announcement.url` | Optional https link that opens when the banner is tapped. |
 | `featuredMatchId` | Pins this match into the spotlight while it's in today's feed. Match IDs are in the Streamed API (`/api/matches/all-today`). |
 | `hiddenCategories` | Sports to hide completely, e.g. `["fight", "motor-sports"]`. Uses the Streamed category keys. |
-| `adBlocking` | `true` also refuses pages and subframes from the wider built-in ad list. Pop-ups, ad redirects and the pop-up networks stay blocked either way. |
+| `adBlocking` | `true` also keeps the top-level page off the wider built-in ad list. Pop-ups and ad redirects stay blocked either way. |
 | `extraBlockedHosts` | More hosts for the player to refuse, e.g. `["newads.example"]`. Subdomains are included. |
 | `playerMode` | `"direct"` (the default; the embed page is the WebView itself, like a browser tab) or `"iframe"` (an unsandboxed iframe, like the website). |
 | `minVersionCode` | Builds with a lower `versionCode` (in `app/build.gradle.kts`) show an "Update required" screen. |

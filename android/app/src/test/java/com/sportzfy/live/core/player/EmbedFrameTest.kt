@@ -30,12 +30,13 @@ class EmbedFrameTest {
     @Test
     fun `player config follows the remote config`() {
         // Embeds load directly, like a browser tab, referred by streamed.pk like its own embed.
-        // The pop-up networks are always refused; the wider ad list only with ad blocking on.
+        // The pop-up networks are always kept off the top-level page; the wider ad list only
+        // with ad blocking on. No request is blocked unless the owner adds the host.
         assertEquals(
             PlayerConfig(
                 PlayerMode.DIRECT,
                 blockedHosts = AdHosts.ALWAYS_BLOCKED,
-                blockedResourceHosts = AdHosts.ALWAYS_BLOCKED,
+                blockedResourceHosts = emptySet(),
                 referer = "https://streamed.pk/",
             ),
             PlayerConfig.from(AppConfig.Default),
@@ -48,25 +49,19 @@ class EmbedFrameTest {
     }
 
     @Test
-    fun `pop-up networks' requests are refused, the wider ad list only navigates`() {
+    fun `ad scripts load so inline player setup does not crash, ad redirects stay blocked`() {
         val config = PlayerConfig.from(AppConfig(adBlocking = true, extraBlockedHosts = setOf("bad.com")))
-        assertEquals(AdHosts.ALWAYS_BLOCKED + "bad.com", config.blockedResourceHosts)
-        val policy = PlayerUrlPolicy(blockedHosts = config.blockedHosts, blockedResourceHosts = config.blockedResourceHosts)
-        for (url in listOf(
-            "https://c1.popads.net/pop.js",
-            "https://www.popcash.net/x.js",
-            "https://pl123.adsterra.com/a.js",
-            "https://go.propellerads.com/x",
-            "https://googleads.g.doubleclick.net/pagead/id",
-            "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
-            "https://onclkds.com/apu.php",
-            "https://acscdn.com/script/aclib.js",
-            "https://s10.histats.com/js15_as.js",
-            "https://x.bad.com/a.js",
-        )) {
-            assertEquals(url, BLOCK, policy.resource(url))
+        assertEquals(setOf("bad.com"), config.blockedResourceHosts)
+        val policy = PlayerUrlPolicy(
+            streamUrl = "https://embed.st/embed/golf/x/1",
+            blockedHosts = config.blockedHosts,
+            blockedResourceHosts = config.blockedResourceHosts,
+        )
+        for (host in AdHosts.ALWAYS_BLOCKED) {
+            assertEquals(host, ALLOW, policy.resource("https://$host/script.js"))
+            assertEquals(host, BLOCK, policy.navigation("https://$host/landing", isMainFrame = true))
         }
-        assertEquals(ALLOW, policy.resource("https://a.exosrv.com/ad-provider.js"))
-        assertEquals(BLOCK, policy.navigation("https://a.exosrv.com/frame", isMainFrame = false))
+        assertEquals(BLOCK, policy.resource("https://x.bad.com/a.js"))
+        assertEquals(ALLOW, policy.navigation("https://player.other-cdn.example/embed", isMainFrame = false))
     }
 }

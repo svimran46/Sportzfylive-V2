@@ -78,8 +78,12 @@ internal class PageLanding {
  * tokens, while the app keeps the ads out:
  * - pop-up windows are trapped and destroyed without ever being shown;
  * - the top-level page stays on the stream's host ([PlayerUrlPolicy]); ad
- *   redirects and app links are cancelled;
- * - requests to blocked ad networks get an empty success;
+ *   redirects and app links are cancelled, while nested player iframes load
+ *   freely;
+ * - the page's own scripts (ad scripts included) are never blocked, because
+ *   inline player setup code calls into them; only hosts the owner adds
+ *   remotely get an empty response;
+ * - no JavaScript is injected: `window.open` stays native;
  * - no file or content access, downloads, geolocation or permission grants.
  *
  * [policy] is read on every request, so a new stream or remote config change
@@ -104,8 +108,8 @@ internal fun createSandboxedWebView(
         javaScriptCanOpenWindowsAutomatically = true
         allowFileAccess = false
         allowContentAccess = false
-        // Browser default: an https stream page may still pull http media.
-        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+        // Embeds on https pages pull http playlists and segments; refusing them leaves a black player.
+        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         setGeolocationEnabled(false)
         setSupportZoom(false)
         builtInZoomControls = false
@@ -297,7 +301,7 @@ private class SandboxedChromeClient(
 }
 
 /** How long a trapped pop-up's window stays open to its opener before it is destroyed. */
-private const val POPUP_LIFETIME_MS = 3_000L
+private const val POPUP_LIFETIME_MS = 1_500L
 
 /**
  * Answer for a refused request: an empty 200 rather than a network error, so
