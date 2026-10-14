@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.Message
 import android.view.KeyEvent
 import android.view.View
@@ -22,11 +25,10 @@ import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.sportzfy.live.core.player.ChromeUserAgent
-import com.sportzfy.live.core.player.EmbedFrame
 import com.sportzfy.live.core.player.PlayerUrlPolicy
 import java.io.ByteArrayInputStream
 
-/** Callbacks from the sandboxed WebView, delivered on the main thread. */
+/** Callbacks from the player WebView, delivered on the main thread. */
 internal interface SandboxListener {
     fun onNavigationBlocked(url: String)
     fun onPageStarted()
@@ -38,21 +40,56 @@ internal interface SandboxListener {
 }
 
 /**
- * Creates the player WebView for third-party embeds. It behaves like a
- * Chrome tab, because the stream sites are paid for by their ads and refuse
- * to play in an app's WebView:
- * - pop-up windows (the ads) open in the phone's browser, the stream stays here;
- * - navigation follows [PlayerUrlPolicy]; app links open in their app, and
- *   hosts the owner blocks remotely get an empty response;
- * - still no file or content access, downloads, geolocation or permission grants.
+ * Where the player's top-level page is, for [PlayerUrlPolicy]'s main-frame
+ * rule. Read and written on the main thread only.
+ */
+internal class PageLanding {
+    /** True from a direct load until its page starts, while server redirects are still followed. */
+    var landing: Boolean = false
+        private set
+
+    /** Host the last direct load landed on; null for the iframe wrapper. */
+    var host: String? = null
+        private set
+
+    /** A direct load of the stream page is starting. */
+    fun begin() {
+        landing = true
+        host = null
+    }
+
+    /** The iframe wrapper is loading: its base URL is not a page the stream may return to. */
+    fun clear() {
+        landing = false
+        host = null
+    }
+
+    fun onPageStarted(url: String?) {
+        if (!landing) return
+        landing = false
+        host = url?.let { runCatching { Uri.parse(it).host }.getOrNull() }
+    }
+}
+
+/**
+ * Creates the player WebView for any stream page or embed URL. It presents
+ * as Chrome with no sandbox, so the embed's anti-sandbox checks pass and its
+ * own heartbeat scripts keep renewing the stream's session cookies and
+ * tokens, while the app keeps the ads out:
+ * - pop-up windows are trapped and destroyed without ever being shown;
+ * - the top-level page stays on the stream's host ([PlayerUrlPolicy]); ad
+ *   redirects and app links are cancelled;
+ * - requests to blocked ad networks get an empty success;
+ * - no file or content access, downloads, geolocation or permission grants.
  *
- * [policy] is read on every request, so remote config changes apply to a
- * live player without rebuilding it.
+ * [policy] is read on every request, so a new stream or remote config change
+ * applies to a live player without rebuilding it.
  */
 @SuppressLint("SetJavaScriptEnabled")
 internal fun createSandboxedWebView(
     context: Context,
     policy: () -> PlayerUrlPolicy,
+    landing: PageLanding,
     listener: SandboxListener,
 ): WebView = WebView(context).apply {
     settings.apply {
@@ -60,10 +97,10 @@ internal fun createSandboxedWebView(
         domStorageEnabled = true
         mediaPlaybackRequiresUserGesture = false
         // Multiple windows stay "supported" so window.open reaches
-        // onCreateWindow, which opens the ad in the browser. With support
-        // turned off, WebView would load the pop-up over the stream instead.
+        // onCreateWindow, which traps the ad. With support turned off,
+        // WebView would load the pop-up over the stream instead.
         setSupportMultipleWindows(true)
-        // The sites open their ad pop-ups from script, as browsers allow.
+        // As in a browser, so pages that test window.open still play.
         javaScriptCanOpenWindowsAutomatically = true
         allowFileAccess = false
         allowContentAccess = false
@@ -80,8 +117,12 @@ internal fun createSandboxedWebView(
     }
     presentAsChrome(settings)
     // Embedded players sit in cross-site iframes and need their own cookies
-    // for anti-bot checks.
-    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+    // for anti-bot checks and for the session the stream's playlist is tied to.
+    val webView = this
+    CookieManager.getInstance().apply {
+        setAcceptCookie(true)
+        setAcceptThirdPartyCookies(webView, true)
+    }
 
     setBackgroundColor(Color.BLACK)
     keepScreenOn = true
@@ -103,8 +144,8 @@ internal fun createSandboxedWebView(
         next != null && next !== view && next.requestFocus(direction)
     }
 
-    webViewClient = SandboxedWebViewClient(policy, listener)
-    webChromeClient = SandboxedChromeClient(listener, policy)
+    webViewClient = SandboxedWebViewClient(policy, landing, listener)
+    webChromeClient = SandboxedChromeClient(listener)
 }
 
 /**
@@ -156,34 +197,32 @@ internal fun WebView.release(rendererGone: Boolean) {
 
 private class SandboxedWebViewClient(
     private val policy: () -> PlayerUrlPolicy,
+    private val landing: PageLanding,
     private val listener: SandboxListener,
 ) : WebViewClient() {
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url.toString()
-        return when (policy().navigation(url, isMainFrame = request.isForMainFrame, isRedirect = request.isRedirect)) {
-            PlayerUrlPolicy.Decision.ALLOW -> false
-            PlayerUrlPolicy.Decision.BLOCK -> {
-                listener.onNavigationBlocked(url)
-                true
-            }
-            // App links from ads (Play Store, intent:) open in their app.
-            PlayerUrlPolicy.Decision.EXTERNAL -> {
-                view.context.openExternally(url)
-                true
-            }
-        }
+        val decision = policy().navigation(
+            url,
+            isMainFrame = request.isForMainFrame,
+            isRedirect = request.isRedirect,
+            pageHost = landing.host,
+            landing = landing.landing,
+        )
+        if (decision == PlayerUrlPolicy.Decision.ALLOW) return false
+        listener.onNavigationBlocked(url)
+        return true
     }
 
     // Runs on a WebView background thread; must not touch UI state.
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-        if (policy().resource(request.url.toString()) == PlayerUrlPolicy.Decision.BLOCK) {
-            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
-        }
+        if (policy().resource(request.url.toString()) == PlayerUrlPolicy.Decision.BLOCK) return emptySuccess(request)
         return null
     }
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+        landing.onPageStarted(url)
         listener.onPageStarted()
     }
 
@@ -192,11 +231,7 @@ private class SandboxedWebViewClient(
     }
 
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-        // A sandboxed channel loads in an iframe, so its failure is a subframe
-        // error. Count the framed page itself as the main frame, nothing else.
-        val framed = (view.tag as? LoadRequest)?.takeIf { it.sandboxed }?.url
-        val isFramedPage = framed != null && EmbedFrame.isFramedPage(request.url.toString(), framed)
-        if (request.isForMainFrame || isFramedPage) listener.onMainFrameError()
+        if (request.isForMainFrame) listener.onMainFrameError()
     }
 
     // Without this override a crashed or killed renderer takes the app down.
@@ -208,41 +243,32 @@ private class SandboxedWebViewClient(
 
 private class SandboxedChromeClient(
     private val listener: SandboxListener,
-    private val policy: () -> PlayerUrlPolicy,
 ) : WebChromeClient() {
 
     /**
      * Pop-ups (window.open, target=_blank) are how the stream sites show
-     * their ads, and the stream only plays once the viewer has been sent
-     * there. By default each one opens in the phone's browser like a new tab,
-     * while the stream stays loaded here: a throwaway WebView catches the
-     * pop-up's first URL and hands it over. With [PlayerUrlPolicy.dropPopups]
-     * the window is refused and nothing opens.
+     * their ads. Each one is handed a throwaway WebView that is never shown
+     * and refuses every load, then destroyed: window.open still returns a
+     * window, so pages that test for a pop-up blocker keep playing, but the
+     * ad never renders, runs or leaves the app.
      */
     override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
-        if (policy().dropPopups) return false
         val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
-        val popup = WebView(view.context)
-        var handedOff = false
-        fun handOff(target: WebView, url: String?) {
-            if (handedOff || url.isNullOrBlank() || url == "about:blank") return
-            handedOff = true
-            view.context.openExternally(url)
-            target.stopLoading()
-            target.post { target.destroy() }
-        }
+        val popup = runCatching { WebView(view.context) }.getOrNull() ?: return false
+        popup.settings.javaScriptEnabled = false
         popup.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
-                handOff(v, request.url.toString())
-                return true
-            }
+            override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean = true
 
-            override fun onPageStarted(v: WebView, url: String?, favicon: Bitmap?) {
-                handOff(v, url)
-            }
+            override fun shouldInterceptRequest(v: WebView, request: WebResourceRequest): WebResourceResponse =
+                emptySuccess(request)
+
+            override fun onRenderProcessGone(v: WebView, detail: RenderProcessGoneDetail): Boolean = true
         }
         transport.webView = popup
         resultMsg.sendToTarget()
+        listener.onNavigationBlocked("popup")
+        // Not attached to any window, so View.post would never run: use the main looper.
+        Handler(Looper.getMainLooper()).postDelayed({ popup.destroy() }, POPUP_LIFETIME_MS)
         return true
     }
 
@@ -268,4 +294,30 @@ private class SandboxedChromeClient(
 
     // Replaces the grey placeholder WebView draws before a <video> starts.
     override fun getDefaultVideoPoster(): Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+}
+
+/** How long a trapped pop-up's window stays open to its opener before it is destroyed. */
+private const val POPUP_LIFETIME_MS = 3_000L
+
+/**
+ * Answer for a refused request: an empty 200 rather than a network error, so
+ * a script tag's onload and a fetch() both succeed and the embed's "did the
+ * ad load" checks pass. CORS is opened for the same reason.
+ */
+private fun emptySuccess(request: WebResourceRequest): WebResourceResponse {
+    val accept = request.requestHeaders["Accept"].orEmpty()
+    val path = request.url.path.orEmpty()
+    val mime = when {
+        path.endsWith(".js") || "javascript" in accept -> "application/javascript"
+        path.endsWith(".css") || "text/css" in accept -> "text/css"
+        else -> "text/plain"
+    }
+    return WebResourceResponse(
+        mime,
+        "utf-8",
+        200,
+        "OK",
+        mapOf("Access-Control-Allow-Origin" to "*", "Cache-Control" to "no-store"),
+        ByteArrayInputStream(ByteArray(0)),
+    )
 }

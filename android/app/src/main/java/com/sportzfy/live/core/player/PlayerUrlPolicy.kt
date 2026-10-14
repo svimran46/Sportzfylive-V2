@@ -3,66 +3,61 @@ package com.sportzfy.live.core.player
 import com.sportzfy.live.domain.model.EmbedUrl
 
 /**
- * Decides what the embed WebView may navigate to and load.
+ * Decides what the embed WebView may navigate to and load, for any stream
+ * URL the app plays.
  *
- * - Top-level navigations stay on [trustedHosts]. Ads open pop-ups through
- *   `window.open` or `top.location`. With multiple windows disabled, both
- *   arrive here as main-frame navigations and are dropped. The exception is
- *   an HTTP redirect answering a navigation that was already allowed.
- * - Subframes may load any https page except [blockedHosts], because the
- *   embed nests its real player in a third-party iframe.
- * - Any scheme other than https is refused (`intent:`, `market:`, `tel:`,
- *   plain http and so on). The only exceptions are `about:blank` and
- *   `about:srcdoc`.
+ * - The top-level page stays on the active stream's host ([streamUrl]), on
+ *   [trustedHosts], or on the host its first load landed on after server
+ *   redirects. Ads hijack the page with `top.location` or a pop-up; with
+ *   pop-ups trapped by the WebView, both arrive here as main-frame
+ *   navigations to another site and are cancelled.
+ * - Subframes may load any http(s) page except [blockedHosts], because
+ *   embeds nest their real player in third-party iframes.
+ * - Other schemes (`intent:`, `market:`, `tel:`, `file:` and so on) never
+ *   load. `about:blank` and `about:srcdoc` do, and `data:`/`blob:` do in
+ *   subframes, where players use them.
  * - Sub-resources (scripts, XHR, images) from [blockedResourceHosts] are
- *   refused. By default that is [blockedHosts]; the app narrows it so the
- *   ad list stops pop-ups and redirects without starving the embed's own
- *   scripts, whose failure makes the stream page refuse to play.
+ *   refused; the WebView answers them with an empty success.
  */
 class PlayerUrlPolicy(
+    streamUrl: String? = null,
     private val trustedHosts: Set<String> = setOf(EmbedUrl.HOST),
     private val blockedHosts: Set<String> = AdHosts.DEFAULT,
     private val blockedResourceHosts: Set<String> = blockedHosts,
-    /**
-     * Browser-like mode, used by the app: stream sites are paid for by ads
-     * and only play once the viewer has been sent to them. The page may go
-     * anywhere on the web (http or https, except [blockedHosts]); links for
-     * other apps (`intent:`, `market:` and the like) are handed to Android.
-     */
-    private val openWeb: Boolean = false,
-    /**
-     * Pop-up windows are refused outright instead of opened in the phone's
-     * browser. Nothing leaves the app, and the stream may not start if its
-     * page needs the pop-up.
-     */
-    val dropPopups: Boolean = false,
 ) {
 
-    /** [EXTERNAL]: open with another app (browser, Play Store) instead of the player. */
-    enum class Decision { ALLOW, BLOCK, EXTERNAL }
+    enum class Decision { ALLOW, BLOCK }
 
-    fun navigation(url: String, isMainFrame: Boolean, isRedirect: Boolean = false): Decision {
+    private val streamDomain: String? = streamUrl?.let(::hostOf)?.let(::siteDomain)
+
+    /**
+     * [pageHost] is the host the player's page landed on, and [landing] is
+     * true while that first load is still following server redirects.
+     */
+    fun navigation(
+        url: String,
+        isMainFrame: Boolean,
+        isRedirect: Boolean = false,
+        pageHost: String? = null,
+        landing: Boolean = false,
+    ): Decision {
         val parsed = parse(url) ?: return Decision.BLOCK
-        if (parsed.scheme == "about") {
-            return if (parsed.rest == "blank" || parsed.rest == "srcdoc") Decision.ALLOW else Decision.BLOCK
+        return when (parsed.scheme) {
+            "about" -> if (parsed.rest == "blank" || parsed.rest == "srcdoc") Decision.ALLOW else Decision.BLOCK
+            "http", "https" -> {
+                val host = parsed.host
+                when {
+                    host == null || host.matchesAny(blockedHosts) -> Decision.BLOCK
+                    !isMainFrame -> Decision.ALLOW
+                    // The stream's own server may send its first load elsewhere (a mirror, a CDN page).
+                    landing && isRedirect -> Decision.ALLOW
+                    host.matchesAny(mainFrameDomains(pageHost)) -> Decision.ALLOW
+                    else -> Decision.BLOCK
+                }
+            }
+            "data", "blob" -> if (isMainFrame) Decision.BLOCK else Decision.ALLOW
+            else -> Decision.BLOCK
         }
-        if (openWeb) return openNavigation(parsed, isMainFrame)
-        val host = parsed.host
-        if (parsed.scheme != "https" || host == null) return Decision.BLOCK
-        if (host.matchesAny(blockedHosts)) return Decision.BLOCK
-        if (!isMainFrame || isRedirect) return Decision.ALLOW
-        return if (host.matchesAny(trustedHosts)) Decision.ALLOW else Decision.BLOCK
-    }
-
-    private fun openNavigation(parsed: ParsedUrl, isMainFrame: Boolean): Decision = when (parsed.scheme) {
-        "http", "https" -> {
-            val host = parsed.host
-            if (host == null || host.matchesAny(blockedHosts)) Decision.BLOCK else Decision.ALLOW
-        }
-        "data", "blob" -> if (isMainFrame) Decision.BLOCK else Decision.ALLOW
-        // Files and app-internal schemes never enter the player.
-        "file", "content", "javascript" -> Decision.BLOCK
-        else -> if (isMainFrame) Decision.EXTERNAL else Decision.BLOCK
     }
 
     fun resource(url: String): Decision {
@@ -70,7 +65,15 @@ class PlayerUrlPolicy(
         return if (host.matchesAny(blockedResourceHosts)) Decision.BLOCK else Decision.ALLOW
     }
 
+    private fun mainFrameDomains(pageHost: String?): Set<String> =
+        trustedHosts + listOfNotNull(streamDomain, pageHost?.let(::siteDomain))
+
     private class ParsedUrl(val scheme: String, val host: String?, val rest: String)
+
+    private fun hostOf(url: String): String? = parse(url)?.host
+
+    /** `www.` is dropped so the bare domain and its other subdomains count as the same site. */
+    private fun siteDomain(host: String): String = host.lowercase().trimEnd('.').removePrefix("www.")
 
     private fun parse(url: String): ParsedUrl? {
         val trimmed = url.trim()

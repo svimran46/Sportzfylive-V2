@@ -26,7 +26,7 @@ import com.sportzfy.live.presentation.components.tvFocus
 
 /**
  * Dual-engine player: Media3 for media streams (HLS, DASH, MPEG-TS, MP4…),
- * the sandboxed WebView for web pages (the `embed.st` players, channel
+ * the player WebView for web pages (the `embed.st` players, channel
  * sites). [format] (a channel's `type`) overrides the guess from the URL's
  * extension. Fills [modifier]; the caller decides the aspect ratio.
  */
