@@ -9,8 +9,6 @@ data class Channel(
     val category: ChannelCategory,
     /** http(s) page or media stream (HLS, DASH, MPEG-TS…), played by the existing player. */
     val streamUrl: String,
-    /** Set by `"sandbox": true` in channels.json: the page runs in a sandboxed frame. */
-    val sandboxed: Boolean = false,
     /** Set by `"type"` in the channel list; null lets the URL's extension decide. */
     val streamFormat: StreamFormat? = null,
 ) {

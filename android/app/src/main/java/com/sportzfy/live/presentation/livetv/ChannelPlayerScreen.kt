@@ -94,17 +94,12 @@ fun ChannelPlayerScreen(
                 CircularProgressIndicator(color = SportzfyColors.Rose)
             }
             else -> {
-                // Only this channel's own host joins embed.st as a page the
-                // player may open; every other rule stays as it is for matches.
-                val base = PlayerConfig.from(LocalAppConfig.current)
-                // Channel pages load directly with no referer, as before. A channel
-                // marked "sandbox": true in channels.json runs in a sandboxed frame
-                // instead, which refuses pop-ups and top-level redirects.
-                val config = base.copy(
+                // Channel pages load directly with no referer and no sandbox. The
+                // player keeps the page on the channel's own host and traps its
+                // pop-ups, as it does for every stream.
+                val config = PlayerConfig.from(LocalAppConfig.current).copy(
                     mode = PlayerMode.DIRECT,
-                    trustedHosts = base.trustedHosts + channel.sourceHost,
                     referer = null,
-                    sandboxed = channel.sandboxed,
                 )
                 BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
                     // Measured outside the scroll so the player can be capped to

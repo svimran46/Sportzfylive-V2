@@ -1,6 +1,5 @@
 package com.sportzfy.live.core.player
 
-import com.sportzfy.live.BuildConfig
 import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.PlayerMode
@@ -8,32 +7,20 @@ import com.sportzfy.live.domain.model.PlayerMode
 /** Player behaviour derived from the remote [AppConfig]. */
 data class PlayerConfig(
     val mode: PlayerMode = PlayerMode.DIRECT,
-    val blockedHosts: Set<String> = AdHosts.DEFAULT,
+    /** Hosts whose pages may not load in any frame. */
+    val blockedHosts: Set<String> = AdHosts.ALWAYS_BLOCKED + AdHosts.DEFAULT,
     /**
-     * Hosts whose scripts and other sub-resources are refused. Only the
-     * owner's extra hosts: the default ad list stays on navigations, so the
-     * embed's own checks still see their scripts load.
+     * Hosts whose scripts and other sub-resources are refused: the pop-up
+     * networks every stream blocks, plus the owner's extra hosts. The wider
+     * ad list stays on navigations only, so embeds that check their ad
+     * scripts still see them load.
      */
-    val blockedResourceHosts: Set<String> = AdHosts.DEFAULT,
-    /**
-     * Hosts the page itself may live on besides `embed.st`. Live TV adds the
-     * channel's own host, so direct mode can open that channel's page.
-     */
-    val trustedHosts: Set<String> = emptySet(),
-    /** Browser-like navigation (see [PlayerUrlPolicy] openWeb): on for every stream. */
-    val openWeb: Boolean = true,
+    val blockedResourceHosts: Set<String> = AdHosts.ALWAYS_BLOCKED,
     /**
      * Referer sent when the page is loaded directly; null sends none. Matches
      * send streamed.pk's, as its own embed iframe does; Live TV sends none.
      */
     val referer: String? = StreamedEndpoints.REFERER,
-    /** Refuse pop-up windows instead of opening them in the browser. Debug-build switch for now. */
-    val dropPopups: Boolean = false,
-    /**
-     * Frames the page in a sandboxed iframe ([EmbedFrame.SANDBOX]), so it cannot
-     * open pop-ups or move the app's page. Live TV channels use it.
-     */
-    val sandboxed: Boolean = false,
     /** Plain-http streams and pages may play. Cleartext is allowed app-wide; this is the switch. */
     val allowHttpStreams: Boolean = true,
     /** DASH and progressive (MPEG-TS, MP4…) streams play in Media3. HLS and web pages always do. */
@@ -42,9 +29,10 @@ data class PlayerConfig(
     companion object {
         fun from(config: AppConfig): PlayerConfig = PlayerConfig(
             mode = config.playerMode,
-            blockedHosts = (if (config.adBlocking) AdHosts.DEFAULT else emptySet()) + config.extraBlockedHosts,
-            blockedResourceHosts = config.extraBlockedHosts,
-            dropPopups = BuildConfig.DROP_POPUPS,
+            blockedHosts = AdHosts.ALWAYS_BLOCKED +
+                (if (config.adBlocking) AdHosts.DEFAULT else emptySet()) +
+                config.extraBlockedHosts,
+            blockedResourceHosts = AdHosts.ALWAYS_BLOCKED + config.extraBlockedHosts,
         )
     }
 }

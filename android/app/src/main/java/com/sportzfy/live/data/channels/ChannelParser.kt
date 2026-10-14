@@ -11,8 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * One entry of `channels.json`. `category` is optional and overrides name-based grouping.
- * `sandbox` is read loosely: any value other than true (boolean or the string "true")
- * leaves the channel unsandboxed, and a wrong type never drops the channel. `type`
+ * A `sandbox` key (used by the website) is ignored: the app never sandboxes a channel. `type`
  * (`"hls"`, `"dash"`, `"ts"`, `"embed"`…) says how to play a URL whose extension
  * doesn't, like an IPTV feed at `http://host:8080/user/pass/123`.
  */
@@ -23,12 +22,8 @@ internal data class ChannelDto(
     val genre: String? = null,
     val url: String? = null,
     val category: String? = null,
-    val sandbox: JsonElement? = null,
     val type: JsonElement? = null,
 )
-
-private fun JsonElement?.isTrue(): Boolean =
-    (this as? JsonPrimitive)?.content?.equals("true", ignoreCase = true) == true
 
 private fun JsonElement?.text(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
 
@@ -38,7 +33,6 @@ private class RawChannel(
     val logo: String?,
     val url: String?,
     val category: String?,
-    val sandboxed: Boolean = false,
     val format: StreamFormat? = null,
 )
 
@@ -83,7 +77,6 @@ object ChannelParser {
                 logo = dto.logo,
                 url = dto.url,
                 category = dto.category,
-                sandboxed = dto.sandbox.isTrue(),
                 format = StreamFormat.fromHint(dto.type.text()),
             )
         }
@@ -157,7 +150,6 @@ object ChannelParser {
                 logoUrl = entry.logo?.let(::decodeEntities)?.trim()?.takeIf { isHttps(it) },
                 category = categoryOf(entry.category, name),
                 streamUrl = url,
-                sandboxed = entry.sandboxed,
                 streamFormat = entry.format,
             )
         }

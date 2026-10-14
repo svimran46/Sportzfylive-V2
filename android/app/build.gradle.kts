@@ -24,11 +24,6 @@ android {
             "\"https://sportzfylive.svimranmy.workers.dev/api/app/config\"",
         )
 
-        // Test switch for one player method at a time (see PlayerConfig.dropPopups).
-        // Off unless passed with -Psportzfy.dropPopups=true, so release builds keep it off.
-        val dropPopups = project.findProperty("sportzfy.dropPopups")?.toString()?.toBoolean() ?: false
-        buildConfigField("boolean", "DROP_POPUPS", dropPopups.toString())
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -29,7 +29,7 @@ class ChannelParserTest {
     }
 
     @Test
-    fun `sandbox flag is off unless the channel sets it to true`() {
+    fun `the website's sandbox flag never drops a channel`() {
         val raw = """[
           {"name":"Plain","url":"https://tv.example/plain"},
           {"name":"Boxed","url":"https://tv.example/boxed","sandbox":true},
@@ -39,7 +39,6 @@ class ChannelParserTest {
         ]"""
         val channels = parse(raw)!!
         assertEquals(listOf("Plain", "Boxed", "Quoted", "Odd", "Off"), channels.map { it.name })
-        assertEquals(listOf(false, true, true, false, false), channels.map { it.sandboxed })
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.sportzfy.live.presentation.watch.player
 
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.FrameLayout
@@ -26,9 +27,11 @@ import com.sportzfy.live.domain.model.EmbedUrl
 import com.sportzfy.live.domain.model.PlayerMode
 
 /**
- * Plays an `embed.st` page. In [PlayerMode.DIRECT] (the default) it is the
- * WebView's page itself, like a browser tab; in [PlayerMode.IFRAME] it runs
- * in a plain iframe inside a wrapper page, like the website.
+ * Plays any stream page or embed URL. In [PlayerMode.DIRECT] (the default)
+ * it is the WebView's page itself, like a browser tab; in [PlayerMode.IFRAME]
+ * it runs in a plain, unsandboxed iframe inside a wrapper page, like the
+ * website. Either way the page stays on [url]'s host and pop-ups are trapped
+ * (see [createSandboxedWebView]).
  *
  * The WebView is created once and reused: a new [url], mode or
  * [StreamPlayerState.retry] reloads the same instance, so switching streams
@@ -42,13 +45,12 @@ internal fun EmbedPlayerView(
     modifier: Modifier = Modifier,
     config: PlayerConfig = PlayerConfig(),
 ) {
-    val policy = remember(config.blockedHosts, config.blockedResourceHosts, config.trustedHosts, config.openWeb, config.dropPopups) {
+    val policy = remember(url, config.blockedHosts, config.blockedResourceHosts) {
         PlayerUrlPolicy(
-            trustedHosts = setOf(EmbedUrl.HOST) + config.trustedHosts,
+            streamUrl = url,
+            trustedHosts = setOf(EmbedUrl.HOST),
             blockedHosts = config.blockedHosts,
             blockedResourceHosts = config.blockedResourceHosts,
-            openWeb = config.openWeb,
-            dropPopups = config.dropPopups,
         )
     }
     val currentPolicy by rememberUpdatedState(policy)
@@ -103,7 +105,11 @@ internal fun EmbedPlayerView(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> holder.webView?.onPause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    holder.webView?.onPause()
+                    // Keep the stream's renewed session cookies across process death.
+                    CookieManager.getInstance().flush()
+                }
                 Lifecycle.Event.ON_RESUME -> holder.webView?.onResume()
                 else -> Unit
             }
@@ -121,7 +127,7 @@ internal fun EmbedPlayerView(
             modifier = modifier,
             factory = { ctx ->
                 try {
-                    createSandboxedWebView(ctx, { currentPolicy }, listener).also { holder.webView = it }
+                    createSandboxedWebView(ctx, { currentPolicy }, holder.landing, listener).also { holder.webView = it }
                 } catch (e: Exception) {
                     // Thrown when the device has no (or a broken) WebView provider.
                     state.isLoading = false
@@ -131,18 +137,14 @@ internal fun EmbedPlayerView(
             },
             update = { view ->
                 val webView = view as? WebView ?: return@AndroidView
-                val request = LoadRequest(url, state.reloadToken, config.mode, config.sandboxed)
+                val request = LoadRequest(url, state.reloadToken, config.mode)
                 if (webView.tag != request) {
                     webView.tag = request
-                    if (config.mode == PlayerMode.IFRAME || config.sandboxed) {
-                        webView.loadDataWithBaseURL(
-                            if (config.sandboxed) EmbedFrame.SANDBOX_BASE_URL else EmbedFrame.BASE_URL,
-                            EmbedFrame.html(url, if (config.sandboxed) EmbedFrame.SANDBOX else null),
-                            "text/html",
-                            "utf-8",
-                            null,
-                        )
+                    if (config.mode == PlayerMode.IFRAME) {
+                        holder.landing.clear()
+                        webView.loadDataWithBaseURL(EmbedFrame.BASE_URL, EmbedFrame.html(url), "text/html", "utf-8", null)
                     } else {
+                        holder.landing.begin()
                         webView.loadUrl(url, config.referer?.let { mapOf("Referer" to it) } ?: emptyMap())
                     }
                 }
@@ -162,6 +164,7 @@ internal fun EmbedPlayerView(
 private class WebViewHolder {
     var webView: WebView? = null
     var deadWebView: WebView? = null
+    val landing = PageLanding()
 }
 
-internal data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode, val sandboxed: Boolean)
+internal data class LoadRequest(val url: String, val reloadToken: Int, val mode: PlayerMode)
