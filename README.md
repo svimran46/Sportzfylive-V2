@@ -2,7 +2,7 @@
 
 [![Deploy to Cloudflare](https://github.com/svimran46/Sportzfylive-V2/actions/workflows/deploy.yml/badge.svg)](https://github.com/svimran46/Sportzfylive-V2/actions/workflows/deploy.yml)
 
-A modern, responsive web application for streaming live sports matches. The public site is static HTML/JS; the backend is a Cloudflare Worker that syncs matches from the Streamed API, resolves per-source stream metadata, and manages admin content.
+A modern, responsive web application for streaming live sports matches and 24/7 TV channels. The public site is static HTML/JS; the backend is a Cloudflare Worker that syncs matches from the Streamed API, resolves per-source stream metadata, runs the Live TV channel catalog, and backs the admin panel.
 
 ## Features
 
@@ -14,6 +14,8 @@ A modern, responsive web application for streaming live sports matches. The publ
 - ⚠️ **Error Handling**: Per-source failure isolation — one bad Streamed source never breaks a match list
 - 🎯 **Watch page**: match identity (crests + share) on top, the player, stream chips labelled with language/provider/HD, then a rail of other matches — all rendered from the match list already in memory, so opening a match costs no extra requests
 - 🔗 **Shareable matches**: share buttons emit `#match=<id>` links, and the site opens that match directly on load
+- 📺 **Live TV** (`/live-tv`): 24/7 channels from the [`channels.json`](https://github.com/svimran46/playlist.m3u) playlist (the same list the Android app uses) — category chips, search, a player with previous/next, reload, full screen and share, `#ch=<id>` deep links, and an "Up next" rail on wide screens
+- 🛠️ **Admin panel** (`/admin`): dashboard, match management (filters, bulk actions, featured/active flags, streams picked from the TV catalog), Live TV channel management (playlist sync, import from URL with stream health checks), fetch logs and site settings — no redeploy needed for any of it
 - 📱 **Responsive Design**: Fully responsive grid layout for mobile, tablet, and desktop
 - 🎨 **Modern UI**: Dark theme with smooth animations and transitions
 
@@ -21,14 +23,20 @@ A modern, responsive web application for streaming live sports matches. The publ
 
 ```
 Streamed API ──▶ Cloudflare Worker (worker.js)
-                 ├─ 10-min cron sync + source resolution (SWR cache in KV)
-                 ├─ Public API: /api/matches/all-today (sanitized, no embedUrl)
+channels.json ─▶ ├─ 10-min cron sync + source resolution (SWR cache in KV) + live-window cleanup
+                 ├─ Live TV catalog: playlist sync (cron every 6 h + on demand), manual channels
+                 ├─ Android app config: /api/app/config (edited on the admin "Android app" page)
+                 ├─ Public API: /api/matches/all-today, /api/site-content, /api/tv/channels
+                 │    (sanitized: no embedUrl, no stream URLs, no admin fields)
+                 ├─ Playback redirects: /api/play/tv/:id, /api/play/stream/:matchId/:streamId
                  ├─ Image proxy: /api/images?url= (same-origin posters/crests, streamed.pk only)
                  ├─ On-demand resolver: /api/streamed/streams?source=&id=
-                 └─ Admin API (token → 24h session, match CRUD, site content)
+                 └─ Admin API (password → 24h session; matches, channels, settings, logs)
                        │
-index.html  ◀─────────┘  Public site (match cards, stream picker)
-admin.html + admin.js     Admin SPA (login, matches, content, sync)
+index.html   ◀────────┤  Public site (match cards, stream picker, notice, featured row)
+live-tv.html ◀────────┤  Live TV page (channel grid + sandboxed player)
+player.html  ◀────────┤  HLS player for .m3u8 streams
+admin.html + admin.js     Admin SPA (dashboard, matches, Live TV, fetch logs, settings)
 ```
 
 ## File Structure
@@ -37,11 +45,15 @@ admin.html + admin.js     Admin SPA (login, matches, content, sync)
 Sportzfylive-V2/
 ├── worker.js          # Cloudflare Worker: API, auth, Streamed sync + resolver
 ├── index.html         # Public site (embedded CSS and JavaScript) — source copy
+├── live-tv.html       # Live TV page — source copy
+├── player.html        # HLS (.m3u8) player page framed by the watch view and Live TV — source copy
 ├── admin.html         # Admin shell (markup + styles) — source copy
-├── admin.js           # Admin SPA logic (login, match CRUD, sync) — source copy
+├── admin.js           # Admin SPA (hash-routed: dashboard, matches, Live TV, logs, settings) — source copy
 ├── og-card.png        # Social share card — source copy
 ├── public/            # The entire published site (Worker static assets)
 │   ├── index.html     #   published copy of the root pages above
+│   ├── live-tv.html
+│   ├── player.html
 │   ├── admin.html
 │   ├── admin.js
 │   ├── og-card.png
@@ -81,14 +93,58 @@ you develop.
 
 ## Usage
 
-### Managing Matches
+### Admin panel
 
-Matches are synced automatically from the Streamed API every 10 minutes. Admins can add manual matches, edit metadata, and manage manual stream rows in the admin panel (`admin.html`), which authenticates against the Worker with an admin token.
+Open `/admin` and sign in with the admin password (the `ADMIN_TOKEN` Worker
+secret, or a password set later under Settings → Admin password). The panel is
+a hash-routed single page app, so the browser Back button and bookmarks work:
+
+| Page | Route | What it does |
+| --- | --- | --- |
+| Dashboard | `#/` | Totals (matches, active, live now, streams), last fetch + health, quick actions, content overview, publishing checklist |
+| Matches | `#/matches` | Search, date filter, chips (All / Live / Today / Upcoming / Past / Active / Inactive / Featured / Manual), bulk activate/deactivate/feature/delete, ★ to pin a match to the homepage Featured row, Delete all |
+| Create / edit match | `#/matches/new`, `#/matches/:id/edit` | Event, kickoff (your time zone, with the UK time shown), competition, sport (or Auto from the event text), teams, featured image, featured/active flags, status, live-window override |
+| Match detail | `#/matches/:id` | Everything about the match plus its streams: add one from the Live TV catalog (search, or **Bulk add** several), edit, copy, reorder (arrows or drag) — changes save immediately |
+| Live TV | `#/tv` | All channels with status toggles, filters and bulk actions; **Sync Playlist**, **Import from URL** (M3U or JSON; every new stream is health-checked first), **Add Channel**, Delete All |
+| Android app | `#/app` | Remote control for the Android app: maintenance mode, forced updates (minimum version + update link), announcement banner, featured match, hidden sports, player mode and ad blocking, channel list and stream proxy URLs, plus the exact JSON installed apps receive (`GET /api/app/config`). Changes reach installed apps within a minute |
+| Fetch Logs | `#/logs` | The last 30 schedule fetches (manual or cron) with counts, duration and errors, plus the last Live TV playlist sync |
+| Settings | `#/settings` | Schedule ingest, TV source, live windows, site notice, analytics + house banner, site identity, maintenance (fetch / playlist sync / cleanup), admin password, data storage report |
+
+Matches are synced from the Streamed API every 10 minutes. The feed owns a
+streamed match's title, sport, kickoff and status; everything an admin sets
+(teams, streams, featured image, featured/active flags, live-window override)
+survives every sync.
+
+**Live windows** decide how long after kickoff a match stays on the site: a
+per-match override, then match-type keyword rules (e.g. *Cricket T20*: `t20,
+ipl, bbl` → 5 h), then the sport category, then the site default. Matches past
+their window are hidden at once and deleted on the next fetch (or by Run
+Cleanup). A match the feed reports live is never removed.
+
+### Live TV
+
+`/live-tv` lists the active channels from the Worker's catalog. The catalog is
+seeded from the TV source playlist on first use (default:
+`https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json`),
+re-synced every 6 hours by the cron when *Re-sync automatically* is on, and on
+demand from the admin. A sync replaces the playlist's channels but keeps manual
+channels, and keeps each synced channel's status, sort order and an
+admin-picked category. Categories (Sports, Football, Cricket, Entertainment,
+Kids, News, Movies) come from a channel's `category` field or its name —
+upstream marks every channel `genre: "Sports"`, cartoons included.
+
+The public channel list never contains stream URLs. The player frames
+`/api/play/tv/:id`, which redirects to the channel. Channels marked
+`"sandbox": true` in the playlist run in a sandboxed iframe (no pop-ups, no
+top-level navigation), others load directly, and `.m3u8` streams play in
+`player.html` with hls.js (native HLS on Safari/iOS). Streams an admin
+attaches to a match play the same way on the match's watch view, ahead of the
+Streamed sources.
 
 ### Playback
 
 - **HLS Streams (.m3u8)**: Automatically played via hls.js
-- **Iframe Embeds**: Displayed in a sandboxed iframe
+- **Iframe Embeds**: Displayed in a regular iframe (no `sandbox` attribute, which embed players refuse to run under)
 - **Search**: Type to filter channels by name
 - **Filter**: Click category buttons to filter by genre
 
@@ -109,7 +165,7 @@ sport, reuses the homepage card markup, and is lazily rendered
 
 ## Testing
 
-Four Node smoke suites cover the UI contracts, the Worker logic and the deploy
+Five Node smoke suites cover the UI contracts, the Worker logic and the deploy
 configuration. Run them all:
 
 ```bash
@@ -118,6 +174,8 @@ bun run test     # or: npm test
 #   node test/dom-ux.smoke.mjs    # keyboard access, modal behavior, stream picker selection
 #   node test/ui-polish.smoke.mjs # design-system structure, layout order, a11y semantics
 #   node test/resolver.smoke.mjs  # Streamed sync, per-source failure isolation, API shaping, image proxy
+#   node test/admin-tv.smoke.mjs  # Live TV catalog, playlist parsing/sync/import, play redirects,
+#                                 # settings, live windows + cleanup, password rotation, fetch log
 #   node test/deploy.smoke.mjs    # published copies in sync, no host leftovers, deploy workflow
 ```
 
@@ -136,7 +194,9 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 ## Security
 
 - **XSS Prevention**: All user data is sanitized and rendered safely using DOM methods
-- **Sandboxed Embeds**: Iframe embeds are sandboxed with limited permissions
+- **Embeds**: Streamed match embeds are not sandboxed (those players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. A Live TV channel marked `"sandbox": true` in `channels.json` runs in a sandboxed iframe (no pop-ups, no top-level navigation) on the website and when attached to a match (the Android app never sandboxes: it traps pop-ups and redirects in the WebView instead); other channels load directly, because some render a black frame inside a sandbox. Admins can flip the flag per channel or per stream
+- **Playback URLs**: public JSON never carries TV channel or admin stream URLs; `/api/play/*` redirects to them (errors answer as sandboxed plain text), and `player.html` only plays those `/api/play/*` paths
+- **Admin password**: `ADMIN_TOKEN` signs sessions and is the bootstrap login. A password set in Settings is stored as a salted PBKDF2 hash in KV and replaces it for logins until reset; logins and password changes share the per-IP failure throttle. Locked out? Delete the `admin_credential` key in the KV namespace
 - **Input Validation**: All data is validated before rendering
 
 ## Browser Support
@@ -178,6 +238,10 @@ npx wrangler secret put ADMIN_TOKEN   # admin panel token
 For local work (`wrangler dev`), put the same names in `.dev.vars` at the repo
 root — it is gitignored, as are `.env` and `.env.local`. `wrangler deploy` only
 ever reads Worker secrets, so a local file can never be published.
+
+`npx wrangler dev` (port 8787) runs the whole stack locally — API, public pages,
+Live TV and the admin panel — against a local KV. The pages detect port 8787
+and call the local Worker instead of the deployed one.
 
 ### Deploy on every push (GitHub Actions)
 

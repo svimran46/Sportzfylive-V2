@@ -84,6 +84,8 @@ function makeElement(id = "") {
         const label = m[1].match(/data-stream-label="([^"]*)"/);
         const checked = m[1].match(/aria-checked="([^"]*)"/);
         const aria = m[1].match(/aria-label="([^"]*)"/);
+        const sandbox = m[1].match(/data-sandbox="([^"]*)"/);
+        if (sandbox) chip.dataset.sandbox = sandbox[1];
         chip.dataset.embedUrl = url ? unescapeAttr(url[1]) : "";
         chip.dataset.streamLabel = label ? unescapeAttr(label[1]) : "";
         chip._attrs["aria-checked"] = checked ? checked[1] : "false";
@@ -440,5 +442,50 @@ ok("Back (button or device) closes the overlay in-app; history claim/pop stays b
 
 assert.ok(!html.includes("openManualStream"), "openManualStream must be gone");
 ok("no references to the removed openManualStream remain");
+
+// ---------------------------------------------------------------------------
+// 4. Streams the admin attached to a match: listed first, played through the
+//    Worker's /api/play redirect (never a raw URL), embeds sandboxed and .m3u8
+//    streams through the HLS player page.
+// ---------------------------------------------------------------------------
+windowStub.__SPORTZFY_MATCHES.set("manual-1", {
+  id: "manual-1",
+  title: "Wrexham vs West Bromwich Albion",
+  status: "live",
+  sources: [],
+  streamed: { sourceCount: 0, streamCount: 0, sources: [], streams: [] },
+  manual: {
+    streamCount: 2,
+    streams: [
+      { id: "s1", name: "Sky Sports Football", language: "English", quality: "HD", kind: "embed", sandbox: true },
+      { id: "s2", name: "Backup", language: "Spanish", quality: "SD", kind: "hls" },
+      { id: "s3", name: "Direct", language: "English", quality: "HD", kind: "embed" }
+    ]
+  }
+});
+{
+  const manualCard = makeElement("manual-card");
+  manualCard.dataset.matchId = "manual-1";
+  manualCard.closest = (selector) =>
+    selector === ".sfy-match-item" || selector === "[data-match-id]" ? manualCard : null;
+  documentStub.dispatch("keydown", { key: "Enter", target: manualCard, preventDefault() {} });
+  const manualChips = documentStub.getElementById("stream-picker").children;
+  assert.equal(manualChips.length, 3, "every admin-attached stream renders as a chip");
+  assert.equal(manualChips[0].dataset.embedUrl, "https://sportzfylive.svimranmy.workers.dev/api/play/stream/manual-1/s1");
+  assert.equal(manualChips[0].dataset.sandbox, "1", "streams flagged sandbox are marked for the sandbox");
+  assert.ok(!manualChips[2].dataset.sandbox, "unflagged embed streams load directly");
+  assert.equal(
+    manualChips[1].dataset.embedUrl,
+    "https://sportzfylive.svimranmy.workers.dev/player.html?src=" + encodeURIComponent("/api/play/stream/manual-1/s2"),
+    ".m3u8 streams play through the HLS player page"
+  );
+  assert.ok(!manualChips[1].dataset.sandbox, "the first-party HLS player page is not sandboxed");
+  assert.ok(manualChips[0].dataset.streamLabel.includes("Sky Sports Football"), "chip names the channel");
+  const frame = documentStub.getElementById("player-container").children[0];
+  assert.equal(frame.tagName, "iframe", "the first stream auto-plays");
+  assert.equal(frame.getAttribute("sandbox"), "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation");
+  context.navigateBack();
+}
+ok("admin-attached streams: listed first, played via /api/play, sandboxed when flagged");
 
 console.log("\nAll " + passed + " DOM assertions passed.");

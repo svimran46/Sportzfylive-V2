@@ -1,0 +1,113 @@
+package com.sportzfy.live.presentation.watch.player
+
+import androidx.annotation.OptIn
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.compose.PlayerSurface
+import com.sportzfy.live.domain.model.StreamFormat
+import okhttp3.OkHttpClient
+import org.koin.compose.koinInject
+
+/**
+ * Plays a media stream with Media3: HLS (`.m3u8`), DASH (`.mpd`) or a
+ * progressive file/stream (MPEG-TS, MP4, Matroska/WebM, FLV, MP3, AAC), over
+ * http or https. Everything is fetched through the app's OkHttp client, so
+ * it carries the same browser headers as API calls.
+ *
+ * A live stream that falls behind its window (the device paused or stalled
+ * past the oldest segment still listed) jumps back to the live edge on its
+ * own instead of showing an error.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+internal fun MediaPlayerView(
+    url: String,
+    format: StreamFormat,
+    state: StreamPlayerState,
+    modifier: Modifier = Modifier,
+    okHttpClient: OkHttpClient = koinInject(),
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val player = remember {
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(OkHttpDataSource.Factory(okHttpClient)))
+            .build()
+    }
+
+    DisposableEffect(player) {
+        val playerListener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                state.isLoading = playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE
+                if (playbackState == Player.STATE_READY) state.error = null
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    player.seekToDefaultPosition()
+                    player.prepare()
+                    return
+                }
+                state.isLoading = false
+                state.error = playerErrorFor(error.errorCode)
+            }
+        }
+        player.addListener(playerListener)
+        onDispose {
+            player.removeListener(playerListener)
+            player.release()
+        }
+    }
+
+    DisposableEffect(player, lifecycleOwner) {
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> player.pause()
+                Lifecycle.Event.ON_START -> player.play()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(lifecycleObserver) }
+    }
+
+    LaunchedEffect(player, url, format, state.reloadToken) {
+        player.setMediaItem(
+            MediaItem.Builder()
+                .setUri(url)
+                .setMimeType(format.mimeType())
+                .build()
+        )
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    PlayerSurface(player = player, modifier = modifier)
+}
+
+/**
+ * HLS and DASH are named outright, so a manifest URL without the usual
+ * extension still plays. Progressive streams pass no type: Media3 sniffs the
+ * container (TS, MP4, Matroska…) from the bytes.
+ */
+private fun StreamFormat.mimeType(): String? = when (this) {
+    StreamFormat.HLS -> MimeTypes.APPLICATION_M3U8
+    StreamFormat.DASH -> MimeTypes.APPLICATION_MPD
+    StreamFormat.PROGRESSIVE, StreamFormat.EMBED -> null
+}

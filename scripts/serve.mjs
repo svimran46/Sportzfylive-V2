@@ -27,13 +27,21 @@ const server = createServer(async (req, res) => {
     if (pathname.endsWith("/")) pathname += "index.html";
 
     // Prevent path traversal.
-    const filePath = join(ROOT, normalize(pathname).replace(/^(\.\.[/\\])+/, ""));
+    let filePath = join(ROOT, normalize(pathname).replace(/^(\.\.[/\\])+/, ""));
     if (!filePath.startsWith(ROOT)) {
       res.writeHead(403).end("Forbidden");
       return;
     }
 
-    const body = await readFile(filePath);
+    // Extensionless page URLs (/live-tv, /admin) resolve to their .html file,
+    // as Workers static assets do.
+    const body = await readFile(filePath).catch(error => {
+      if (extname(filePath)) throw error;
+      return readFile(filePath + ".html").then(data => {
+        filePath += ".html";
+        return data;
+      });
+    });
     res.writeHead(200, {
       "Content-Type": MIME[extname(filePath)] || "application/octet-stream",
       "Cache-Control": "no-cache"

@@ -1,0 +1,208 @@
+package com.sportzfy.live.presentation.livetv
+
+import com.sportzfy.live.domain.model.PlayerMode
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sportzfy.live.core.player.PlayerConfig
+import com.sportzfy.live.core.theme.SportzfyColors
+import com.sportzfy.live.core.theme.SportzfyIcon
+import com.sportzfy.live.core.theme.SportzfyIcons
+import com.sportzfy.live.domain.model.Channel
+import com.sportzfy.live.presentation.components.ChannelCard
+import com.sportzfy.live.presentation.components.EmptyState
+import com.sportzfy.live.presentation.components.tvFocus
+import com.sportzfy.live.presentation.config.LocalAppConfig
+import com.sportzfy.live.presentation.watch.player.StreamPlayer
+import com.sportzfy.live.presentation.watch.player.rememberStreamPlayerState
+import org.koin.compose.viewmodel.koinViewModel
+
+/**
+ * Plays one channel in the app's existing player (same WebView protections,
+ * pop-up blocking and fullscreen as matches), with other channels from the
+ * same group below to switch in place.
+ */
+@Composable
+fun ChannelPlayerScreen(
+    onBack: () -> Unit,
+    viewModel: ChannelPlayerViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val playerState = rememberStreamPlayerState()
+    val channel = state.channel
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { ChannelTopBar(channel, onBack) },
+    ) { padding ->
+        when {
+            state.isMissing && state.isLoadFailed -> EmptyState(
+                icon = SportzfyIcons.Offline,
+                title = "Couldn't load channels",
+                message = "Couldn't load the channel list. Check your connection and try again.",
+                primaryAction = "Retry" to viewModel::retry,
+                modifier = Modifier.padding(padding).fillMaxSize().wrapContentSize(),
+            )
+            state.isMissing -> EmptyState(
+                icon = SportzfyIcons.Alert,
+                title = "Channel unavailable",
+                message = "This channel is no longer available.",
+                primaryAction = "Back to Live TV" to onBack,
+                modifier = Modifier.padding(padding).fillMaxSize().wrapContentSize(),
+            )
+            channel == null -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = SportzfyColors.Rose)
+            }
+            else -> {
+                // Channel pages load directly with no referer and no sandbox. The
+                // player keeps the page on the channel's own host and traps its
+                // pop-ups, as it does for every stream.
+                val config = PlayerConfig.from(LocalAppConfig.current).copy(mode = PlayerMode.DIRECT)
+                BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
+                    // Measured outside the scroll so the player can be capped to
+                    // the viewport: on TV/landscape a full-width 16:9 player would
+                    // be taller than the screen.
+                    val playerMaxHeight = maxHeight * 0.7f
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        StreamPlayer(
+                            url = channel.streamUrl,
+                            format = channel.streamFormat,
+                            // No fillMaxWidth: it would force the full width and
+                            // break the ratio once the height cap applies.
+                            modifier = Modifier
+                                .widthIn(max = 960.dp)
+                                .heightIn(max = playerMaxHeight)
+                                .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
+                            state = playerState,
+                            config = config,
+                        )
+                        ChannelInfo(channel, playerState.blockedCount)
+                        if (state.related.isNotEmpty()) {
+                            Text(
+                                text = "More ${channel.category.label}",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                items(state.related, key = { it.id }) { other ->
+                                    ChannelCard(other, onClick = { viewModel.selectChannel(other.id) }, modifier = Modifier.width(280.dp))
+                                }
+                            }
+                            Spacer(Modifier.height(24.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelTopBar(channel: Channel?, onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .padding(end = 16.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.tvFocus(CircleShape)) {
+            SportzfyIcon(SportzfyIcons.Back, contentDescription = "Back")
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = "LIVE TV" + (channel?.let { " · ${it.category.label.uppercase()}" } ?: ""),
+                style = MaterialTheme.typography.labelMedium,
+                color = SportzfyColors.RoseText,
+            )
+            Text(
+                text = channel?.name ?: "Loading…",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChannelInfo(channel: Channel, blockedCount: Int) {
+    val uriHandler = LocalUriHandler.current
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text(channel.name, style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = "Source: ${channel.sourceHost}",
+            style = MaterialTheme.typography.bodySmall,
+            color = SportzfyColors.TextSecondary,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        if (blockedCount > 0) {
+            Text(
+                text = if (blockedCount == 1) "1 pop-up blocked" else "$blockedCount pop-ups blocked",
+                style = MaterialTheme.typography.bodySmall,
+                color = SportzfyColors.TextMuted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+        // Escape hatch for a channel page that won't play inside the app.
+        OutlinedButton(
+            onClick = { runCatching { uriHandler.openUri(channel.streamUrl) } },
+            border = BorderStroke(1.dp, SportzfyColors.TextMuted),
+            modifier = Modifier.padding(top = 12.dp).tvFocus(RoundedCornerShape(50)),
+        ) {
+            SportzfyIcon(SportzfyIcons.ExternalLink, contentDescription = null, size = 18.dp)
+            Spacer(Modifier.width(8.dp))
+            Text("Open in browser")
+        }
+    }
+}

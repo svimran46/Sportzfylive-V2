@@ -1,8 +1,10 @@
-.wrangler
-node_modules
-.DS_Store
-.env
-.env.local
-# Wrangler's local secret file (used by `wrangler dev`) — never commit it.
+node_modules/
+.wrangler/
+dist/
+
+# Cloudflare & environment secrets
 .dev.vars
 .dev.vars.*
+.env
+.env.local
+.env.*

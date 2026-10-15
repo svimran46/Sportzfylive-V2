@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0A0B10">
+  <meta name="theme-color" content="#08090C">
   <title>Sportzfylive - Live Sports</title>
   <meta name="description" content="Watch live sports from around the world. Football, basketball, cricket, tennis and more — live and upcoming matches, all in one place.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23D93698'/%3E%3Cpath d='M12 5.25 14.35 8.1l.65 3.65-3 1.75-3-1.75.65-3.65L12 5.25Z' fill='%230A0B10'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%2383FF00'/%3E%3Cpath d='M12 5.25 14.35 8.1l.65 3.65-3 1.75-3-1.75.65-3.65L12 5.25Z' fill='%2308090C'/%3E%3C/svg%3E">
 
   <!-- Social share cards (image generated in the site's own design language) -->
   <meta property="og:type" content="website">
@@ -23,7 +23,9 @@
   <meta name="twitter:description" content="Watch live sports from around the world. Every match, every sport, one place.">
   <meta name="twitter:image" content="https://sportzfylive.svimranmy.workers.dev/og-card.png">
 
-  <!-- Self-hosted variable DM Sans: one preloaded woff2, zero external CSS -->
+  <!-- Self-hosted variable Space Grotesk, Inter and DM Sans: preloaded woff2, zero external CSS -->
+  <link rel="preload" href="/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 
   <!-- Warm connections to the API worker and image host -->
@@ -32,6 +34,38 @@
 
   <!-- ============ CRITICAL CSS: tokens, fonts, reset, header, hero ============ -->
   <style id="sportzfy-critical">
+    @font-face{
+      font-family:"Space Grotesk";
+      font-style:normal;
+      font-weight:300 700;
+      font-display:swap;
+      src:url("/fonts/space-grotesk-latin.woff2") format("woff2");
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    @font-face{
+      font-family:"Space Grotesk";
+      font-style:normal;
+      font-weight:300 700;
+      font-display:swap;
+      src:url("/fonts/space-grotesk-latin-ext.woff2") format("woff2");
+      unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+    }
+    @font-face{
+      font-family:"Inter";
+      font-style:normal;
+      font-weight:100 900;
+      font-display:swap;
+      src:url("/fonts/inter-latin.woff2") format("woff2");
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    @font-face{
+      font-family:"Inter";
+      font-style:normal;
+      font-weight:100 900;
+      font-display:swap;
+      src:url("/fonts/inter-latin-ext.woff2") format("woff2");
+      unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+    }
     @font-face{
       font-family:"DM Sans";
       font-style:normal;
@@ -50,27 +84,27 @@
     }
 
     :root{
-      /* Low-glare dark theme tokens */
-      --canvas:#0A0B10;
-      --header-bg:rgba(10,11,16,.88);
-      --surface:#14161F;
-      --surface-2:#14161F;
-      --surface-hover:#1C1E2A;
-      --surface-focus:#232736;
-      --raised:#14161F;
-      --raised-hover:#1C1E2A;
-      --ink:#E7E8ED;
-      --ink-muted:#9497A6;
-      --ink-faint:#5B5E6B;
-      --accent:#2C3EE8;
-      --accent-dim:rgba(44,62,232,.18);
-      --accent-pink:#D93698;
-      --accent-pink-dim:rgba(217,54,152,.18);
-      --live:#E02938;
-      --live-dim:rgba(224,41,56,.18);
-      --brand-ink:#0A0B10;
-      --border:rgba(255,255,255,.06);
-      --border-strong:rgba(255,255,255,.1);
+      /* Electric Volt & Carbon Black design tokens */
+      --canvas:#08090C;
+      --header-bg:rgba(8,9,12,.88);
+      --surface:#12151D;
+      --surface-2:#12151D;
+      --surface-hover:#1A1F2B;
+      --surface-focus:#222938;
+      --raised:#12151D;
+      --raised-hover:#1A1F2B;
+      --ink:#F8FAFC;
+      --ink-muted:#A8B3CF;
+      --ink-faint:#8A99AD;
+      --accent:#83FF00;
+      --accent-dim:rgba(131,255,0,.15);
+      --accent-pink:#D7FF44;
+      --accent-pink-dim:rgba(215,255,68,.15);
+      --live:#FF2A3B;
+      --live-dim:rgba(255,42,59,.16);
+      --brand-ink:#08090C;
+      --border:rgba(255,255,255,.09);
+      --border-strong:rgba(255,255,255,.14);
       --radius-pill:999px;
       --radius-card:16px;
       --shadow-card:0 18px 40px -18px rgba(0,0,0,.6);
@@ -93,7 +127,7 @@
       min-height:100vh;
       background:var(--canvas);
       color:var(--ink);
-      font-family:"DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+      font-family:"Inter","DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
       font-size:15px;
       line-height:1.55;
       font-variant-numeric:tabular-nums;
@@ -126,6 +160,7 @@
     button:active{
       box-shadow:var(--hover-shadows),var(--accent-dim) 0 0 24px 4px;
       background-color:var(--accent);
+      color:var(--brand-ink);
       transform:scale(.97);
     }
     button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
@@ -173,7 +208,8 @@
       width:100%;height:36px;padding:0 14px 0 34px;
       background:var(--surface-2);border:1px solid var(--border-strong);
       border-radius:var(--radius-pill);color:var(--ink);
-      font-size:12px;font-family:inherit;outline:none;
+      font-size:13px;font-family:inherit;outline:none;
+      text-overflow:ellipsis;overflow:hidden;white-space:nowrap;
       transition:background .15s ease,border-color .15s ease;
     }
     @media(min-width:640px){.sfy-search input{height:40px;font-size:14px;padding-right:44px}}
@@ -198,22 +234,39 @@
     .sfy-nav a svg{width:16px;height:16px}
     .sfy-nav a:hover,.sfy-nav a.active{color:var(--accent);font-weight:700}
 
-    .sfy-header-actions{display:flex;align-items:center;gap:4px;margin-left:auto}
+    .sfy-header-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
     .sfy-icon-btn{
-      width:38px;height:38px;padding:0;display:grid;place-items:center;
+      width:44px;height:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;
       border-radius:1.1em;background:var(--raised);border:1px solid var(--border);color:var(--ink-muted);
       box-shadow:var(--btn-shadow-sm);
       transition:box-shadow ease-in-out .25s,color .15s ease,border-color .15s ease;
     }
     .sfy-icon-btn:hover{background:var(--raised-hover);border-color:rgba(255,255,255,.14);color:var(--ink);box-shadow:var(--hover-shadows)}
-    .sfy-icon-btn svg{width:17px;height:17px}
+    .sfy-icon-btn svg{width:18px;height:18px}
     .sfy-mobile-toggle{display:grid}
     @media(min-width:1024px){.sfy-mobile-toggle{display:none}}
+
+    .sfy-header-sports{
+      display:flex;align-items:center;gap:6px;
+      padding:2px 0 10px;overflow-x:auto;scrollbar-width:none;
+    }
+    .sfy-header-sports::-webkit-scrollbar{display:none}
+    @media(min-width:1024px){.sfy-header-sports{display:none}}
+    .sfy-header-sport-chip{
+      flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+      height:30px;padding:0 12px;border-radius:var(--radius-pill);
+      background:var(--raised);border:1px solid var(--border);color:var(--ink-muted);
+      font-size:11.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;cursor:pointer;
+      transition:all .15s ease;
+    }
+    .sfy-header-sport-chip:hover,.sfy-header-sport-chip.active{
+      background:var(--accent);color:var(--brand-ink);border-color:var(--accent);
+    }
 
     .sfy-mobile-nav{
       display:none;flex-direction:column;gap:2px;
       padding:10px 16px 14px;border-top:1px solid var(--border);
-      background:#0A0B10;
+      background:var(--canvas);
     }
     .sfy-mobile-nav.open{display:flex}
     .sfy-mobile-nav a{
@@ -283,52 +336,53 @@
        radar graphic (replacing harsh pitch stripes). */
     .sfy-hero{
       position:relative;overflow:hidden;
-      margin:16px 0 24px;
+      margin:12px 0 18px;
       border-radius:20px;
       background:
-        radial-gradient(900px 340px at 85% -10%,rgba(44,62,232,.15),transparent 62%),
-        radial-gradient(520px 260px at -8% 110%,rgba(217,54,152,.12),transparent 60%),
-        linear-gradient(160deg,#14161F 0%,#0E1017 60%,#0A0B10 100%);
+        radial-gradient(900px 340px at 85% -10%,rgba(131,255,0,.14),transparent 62%),
+        radial-gradient(520px 260px at -8% 110%,rgba(215,255,68,.10),transparent 60%),
+        linear-gradient(160deg,#12151D 0%,#0C0E14 60%,#08090C 100%);
       border:1px solid var(--border);
       box-shadow:0 20px 48px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.04);
-      min-height:300px;
+      min-height:220px;
     }
-    @media(min-width:640px){.sfy-hero{min-height:340px;margin-bottom:28px}}
+    @media(min-width:640px){.sfy-hero{min-height:245px;margin-bottom:20px}}
     /* Ambient gradient glow layer */
     .sfy-hero::before{
       content:"";position:absolute;inset:0;
       background:
-        radial-gradient(ellipse 65% 55% at 75% 45%,rgba(44,62,232,.16),transparent 70%),
-        radial-gradient(ellipse 50% 50% at 90% 70%,rgba(217,54,152,.14),transparent 60%);
+        radial-gradient(ellipse 65% 55% at 75% 45%,rgba(131,255,0,.15),transparent 70%),
+        radial-gradient(ellipse 50% 50% at 90% 70%,rgba(215,255,68,.12),transparent 60%);
       pointer-events:none;z-index:0;
     }
-    /* Blue->pink wireframe diamond radar graphic */
+    /* Volt cyber wireframe diamond radar graphic */
     .sfy-hero::after{
       content:"";position:absolute;
       top:50%;right:min(4vw,40px);transform:translateY(-50%);
-      width:min(44vw,420px);height:min(44vw,420px);
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232C3EE8' stop-opacity='0.8'/%3E%3Cstop offset='100%25' stop-color='%23D93698' stop-opacity='0.8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='100%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D93698' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%232C3EE8' stop-opacity='0.6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='none' stroke-width='1.2'%3E%3Cpolygon points='100,15 185,100 100,185 15,100' stroke='url(%23g1)'/%3E%3Cpolygon points='100,38 162,100 100,162 38,100' stroke='url(%23g2)' stroke-dasharray='4,3'/%3E%3Cpolygon points='100,60 140,100 100,140 60,100' stroke='url(%23g1)'/%3E%3Cline x1='100' y1='15' x2='100' y2='185' stroke='url(%23g1)' stroke-dasharray='3,3'/%3E%3Cline x1='15' y1='100' x2='185' y2='100' stroke='url(%23g2)' stroke-dasharray='3,3'/%3E%3Cline x1='100' y1='15' x2='100' y2='60' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='15' y1='100' x2='60' y2='100' stroke='url(%23g1)' stroke-width='2'/%3E%3Cline x1='185' y1='100' x2='140' y2='100' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='100' y1='185' x2='100' y2='140' stroke='url(%23g1)' stroke-width='2'/%3E%3Ccircle cx='100' cy='100' r='5' fill='%232C3EE8'/%3E%3Ccircle cx='100' cy='15' r='3' fill='%23D93698'/%3E%3Ccircle cx='185' cy='100' r='3' fill='%232C3EE8'/%3E%3Ccircle cx='100' cy='185' r='3' fill='%23D93698'/%3E%3Ccircle cx='15' cy='100' r='3' fill='%232C3EE8'/%3E%3C/g%3E%3C/svg%3E");
+      width:min(36vw,260px);height:min(36vw,260px);
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2383FF00' stop-opacity='0.8'/%3E%3Cstop offset='100%25' stop-color='%23D7FF44' stop-opacity='0.8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='100%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D7FF44' stop-opacity='0.6'/%3E%3Cstop offset='100%25' stop-color='%2383FF00' stop-opacity='0.6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='none' stroke-width='1.2'%3E%3Cpolygon points='100,15 185,100 100,185 15,100' stroke='url(%23g1)'/%3E%3Cpolygon points='100,38 162,100 100,162 38,100' stroke='url(%23g2)' stroke-dasharray='4,3'/%3E%3Cpolygon points='100,60 140,100 100,140 60,100' stroke='url(%23g1)'/%3E%3Cline x1='100' y1='15' x2='100' y2='185' stroke='url(%23g1)' stroke-dasharray='3,3'/%3E%3Cline x1='15' y1='100' x2='185' y2='100' stroke='url(%23g2)' stroke-dasharray='3,3'/%3E%3Cline x1='100' y1='15' x2='100' y2='60' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='15' y1='100' x2='60' y2='100' stroke='url(%23g1)' stroke-width='2'/%3E%3Cline x1='185' y1='100' x2='140' y2='100' stroke='url(%23g2)' stroke-width='2'/%3E%3Cline x1='100' y1='185' x2='100' y2='140' stroke='url(%23g1)' stroke-width='2'/%3E%3Ccircle cx='100' cy='100' r='5' fill='%2383FF00'/%3E%3Ccircle cx='100' cy='15' r='3' fill='%23D7FF44'/%3E%3Ccircle cx='185' cy='100' r='3' fill='%2383FF00'/%3E%3Ccircle cx='100' cy='185' r='3' fill='%23D7FF44'/%3E%3Ccircle cx='15' cy='100' r='3' fill='%2383FF00'/%3E%3C/g%3E%3C/svg%3E");
       background-size:contain;background-repeat:no-repeat;background-position:center;
       opacity:.22;filter:blur(0.5px);
       pointer-events:none;z-index:1;
     }
     @media(max-width:640px){
-      .sfy-hero::after{right:-15%;width:60vw;height:60vw;opacity:.16}
+      .sfy-hero::after{right:-15%;width:50vw;height:50vw;opacity:.14}
     }
     .sfy-hero-inner{
       position:relative;z-index:2;
-      min-height:300px;padding:34px 24px 38px;
+      min-height:220px;padding:24px 20px;
       display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
-      max-width:640px;
+      max-width:680px;
     }
-    @media(min-width:640px){.sfy-hero-inner{min-height:340px;padding:44px}}
+    @media(min-width:640px){.sfy-hero-inner{min-height:245px;padding:26px 36px}}
     .sfy-hero-pill{
       display:inline-flex;align-items:center;gap:6px;
-      padding:5px 12px;margin-bottom:14px;
+      padding:4px 10px;margin-bottom:12px;
       border-radius:var(--radius-pill);
       background:var(--live-dim);color:var(--live);
       border:1px solid rgba(224,41,56,.25);
-      font-size:11px;font-weight:700;letter-spacing:1px;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
     }
     .sfy-hero-pill i{
       width:7px;height:7px;border-radius:50%;background:var(--live);
@@ -340,30 +394,28 @@
       50%{opacity:.6;box-shadow:0 0 2px var(--live)}
     }
     .sfy-hero-title{
-      margin:0 0 14px;
-      font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
-      font-size:clamp(20px,3.8vw,34px);font-weight:700;
-      letter-spacing:-0.5px;line-height:1.4;color:var(--ink);
-      text-shadow:0 0 6px rgba(231,232,237,.14);
+      margin:0 0 12px;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(22px,3.4vw,34px);font-weight:700;
+      letter-spacing:-0.03em;line-height:1.2;color:var(--ink);
     }
     .sfy-hero-title span{
       display:block;color:var(--ink);
-      text-shadow:0 0 6px rgba(231,232,237,.14);
     }
     .sfy-hero-sub{
-      margin:0 0 18px;max-width:480px;
-      color:var(--ink-muted);font-size:14px;line-height:1.6;
+      margin:0 0 14px;max-width:480px;
+      color:var(--ink-muted);font-size:13.5px;line-height:1.5;
     }
-    @media(min-width:640px){.sfy-hero-sub{font-size:15px}}
+    @media(min-width:640px){.sfy-hero-sub{font-size:14px}}
     .sfy-hero-facts{
       display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
-      margin:0 0 22px;padding:0;list-style:none;
+      margin:0 0 18px;padding:0;list-style:none;
     }
     .sfy-hero-facts li{
       display:inline-flex;align-items:center;gap:8px;
       padding:6px 14px;border-radius:var(--radius-pill);
       background:var(--surface);border:1px solid var(--border);
-      color:var(--ink-muted);font-size:12.5px;font-weight:600;
+      color:var(--ink-muted);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.02em;
       box-shadow:var(--btn-shadow-sm);
     }
     .sfy-hero-facts li::before{
@@ -380,7 +432,7 @@
       box-shadow:0 0 8px var(--live-dim);
     }
     .sfy-hero-teams{display:flex;align-items:center;justify-content:flex-start;gap:18px;margin-bottom:8px}
-    .sfy-hero-team{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700}
+    .sfy-hero-team{display:flex;align-items:center;gap:9px;font-size:14px;font-family:'Inter',sans-serif;font-weight:600}
     .sfy-hero-team img{
       width:46px;height:46px;object-fit:contain;
       padding:5px;border-radius:50%;
@@ -391,18 +443,19 @@
     .sfy-hero-btn{
       display:inline-flex;align-items:center;gap:8px;
       min-height:46px;padding:0.9em 2em;
-      color:var(--ink);
-      background:linear-gradient(135deg,#2334D0 0%,#2C3EE8 50%,#3648EE 100%);
-      border:1px solid rgba(255,255,255,0.12);
-      box-shadow:var(--btn-shadow),0 0 20px rgba(44,62,232,0.3);
+      color:var(--brand-ink);
+      font-weight:700;
+      background:linear-gradient(135deg,#73E600 0%,#83FF00 50%,#94FF1A 100%);
+      border:1px solid rgba(131,255,0,0.4);
+      box-shadow:var(--btn-shadow),0 0 20px rgba(131,255,0,0.3);
     }
     .sfy-hero-btn:hover{
-      color:var(--ink);
-      background:linear-gradient(135deg,#283AE0 0%,#3648EE 50%,#4355F5 100%);
-      box-shadow:var(--hover-shadows),0 0 28px rgba(44,62,232,0.45);
-      border-color:rgba(255,255,255,0.2);
+      color:var(--brand-ink);
+      background:linear-gradient(135deg,#83FF00 0%,#94FF1A 50%,#A5FF33 100%);
+      box-shadow:var(--hover-shadows),0 0 28px rgba(131,255,0,0.45);
+      border-color:rgba(255,255,255,0.3);
     }
-    .sfy-hero-btn:active{transform:scale(.96);color:var(--ink)}
+    .sfy-hero-btn:active{transform:scale(.96);color:var(--brand-ink)}
     .sfy-hero-btn svg{width:14px;height:14px;fill:currentColor}
 
     .sfy-sheen{position:relative;overflow:hidden}
@@ -431,19 +484,26 @@
     .sfy-featured .sfy-hero-inner{align-items:flex-start;text-align:left}
     .sfy-featured .sfy-hero-gradient{
       content:"";position:absolute;inset:0;z-index:1;
-      background:linear-gradient(90deg,rgba(10,11,16,.92),rgba(14,16,23,.6) 55%,rgba(10,11,16,.95));
+      background:linear-gradient(90deg,rgba(8,9,12,.92),rgba(14,17,23,.6) 55%,rgba(8,9,12,.95));
     }
 
+    /* Site notice: a full-width bar under the header (text, or an image
+       banner with an optional mobile crop), edited in the admin Settings. */
     .sfy-site-notice{
-      display:none;align-items:center;justify-content:center;gap:8px;
-      padding:9px 16px;background:var(--surface);border:1px solid var(--border);color:var(--ink-muted);
-      font-size:12.5px;font-weight:600;text-align:center;
-      border-radius:0 0 16px 16px;
+      display:none;align-items:center;justify-content:center;gap:8px;overflow:hidden;
+      padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);color:var(--ink);
+      font-size:13px;font-weight:600;text-align:center;
     }
     .sfy-site-notice.show{display:flex}
-    .sfy-site-notice span{color:var(--accent);font-size:9px}
-    .sfy-site-notice a{text-decoration:underline;text-underline-offset:2px}
+    .sfy-site-notice .sfy-notice-dot{color:var(--accent);font-size:9px}
+    .sfy-site-notice a{color:inherit;text-decoration:underline;text-underline-offset:2px}
     .sfy-site-notice a:hover{color:var(--accent)}
+    .sfy-site-notice.marquee{justify-content:flex-start;white-space:nowrap}
+    .sfy-site-notice.marquee .sfy-notice-track{display:inline-block;padding-left:100%;animation:sfy-notice-scroll 18s linear infinite}
+    @keyframes sfy-notice-scroll{to{transform:translateX(-100%)}}
+    .sfy-site-notice.image{padding:0;background:transparent;border:0}
+    .sfy-site-notice.image a,.sfy-site-notice.image picture{display:block;width:100%;text-decoration:none}
+    .sfy-site-notice.image img{display:block;width:100%;height:auto;max-height:180px;object-fit:cover}
     .sfy-site-banner{display:none;margin-top:14px}
     .sfy-site-banner.show{display:block}
     .sfy-site-banner img{width:100%;border-radius:14px;border:1px solid var(--border)}
@@ -454,13 +514,42 @@
       100%{background-position:200% 0}
     }
     .sfy-skeleton{
-      background:linear-gradient(90deg,#14161F 25%,#1E2230 50%,#14161F 75%)!important;
+      background:linear-gradient(90deg,#12151D 25%,#1A1F2B 50%,#12151D 75%)!important;
       background-size:200% 100%!important;
       animation:sfy-shimmer 1.8s infinite ease-in-out!important;
     }
     .sfy-event-poster,.sfy-hero-bg{transition:opacity .25s ease}
     .sfy-event-poster:not(.loaded),.sfy-hero-bg:not(.loaded){opacity:0}
     .sfy-event-poster.loaded,.sfy-hero-bg.loaded{opacity:1}
+
+    /* ======================= HERO LIVE GRID ======================= */
+    .sfy-hero-live{
+      margin:0 0 24px;
+    }
+    .sfy-hero-live.show{display:block}
+    .sfy-hero-live-title{
+      margin:0 0 14px;
+      display:flex;align-items:center;gap:9px;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(16px,2.4vw,20px);font-weight:700;letter-spacing:-0.02em;line-height:1.3;
+      color:var(--ink);
+    }
+    .sfy-hero-live-title::before{
+      content:"";width:5px;height:18px;border-radius:999px;background:var(--live);flex-shrink:0;
+    }
+    .sfy-hero-live-title .sfy-hero-live-count{
+      color:var(--live);font-family:"Space Grotesk",sans-serif;font-size:12px;font-weight:600;letter-spacing:0.02em;margin-left:6px;
+    }
+    .sfy-hero-live-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));
+      gap:16px;
+    }
+    @media(min-width:640px){
+      .sfy-hero-live-grid{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(min-width:1024px){
+      .sfy-hero-live-grid{grid-template-columns:repeat(4,1fr)}
+    }
   </style>
 
   <!-- ============ DESIGN SYSTEM: tiles, chips, carousels, cards, modal, footer ============ -->
@@ -472,11 +561,11 @@
     .sfy-section-title{display:flex;align-items:center;gap:9px;min-width:0}
     .sfy-section-title::before{content:"";width:5px;height:18px;border-radius:999px;background:var(--accent);flex-shrink:0}
     .sfy-section h2{
-      margin:0;font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
-      font-size:clamp(13px,2vw,17px);font-weight:700;letter-spacing:0;line-height:1.45;
-      color:var(--ink);text-shadow:0 0 4px rgba(231,232,237,.1);
+      margin:0;font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(16px,2.4vw,20px);font-weight:700;letter-spacing:-0.02em;line-height:1.3;
+      color:var(--ink);
     }
-    @media(min-width:640px){.sfy-section h2{font-size:clamp(14px,2.2vw,18px)}}
+    @media(min-width:640px){.sfy-section h2{font-size:clamp(17px,2.4vw,22px)}}
 
     /* ======================= LIVE TICKER BANNER ======================= */
     .sfy-ticker-wrap{
@@ -492,7 +581,7 @@
       display:inline-flex;align-items:center;gap:6px;
       padding:4px 10px;border-radius:8px;
       background:var(--surface-hover);border:1px solid var(--border);
-      color:var(--ink);font-size:11px;font-weight:800;letter-spacing:.06em;
+      color:var(--ink);font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
       flex-shrink:0;z-index:2;
     }
     .sfy-ticker-dot{
@@ -513,11 +602,11 @@
     .sfy-ticker-wrap:hover .sfy-ticker-track{animation-play-state:paused}
     .sfy-ticker-item{
       display:inline-flex;align-items:center;gap:8px;
-      font-size:12.5px;color:var(--ink-muted);font-weight:600;
+      font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink-muted);font-weight:500;
     }
     .sfy-ticker-tag{
-      font-style:normal;padding:2px 6px;border-radius:4px;
-      font-size:10px;font-weight:800;letter-spacing:.04em;
+      font-family:'Space Grotesk',sans-serif;font-style:normal;padding:2px 6px;border-radius:4px;
+      font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
       background:var(--accent-dim);color:var(--accent);
     }
     .sfy-ticker-tag.live{
@@ -552,7 +641,7 @@
     .sfy-tile[data-nav="FOOTBALL"] .sfy-tile-icon{background:var(--surface-hover);color:var(--ink);border:1px solid var(--border)}
     .sfy-tile[data-nav="CRICKET"] .sfy-tile-icon{background:var(--surface-hover);color:var(--ink);border:1px solid var(--border)}
     .sfy-tile[data-nav="ALL"] .sfy-tile-icon{background:var(--surface-hover);color:var(--ink);border:1px solid var(--border)}
-    .sfy-tile span:last-child{font-size:13px;font-weight:700;color:var(--ink)}
+    .sfy-tile span:last-child{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink)}
 
     /* ======================= CATEGORY CHIPS ======================= */
     .sfy-chips{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 20px;scrollbar-width:none}
@@ -563,27 +652,26 @@
       border-radius:var(--radius-pill);
       background:var(--surface);color:var(--ink-muted);
       border:1px solid var(--border);
-      font-size:12px;font-weight:600;white-space:nowrap;
+      font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.02em;white-space:nowrap;
       box-shadow:var(--btn-shadow-sm);
     }
     .sfy-chip:hover{color:var(--ink);border-color:rgba(255,255,255,.14);box-shadow:var(--hover-shadows)}
-    .sfy-chip.active{background:var(--accent);color:var(--ink);border-color:rgba(255,255,255,.2);box-shadow:0 0 20px var(--accent-dim)}
+    .sfy-chip.active{background:var(--accent);color:var(--brand-ink);font-weight:700;border-color:var(--accent);box-shadow:0 0 20px var(--accent-dim)}
 
     /* ======================= MATCH CAROUSELS ======================= */
     .category-section{position:relative;margin-bottom:30px}
     .category-heading-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
     .category-heading-row h2{
       margin:0;display:flex;align-items:center;gap:9px;min-width:0;
-      font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
-      font-size:clamp(13px,2vw,17px);font-weight:700;letter-spacing:0;color:var(--ink);line-height:1.45;
-      text-shadow:0 0 4px rgba(231,232,237,.1);
+      font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(16px,2.4vw,20px);font-weight:700;letter-spacing:-0.02em;color:var(--ink);line-height:1.3;
     }
-    @media(min-width:640px){.category-heading-row h2{font-size:clamp(14px,2.2vw,18px)}}
+    @media(min-width:640px){.category-heading-row h2{font-size:clamp(17px,2.4vw,22px)}}
     .category-heading-row h2::before{
       content:"";width:5px;height:18px;border-radius:999px;background:var(--accent);flex-shrink:0;
     }
     .category-section[data-category="LIVE"] .category-heading-row h2::before{background:var(--live)}
-    .sfy-section-count{color:var(--ink-muted);font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;white-space:nowrap;margin-left:6px}
+    .sfy-section-count{color:var(--ink-muted);font-family:"Space Grotesk",sans-serif;font-size:12px;font-weight:600;letter-spacing:0.02em;white-space:nowrap;margin-left:6px}
     .category-section[data-category="LIVE"] .sfy-section-count{color:var(--live)}
     .category-controls{display:flex;gap:10px;flex-shrink:0}
     .category-arrow{
@@ -652,21 +740,22 @@
       width:clamp(50px,7vw,72px);height:clamp(50px,7vw,72px);
       border-radius:50%;
       background:rgba(255,255,255,.04);border:1px solid var(--border);
-      color:var(--ink-muted);font-size:14px;font-weight:800;letter-spacing:.5px;
+      color:var(--ink-muted);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;
     }
     .sfy-hero-team .sfy-logo-fallback{width:46px;height:46px;font-size:13px}
-    .sfy-fallback-vs{color:var(--ink-faint);font-size:12px;font-weight:800;letter-spacing:.6px}
+    .sfy-fallback-vs{color:var(--ink-faint);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
     .sfy-event-badge,.sfy-event-live{
       position:absolute;z-index:3;top:10px;left:10px;
-      display:inline-flex;align-items:center;gap:5px;
-      padding:5px 10px;border-radius:var(--radius-pill);
-      font-size:11px;line-height:1;font-weight:700;
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 10px;border-radius:var(--radius-pill);
+      font-family:'Space Grotesk',sans-serif;
+      font-size:11px;line-height:1;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
       backdrop-filter:blur(8px);
     }
     .sfy-event-badge{background:rgba(14,16,23,.88);border:1px solid var(--border);color:var(--ink)}
-    .sfy-event-live{background:var(--live);color:var(--ink);letter-spacing:.5px;box-shadow:0 0 10px var(--live-dim)}
-    .sfy-event-live::before{
-      content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);
+    .sfy-event-live{background:var(--live);color:var(--ink);box-shadow:0 0 12px var(--live-dim)}
+    .sfy-event-live .live-dot{
+      width:6px;height:6px;border-radius:50%;background:var(--ink);flex-shrink:0;
       box-shadow:0 0 6px var(--ink);
       animation:sfy-live-glow 2s ease-in-out infinite;
     }
@@ -675,7 +764,7 @@
       display:inline-flex;align-items:center;gap:5px;
       padding:5px 9px;border-radius:var(--radius-pill);
       background:rgba(14,16,23,.88);border:1px solid var(--border);
-      color:var(--ink);font-size:11px;font-weight:700;
+      color:var(--ink);font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:.04em;
     }
     .sfy-stream-chip svg{width:11px;height:11px}
     .sfy-event-favorite{
@@ -687,10 +776,11 @@
     }
     .sfy-event-title{
       margin-top:11px;color:var(--ink);
-      font-size:14px;font-weight:700;letter-spacing:-.2px;line-height:1.35;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:14.5px;font-weight:700;letter-spacing:-0.02em;line-height:1.35;
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
-    .sfy-event-category{margin-top:3px;color:var(--ink-faint);font-size:12.5px;font-weight:500}
+    .sfy-event-category{margin-top:3px;color:var(--ink-muted);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500}
     .sfy-event-category span{margin:0 4px;color:var(--ink-faint)}
     .sfy-match-item:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 
@@ -705,8 +795,8 @@
     .loading-state p{margin:10px 0 0;font-size:14px}
     .sfy-skeletons{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin:24px 0}
     .sfy-skeleton{border-radius:14px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--btn-shadow-sm);overflow:hidden}
-    .sfy-skeleton::before{content:"";display:block;aspect-ratio:16/9;background:linear-gradient(100deg,#14161F 40%,#1E2230 50%,#14161F 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
-    .sfy-skeleton::after{content:"";display:block;height:11px;width:72%;margin:14px 12px 0;border-radius:6px;background:linear-gradient(100deg,#14161F 40%,#1E2230 50%,#14161F 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
+    .sfy-skeleton::before{content:"";display:block;aspect-ratio:16/9;background:linear-gradient(100deg,#12151D 40%,#1A1F2B 50%,#12151D 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
+    .sfy-skeleton::after{content:"";display:block;height:11px;width:72%;margin:14px 12px 0;border-radius:6px;background:linear-gradient(100deg,#12151D 40%,#1A1F2B 50%,#12151D 60%);background-size:200% 100%;animation:sfy-shimmer 1.4s linear infinite}
     @keyframes sfy-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     .error-state h3{margin:0 0 6px;color:var(--ink);font-size:18px}
     .error-state p{margin:0;font-size:14px}
@@ -763,12 +853,13 @@
     .stream-eyebrow{display:none}
     .stream-status{
       margin:0 0 8px;display:inline-flex;align-items:center;justify-content:flex-start;gap:6px;
-      padding:3px 9px;border-radius:6px;
-      font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
-      background:var(--live);color:var(--ink);border:none;
+      padding:4px 10px;border-radius:var(--radius-pill);
+      font-family:'Space Grotesk',sans-serif;
+      font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+      background:var(--live);color:var(--ink);box-shadow:0 0 12px var(--live-dim);border:none;
     }
     .stream-status:not(:has(.live-dot)){
-      background:var(--surface);color:var(--ink-faint);border:1px solid var(--border);
+      background:var(--surface);color:var(--ink-muted);border:1px solid var(--border);box-shadow:none;
     }
     .stream-status .live-dot{
       width:6px;height:6px;border-radius:50%;background:var(--ink);flex-shrink:0;
@@ -776,11 +867,10 @@
     }
     .stream-title{
       margin:0 0 8px;
-      font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
-      font-size:clamp(16px,2.4vw,22px);font-weight:700;
-      letter-spacing:0;line-height:1.35;color:var(--ink);
+      font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(18px,2.6vw,26px);font-weight:700;
+      letter-spacing:-0.02em;line-height:1.25;color:var(--ink);
       overflow-wrap:anywhere;
-      text-shadow:0 0 4px rgba(231,232,237,.1);
     }
     .watch-sub{
       width:100%;display:flex;align-items:center;justify-content:flex-start;gap:12px;
@@ -790,9 +880,9 @@
     }
     .watch-team{
       display:inline-flex;align-items:center;gap:6px;min-width:0;
-      color:var(--ink-muted);font-size:12.5px;font-weight:600;
+      color:var(--ink-muted);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;
     }
-    .watch-team-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .watch-team-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Inter',sans-serif;font-weight:600}
     .watch-team-crest{
       width:22px;height:22px;flex:0 0 auto;border-radius:50%;
       display:grid;place-items:center;overflow:hidden;
@@ -801,7 +891,7 @@
     }
     .watch-team-crest img{width:100%;height:100%;object-fit:contain;padding:2px;box-sizing:border-box}
     .watch-team-crest .sfy-logo-fallback{width:100%;height:100%;font-size:10px}
-    .watch-vs{color:var(--ink-faint);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+    .watch-vs{color:var(--ink-faint);font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 
     /* Social share controls */
     .watch-share{display:none!important}
@@ -869,19 +959,19 @@
     .watch-share-btn.sfy-social-item.copy:hover,
     .watch-share-btn.sfy-social-item.copy:hover .sfy-social-tooltip,
     .watch-share-btn.sfy-social-item.copy:hover .sfy-social-tooltip::before{
-      background:var(--accent);color:var(--ink);border-color:var(--accent);
+      background:var(--accent);color:var(--brand-ink);border-color:var(--accent);
     }
     .watch-share-btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
     .watch-related{
       margin-top:0;padding:16px;
-      background:#0E1017;border:1px solid var(--border);border-radius:16px;
+      background:#0C0E14;border:1px solid var(--border);border-radius:16px;
       content-visibility:auto;contain-intrinsic-size:auto 460px;
     }
     .watch-related-title{margin:0 0 12px;font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--ink-muted);text-transform:uppercase}
     .watch-related-grid{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow-y:auto;scrollbar-width:thin}
     .watch-related-grid::-webkit-scrollbar{width:4px}
-    .watch-related-grid::-webkit-scrollbar-thumb{background:#232736;border-radius:999px}
+    .watch-related-grid::-webkit-scrollbar-thumb{background:#1A1F2B;border-radius:999px}
     .watch-related-grid .sfy-card{
       display:flex;flex-direction:row;align-items:center;gap:12px;
       padding:10px;border-radius:12px;
@@ -890,12 +980,12 @@
       width:100%;text-align:left;box-shadow:none;
     }
     .watch-related-grid .sfy-card:hover{
-      background:var(--surface-hover);border-color:rgba(44,62,232,0.4);
+      background:var(--surface-hover);border-color:rgba(131,255,0,0.35);
       transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,0.5);
     }
     .watch-related-grid .sfy-card-poster{
       width:80px;height:50px;flex-shrink:0;border-radius:8px;overflow:hidden;
-      position:relative;background:#0A0B10;
+      position:relative;background:var(--canvas);
     }
     .watch-related-grid .sfy-card-poster .sfy-event-banner{width:100%;height:100%}
     .watch-related-grid .sfy-card-poster .sfy-event-logo{width:22px;height:22px}
@@ -946,7 +1036,7 @@
       position:relative;width:100%;max-width:100%;aspect-ratio:16/9;
       background:#08090D;overflow:hidden;display:block;
     }
-    .player-container iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+    .player-container iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;z-index:1}
     .player-empty{
       position:absolute;inset:0;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
@@ -960,6 +1050,46 @@
       cursor:pointer;transition:transform .18s ease;
     }
     .player-empty:hover svg{transform:scale(1.08)}
+    .player-loader{
+      position:absolute;top:0;left:0;right:0;bottom:42px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+      background:rgba(8,9,13,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      z-index:10;pointer-events:none;transition:opacity 0.25s ease;
+    }
+    .player-loader[hidden]{display:none!important}
+    .player-loader-spinner{
+      width:38px;height:38px;border-radius:50%;
+      border:3px solid rgba(255,255,255,0.12);
+      border-top-color:var(--accent);
+      animation:sfy-spin 0.8s linear infinite;
+    }
+    @keyframes sfy-spin{to{transform:rotate(360deg)}}
+    .player-loader-text{
+      font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:0.02em;
+    }
+    .player-idle{
+      position:absolute;top:0;left:0;right:0;bottom:42px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:radial-gradient(circle at center,#161a25 0%,#08090D 80%);
+      z-index:5;transition:opacity 0.25s ease;
+    }
+    .player-idle[hidden]{display:none!important}
+    .player-idle-content{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+      text-align:center;padding:24px;z-index:2;
+    }
+    .player-idle-play{
+      width:60px;height:60px;border-radius:50%;
+      background:var(--accent);color:var(--brand-ink);border:none;
+      display:grid;place-items:center;cursor:pointer;
+      box-shadow:0 0 24px var(--accent-dim),var(--btn-shadow);
+      transition:transform 0.18s ease,box-shadow 0.18s ease;
+    }
+    .player-idle-play:hover{transform:scale(1.08);box-shadow:0 0 32px var(--accent-dim)}
+    .player-idle-play svg{width:24px;height:24px;margin-left:3px}
+    .player-idle-prompt{
+      margin:0;font-size:14px;font-weight:700;color:var(--ink);letter-spacing:0.01em;
+    }
     .player-bar{
       display:flex;align-items:center;justify-content:flex-start;
       padding:11px 18px;min-height:42px;
@@ -967,10 +1097,10 @@
     }
     .player-bar-source{
       display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;
-      color:var(--ink-muted);font-size:12.5px;font-weight:600;letter-spacing:.01em;
+      color:var(--ink-muted);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;letter-spacing:.01em;
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     }
-    .player-bar-source strong{color:var(--ink);font-weight:800}
+    .player-bar-source strong{color:var(--ink);font-family:'Space Grotesk',sans-serif;font-weight:600;letter-spacing:0.02em}
     .player-bar-source .sfy-pulse-dot{
       width:7px;height:7px;border-radius:50%;background:var(--accent);
       box-shadow:0 0 8px var(--accent-dim);flex-shrink:0;
@@ -978,10 +1108,10 @@
     }
     .stream-sources-section{margin-top:20px}
     .stream-sources-label{
-      margin:0 0 12px;font-size:12.5px;font-weight:800;color:var(--ink-muted);
+      margin:0 0 12px;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;color:var(--ink-muted);
       text-transform:uppercase;letter-spacing:0.06em;
     }
-    .stream-sources-label em{font-style:normal;color:var(--ink-faint);font-weight:500;text-transform:none;letter-spacing:normal}
+    .stream-sources-label em{font-style:normal;color:var(--ink-faint);font-family:'Inter',sans-serif;font-weight:400;text-transform:none;letter-spacing:normal}
     .stream-toggle-strip{
       display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;
       padding:4px 0 24px;overscroll-behavior-x:contain;
@@ -998,44 +1128,56 @@
       box-shadow:var(--btn-shadow-sm);
       transition:all 0.18s ease;
     }
-    .stream-toggle-num{font-size:14px;font-weight:900;line-height:1}
+    .stream-toggle-num{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:0.02em;line-height:1}
     .stream-toggle-glyph{display:none}
     .stream-toggle-label{
       display:flex;align-items:center;gap:4px;min-width:0;max-width:100%;
-      font-size:11.5px;font-weight:500;color:var(--ink-muted);
+      font-family:'Inter',sans-serif;font-size:11.5px;font-weight:400;color:var(--ink-muted);
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     }
-    .stream-toggle-label b{font-size:11.5px;font-weight:700;color:var(--ink)}
-    .stream-toggle-label span{font-size:11px;font-weight:500;color:var(--ink-faint)}
+    .stream-toggle-label b{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;color:var(--ink)}
+    .stream-toggle-label span{font-family:'Inter',sans-serif;font-size:11px;font-weight:400;color:var(--ink-muted)}
     .stream-toggle-tags{display:inline-flex;align-items:center;gap:4px}
     .stream-toggle-tag{
-      padding:2px 6px;border-radius:4px;font-style:normal;
-      font-size:9.5px;font-weight:800;letter-spacing:.05em;
-      background:rgba(234,179,8,0.15);color:#facc15;
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:2px 7px;border-radius:6px;font-style:normal;
+      font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06);color:var(--ink-muted);
     }
-    .stream-toggle-tag.hd{background:var(--accent-dim);color:var(--accent)}
+    .stream-toggle-tag.hd{
+      background:rgba(131,255,0,0.12);color:var(--accent);
+      border:1px solid rgba(131,255,0,0.28);
+    }
     .stream-toggle-tip{display:none}
 
-    /* ACTIVE STREAM CHIP - DEEP ACCENT BLUE WITH SOFT GLOW */
+    /* ACTIVE STREAM CHIP - ELECTRIC VOLT WITH HIGH CONTRAST */
     .stream-toggle.selected{
       background:var(--accent)!important;border-color:var(--accent)!important;
-      color:var(--ink)!important;box-shadow:0 0 20px var(--accent-dim)!important;
+      color:var(--brand-ink)!important;box-shadow:0 0 20px var(--accent-dim)!important;
     }
     .stream-toggle.selected .stream-toggle-num,
     .stream-toggle.selected b,
-    .stream-toggle.selected span{color:var(--ink)!important}
-    .stream-toggle.selected .stream-toggle-tag{background:rgba(255,255,255,0.18)!important;color:var(--ink)!important}
+    .stream-toggle.selected span{color:var(--brand-ink)!important}
+    .stream-toggle.selected .stream-toggle-tag{
+      background:rgba(0,0,0,0.22)!important;color:var(--brand-ink)!important;
+      border:1px solid rgba(0,0,0,0.35)!important;
+    }
+    .stream-toggle.selected .stream-toggle-tag.hd{
+      background:rgba(0,0,0,0.28)!important;color:var(--brand-ink)!important;
+      border:1px solid rgba(0,0,0,0.45)!important;
+    }
 
     /* SINGLE CHANNEL: No animation, no color change */
     .stream-toggle:not([data-multi-feed="true"]):not(.selected):hover{
-      transform:none;color:var(--ink);border-color:rgba(44,62,232,0.3);background:var(--surface-hover);
+      transform:none;color:var(--ink);border-color:rgba(131,255,0,0.3);background:var(--surface-hover);
       box-shadow:var(--btn-shadow-sm);
     }
 
     /* MINIMALIST STREAM TOOLTIP & MULTI-FEED */
     .stream-toggle[data-multi-feed="true"]{overflow:visible}
     .stream-toggle[data-multi-feed="true"]:not(.selected):hover{
-      border-color:rgba(44,62,232,0.5);color:var(--ink);
+      border-color:rgba(131,255,0,0.5);color:var(--ink);
       box-shadow:0 4px 14px rgba(0,0,0,0.5),0 0 12px var(--accent-dim);
       transform:translateY(-1px);
     }
@@ -1139,8 +1281,6 @@
 </head>
 <body>
 
-<div id="sfy-site-notice" class="sfy-site-notice" role="status"></div>
-
 <!-- ============================= HEADER ============================= -->
 <header class="sfy-header">
   <div class="site-container">
@@ -1154,7 +1294,7 @@
 
       <div class="sfy-search" role="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="sfy-search-input" type="search" autocomplete="off" placeholder="Search matches, teams, leagues..." aria-label="Search matches, teams, leagues">
+        <input id="sfy-search-input" type="search" autocomplete="off" placeholder="Search" aria-label="Search matches, teams, leagues">
         <span class="sfy-shortcut" aria-hidden="true">⌘K</span>
       </div>
 
@@ -1164,22 +1304,34 @@
         <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
         <a href="#" data-nav="CRICKET"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg>Cricket</a>
         <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
+        <a href="/live-tv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg>Live TV</a>
       </nav>
 
       <div class="sfy-header-actions">
-        <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh matches">
+        <button class="sfy-icon-btn" type="button" onclick="loadMatches()" aria-label="Refresh matches" title="Refresh matches">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         </button>
-        <button class="sfy-icon-btn" type="button" id="sfy-sidebar-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="sfy-sidebar">
+        <button class="sfy-icon-btn" type="button" id="sfy-sidebar-toggle" aria-label="Menu" title="Menu" aria-expanded="false" aria-controls="sfy-sidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
       </div>
+    </div>
+    <div class="sfy-header-sports scrollbar-hide" aria-label="Quick sports">
+      <button class="sfy-header-sport-chip active" type="button" data-nav="ALL">All</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="LIVE">Live</button>
+      <a class="sfy-header-sport-chip" href="/live-tv">Live TV</a>
+      <button class="sfy-header-sport-chip" type="button" data-nav="FOOTBALL">Football</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="CRICKET">Cricket</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="BASKETBALL">Basketball</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="BASEBALL">Baseball</button>
+      <button class="sfy-header-sport-chip" type="button" data-nav="TENNIS">Tennis</button>
     </div>
   </div>
 
   <nav class="sfy-mobile-nav" id="sfy-mobile-nav" aria-label="Mobile navigation">
     <a href="#" data-nav="ALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home</a>
     <a href="#" data-nav="LIVE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>Live</a>
+    <a href="/live-tv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg>Live TV</a>
     <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
     <a href="#" data-nav="AMERICAN FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6.5" transform="rotate(-45 12 12)"/><path d="m8.5 8.5 7 7"/></svg>American Football</a>
     <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
@@ -1194,6 +1346,7 @@
   </nav>
 </header>
 
+<div id="sfy-site-notice" class="sfy-site-notice" role="status"></div>
 <div id="sfy-site-banner" class="site-container sfy-site-banner"></div>
 
 <main class="site-container">
@@ -1215,6 +1368,17 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         <span>Watch now</span>
       </button>
+    </div>
+  </section>
+
+  <!-- ============================= HERO LIVE MATCHES ============================= -->
+  <section class="sfy-hero-live show" id="sfy-hero-live" aria-label="Live matches">
+    <h2 class="sfy-hero-live-title">Live Now <span class="sfy-hero-live-count" id="sfy-hero-live-count">Live</span></h2>
+    <div class="sfy-hero-live-grid" id="sfy-hero-live-grid">
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
+      <div class="sfy-skeleton" style="aspect-ratio:16/9;border-radius:14px"></div>
     </div>
   </section>
 
@@ -1240,6 +1404,7 @@
   <div class="sfy-chips scrollbar-hide" id="sfy-chips" aria-label="Sport filters">
     <button class="sfy-chip active" type="button" data-nav="ALL">All</button>
     <button class="sfy-chip" type="button" data-nav="LIVE">Live</button>
+    <a class="sfy-chip" href="/live-tv">Live TV</a>
     <button class="sfy-chip" type="button" data-nav="FOOTBALL">Football</button>
     <button class="sfy-chip" type="button" data-nav="AMERICAN FOOTBALL">NFL</button>
     <button class="sfy-chip" type="button" data-nav="BASKETBALL">Basketball</button>
@@ -1285,9 +1450,9 @@
         <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15 19 3l2 2L9 17z"/><path d="M7 15l-3 6 6-3z"/></svg></span>
         <span>Cricket</span>
       </a>
-      <a href="#" class="sfy-tile" data-nav="ALL">
-        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg></span>
-        <span>All Sports</span>
+      <a href="/live-tv" class="sfy-tile">
+        <span class="sfy-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg></span>
+        <span>Live TV</span>
       </a>
     </div>
   </section>
@@ -1305,6 +1470,7 @@
   <nav class="sfy-sidebar-nav" aria-label="Sidebar navigation">
     <a href="#" data-nav="ALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home</a>
     <a href="#" data-nav="LIVE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>Live</a>
+    <a href="/live-tv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></svg>Live TV</a>
     <a href="#" data-nav="FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>Football</a>
     <a href="#" data-nav="AMERICAN FOOTBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6.5" transform="rotate(-45 12 12)"/><path d="m8.5 8.5 7 7"/></svg>NFL</a>
     <a href="#" data-nav="BASKETBALL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>Basketball</a>
@@ -1330,6 +1496,7 @@
       <nav class="sfy-footer-nav" aria-label="Footer navigation">
         <a href="#" data-nav="ALL">Home</a>
         <a href="#" data-nav="LIVE">Live</a>
+        <a href="/live-tv">Live TV</a>
         <a href="#" data-nav="FOOTBALL">Football</a>
         <a href="#" data-nav="CRICKET">Cricket</a>
         <a href="#" data-nav="BASKETBALL">Basketball</a>
@@ -1364,6 +1531,18 @@
       <div class="stream-main-col">
         <div class="player-unit">
           <div id="player-container" class="player-container" hidden></div>
+          <div id="player-idle" class="player-idle" hidden>
+            <div class="player-idle-content">
+              <button type="button" class="player-idle-play" id="player-idle-play-btn" aria-label="Start stream">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="8 5 19 12 8 19"/></svg>
+              </button>
+              <p class="player-idle-prompt">Tap a stream below to start watching</p>
+            </div>
+          </div>
+          <div id="player-loader" class="player-loader" hidden aria-live="polite">
+            <div class="player-loader-spinner" aria-hidden="true"></div>
+            <span class="player-loader-text" id="player-loader-text">Loading stream...</span>
+          </div>
           <div class="player-bar">
             <span class="player-bar-source" id="player-bar-source"></span>
           </div>
@@ -1382,9 +1561,15 @@
 
 <!-- ============================= JAVASCRIPT ============================= -->
 <script>
-    const PROXY_URL = "https://sportzfylive.svimranmy.workers.dev";
+    // Same origin when the Worker serves this page (workers.dev, or `wrangler
+    // dev` on its default port); the deployed Worker otherwise (static preview).
+    const PROXY_URL = (typeof location !== "undefined" && location.hostname &&
+        (location.hostname.endsWith("workers.dev") || location.port === "8787"))
+        ? location.origin
+        : "https://sportzfylive.svimranmy.workers.dev";
 
     const CATEGORY_ORDER = [
+        "FEATURED",
         "LIVE",
         "TODAYS MATCHES",
         "FOOTBALL",
@@ -1579,22 +1764,95 @@
         }
     }
 
+    // Admin-set links and images are https URLs or same-site paths (the Worker
+    // validates both); anything else is dropped instead of rendered.
+    function safeLink(value) {
+        const url = String(value || "").trim();
+        return /^https:\/\//i.test(url) || (url.startsWith("/") && !url.startsWith("//")) ? url : "";
+    }
+
+    // Site notice from the admin Settings: a text bar (colour, optional link,
+    // optional marquee) or an image banner with an optional mobile crop.
+    function renderSiteNotice(notice) {
+        const host = document.getElementById("sfy-site-notice");
+        if (!host) return;
+        const n = notice || {};
+        const image = safeLink(n.image);
+        const mobile = safeLink(n.imageMobile);
+        const link = safeLink(n.link);
+        const text = String(n.text || "");
+        const show = Boolean(n.enabled && (image || text));
+        host.className = "sfy-site-notice" + (show ? " show" : "") + (image ? " image" : (n.marquee ? " marquee" : ""));
+        host.style.background = !image && /^#[0-9a-f]{6}$/i.test(n.bg || "") ? n.bg : "";
+        if (!show) {
+            host.innerHTML = "";
+            return;
+        }
+        const target = link && n.newTab ? ' target="_blank" rel="noopener"' : "";
+        if (image) {
+            const picture = '<picture>' +
+                (mobile ? '<source media="(max-width:640px)" srcset="' + esc(mobile) + '">' : "") +
+                '<img src="' + esc(image) + '" alt="' + esc(text || "Announcement") + '" decoding="async"></picture>';
+            host.innerHTML = link ? '<a href="' + esc(link) + '"' + target + '>' + picture + '</a>' : picture;
+            return;
+        }
+        const body = link
+            ? '<a href="' + esc(link) + '"' + target + '>' + esc(text) + '</a>'
+            : '<span>' + esc(text) + '</span>';
+        host.innerHTML = n.marquee
+            ? '<span class="sfy-notice-track">' + body + '</span>'
+            : '<span class="sfy-notice-dot" aria-hidden="true">●</span>' + body;
+    }
+
+    // Site name, tagline and contact address from the admin Settings.
+    function applySiteIdentity(identity) {
+        const name = String(identity?.siteName || "").trim();
+        const email = String(identity?.contactEmail || "").trim();
+        if (name) {
+            const tagline = String(identity?.tagline || "").trim();
+            document.title = name + (tagline ? " - " + tagline : "");
+            const split = name.lastIndexOf(" ");
+            const markup = split > 0
+                ? esc(name.slice(0, split)) + "<span>" + esc(name.slice(split + 1)) + "</span>"
+                : esc(name);
+            document.querySelectorAll(".sfy-brand-text").forEach(el => { el.innerHTML = markup; });
+        }
+        const copy = document.querySelector(".sfy-footer-copy");
+        if (copy && (name || email)) {
+            copy.innerHTML = "© " + new Date().getFullYear() + " " + esc(name || "Sportzfylive") + ". All rights reserved." +
+                (/^[^\s@<>"']+@[^\s@<>"']+$/.test(email) ? ' · <a href="mailto:' + esc(email) + '">' + esc(email) + "</a>" : "");
+        }
+    }
+
+    function loadAnalytics(analytics) {
+        const id = String(analytics?.gaId || "");
+        if (!/^G-[A-Z0-9]{4,20}$/.test(id) || window.__sfyAnalytics) return;
+        window.__sfyAnalytics = true;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag("js", new Date());
+        window.gtag("config", id);
+        const script = document.createElement("script");
+        script.async = true;
+        script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(id);
+        document.head.appendChild(script);
+    }
+
     async function loadSiteContent() {
         try {
             const data = await fetchJson(PROXY_URL + "/api/site-content");
-            const notice = document.getElementById("sfy-site-notice");
-            if (notice) {
-                notice.classList.toggle("show", Boolean(data.notice?.enabled && data.notice?.text));
-                notice.innerHTML = data.notice?.link
-                    ? '<span>●</span><a href="' + esc(data.notice.link) + '" target="_blank" rel="noopener">' + esc(data.notice.text) + '</a>'
-                    : '<span>●</span><span>' + esc(data.notice?.text || "") + '</span>';
-            }
+            renderSiteNotice(data.notice);
+            applySiteIdentity(data.identity);
+            loadAnalytics(data.analytics);
             const banner = document.getElementById("sfy-site-banner");
+            const bannerImage = safeLink(data.banner?.image);
+            const bannerLink = safeLink(data.banner?.link);
             if (banner) {
-                banner.classList.toggle("show", Boolean(data.banner?.enabled && data.banner?.image));
-                banner.innerHTML = data.banner?.link
-                    ? '<a href="' + esc(data.banner.link) + '" target="_blank" rel="noopener"><img src="' + esc(data.banner.image) + '" alt="' + esc(data.banner.alt || "Banner") + '" loading="lazy" decoding="async"></a>'
-                    : '<img src="' + esc(data.banner?.image || "") + '" alt="' + esc(data.banner?.alt || "Banner") + '" loading="lazy" decoding="async">';
+                banner.classList.toggle("show", Boolean(data.banner?.enabled && bannerImage));
+                const img = '<img src="' + esc(bannerImage) + '" alt="' + esc(data.banner?.alt || "Banner") + '" loading="lazy" decoding="async">';
+                banner.innerHTML = bannerLink
+                    ? '<a href="' + esc(bannerLink) + '"' + (bannerLink.startsWith("/") ? "" : ' target="_blank" rel="noopener"') + '>' + img + '</a>'
+                    : img;
             }
             const featured = document.getElementById("sfy-featured"), match = data.featuredMatch;
             if (featured) {
@@ -1740,6 +1998,9 @@
 
             const date = safeDate(match.date ?? match.timestamp);
 
+            // Matches the admin starred are pinned in their own row too.
+            if (match.featured) groups.FEATURED.push(match);
+
             if (isLive(match)) {
                 groups.LIVE.push(match);
                 continue;
@@ -1767,7 +2028,7 @@
             if (!list.length) continue;
 
             const sectionId = "category-" + category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            const heading = category === "TODAYS MATCHES" ? "Today's Matches" : category;
+            const heading = category === "TODAYS MATCHES" ? "Today's Matches" : category === "FEATURED" ? "Featured Matches" : category;
             output += `
                 <section class="category-section" data-category="${esc(category)}" data-carousel-category="${esc(category)}">
                     <div class="category-heading-row">
@@ -1789,6 +2050,28 @@
 
         container.innerHTML = output ||
             `<div class="empty-state">No matches available.</div>`;
+
+        // Populate hero live grid
+        const heroLiveSection = document.getElementById('sfy-hero-live');
+        const heroLiveGrid = document.getElementById('sfy-hero-live-grid');
+        const heroLiveCount = document.getElementById('sfy-hero-live-count');
+        const heroLiveTitle = heroLiveSection ? heroLiveSection.querySelector('.sfy-hero-live-title') : null;
+        if (heroLiveSection && heroLiveGrid) {
+            const liveMatches = groups.LIVE || [];
+            const displayMatches = liveMatches.length > 0 ? liveMatches : (groups['TODAYS MATCHES'] || matches);
+            if (displayMatches.length > 0) {
+                heroLiveGrid.innerHTML = displayMatches.slice(0, 8).map(buildMatchCard).join('');
+                if (heroLiveTitle) {
+                    heroLiveTitle.innerHTML = (liveMatches.length > 0 ? 'Live Now' : "Today's Games") +
+                        ' <span class="sfy-hero-live-count" id="sfy-hero-live-count">' +
+                        (liveMatches.length > 0 ? liveMatches.length + (liveMatches.length === 1 ? ' match' : ' matches') : 'Today') +
+                        '</span>';
+                }
+                heroLiveSection.classList.add('show');
+            } else {
+                heroLiveSection.classList.remove('show');
+            }
+        }
 
         // Update ticker track with real matches
         const tickerTrack = document.getElementById("sfy-ticker-track");
@@ -1824,8 +2107,10 @@
             ? matchDate.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })
             : "";
 
-        const streamChip = match.streamed?.streamCount
-            ? `<span class="sfy-stream-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M2 12h3"/><path d="m8 8 8 8"/><path d="M12 2v3"/><path d="m16 8-8 8"/><path d="M19 12h3"/></svg>${match.streamed.streamCount} stream${match.streamed.streamCount === 1 ? "" : "s"}</span>`
+        const streamTotal = (Number(match.streamed?.streamCount) || 0) +
+            (Array.isArray(match.manual?.streams) ? match.manual.streams.length : 0);
+        const streamChip = streamTotal
+            ? `<span class="sfy-stream-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M2 12h3"/><path d="m8 8 8 8"/><path d="M12 2v3"/><path d="m16 8-8 8"/><path d="M19 12h3"/></svg>${streamTotal} stream${streamTotal === 1 ? "" : "s"}</span>`
             : "";
 
         // A crest the Streamed feed does not carry (most teams ship an empty
@@ -1863,7 +2148,7 @@
             <article class="match-card sfy-match-item" data-match-id="${esc(id)}" tabindex="0" role="button" aria-label="Open ${esc(match.title || "Match")}">
                 <div class="sfy-event-visual ${poster ? "has-poster sfy-skeleton" : ""}">
                     ${live
-                        ? '<span class="sfy-event-live">LIVE</span>'
+                        ? '<span class="sfy-event-live"><span class="live-dot" aria-hidden="true"></span>Live now</span>'
                         : `<span class="sfy-event-badge">${esc(dateText)}</span>`}
                     ${streamChip}
                     ${match.popular ? '<span class="sfy-event-favorite" aria-hidden="true">★</span>' : ""}
@@ -1881,10 +2166,12 @@
             </article>`;
     }
     /*
-     * STREAMED SOURCES ONLY
+     * WATCH VIEW
      *
-     * The public site displays only Streamed-origin source metadata.
-     * No manual/admin-added stream section is rendered on the public site.
+     * Streams come from two places: Streamed-origin source metadata (played
+     * through embed.st) and streams the admin attached to the match (played
+     * through the Worker's /api/play redirect). Neither carries a playback
+     * URL in the public match list.
      */
     let activeMatch = null;
     // True while the watch view has claimed its own history entry, so the
@@ -1915,8 +2202,34 @@
             "/" + encodeURIComponent(id) + "/" + encodeURIComponent(no);
     }
 
+    // Admin-attached streams marked as sandboxed (Live TV channels flagged
+    // "sandbox": true in channels.json) run with no pop-ups and no top-level
+    // navigation. Scripts and same-origin stay on so the player works; the
+    // page is on another origin, so it cannot lift the sandbox.
+    const MANUAL_STREAM_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation";
+
     function collectPlayableStreams(match) {
         const playable = [];
+        // Streams the admin attached (often from the Live TV catalog) come
+        // first, in the admin's order. The public list carries ids only; the
+        // Worker redirects /api/play/stream/... to the stream itself.
+        const manual = match && match.manual && Array.isArray(match.manual.streams) ? match.manual.streams : [];
+        for (const stream of manual) {
+            if (!stream || !stream.id) continue;
+            const path = "/api/play/stream/" + encodeURIComponent(String(match.id || "")) + "/" + encodeURIComponent(String(stream.id));
+            const hls = stream.kind === "hls";
+            playable.push({
+                group: { source: String(stream.name || "Stream"), id: String(stream.id) },
+                stream: {
+                    streamNo: 0,
+                    language: String(stream.language || "English"),
+                    hd: /^(HD|FHD|4K)$/i.test(String(stream.quality || "")),
+                    source: String(stream.name || "Stream")
+                },
+                url: hls ? PROXY_URL + "/player.html?src=" + encodeURIComponent(path) : PROXY_URL + path,
+                sandbox: !hls && stream.sandbox === true
+            });
+        }
         const groups = (match && match.streamed && Array.isArray(match.streamed.sources))
             ? match.streamed.sources : [];
         for (const group of groups) {
@@ -1946,40 +2259,48 @@
         let flatIndex = 0;
         return playable.map(function (item) {
             flatIndex += 1;
-            const url = streamEmbedUrl(item.group, item.stream.streamNo);
-            const label = "Stream " + flatIndex + " • " +
-                (item.stream.language || "Default");
+            const url = item.url || streamEmbedUrl(item.group, item.stream.streamNo);
+            const language = String(item.stream.language || "Default");
+            const rawProvider = String(item.group.source || "Streamed");
+            const networkClean = (function() {
+                const p = rawProvider.trim().toLowerCase();
+                if (p === "admin") return "Feed " + (item.stream.streamNo || flatIndex);
+                if (p === "streamed") return "Official";
+                if (p === "yes") return "YES Network";
+                if (p === "masn") return "MASN";
+                return rawProvider;
+            })();
+            const label = "Stream " + flatIndex + " (" + language + (networkClean ? " – " + networkClean : "") + ")";
             const tip = "Stream " + flatIndex +
                 (item.stream.hd ? " · HD" : "") +
-                " · " + (item.stream.language || "Default") +
-                " · " + item.group.source;
-            const language = String(item.stream.language || "Default");
-            const provider = String(item.group.source || "Streamed");
+                " · " + language +
+                (networkClean ? " · " + networkClean : "");
             const chKey = String(item.stream.source || item.group.source || "Streamed").trim().toLowerCase();
             const isMulti = channelCounts[chKey] > 1;
 
             const multiAttr = isMulti ? ' data-multi-feed="true"' : '';
             const multiTooltip = isMulti
                 ? '<div class="tooltip-content" aria-hidden="true">' +
-                    '<span class="tooltip-feed-title">' + esc(provider) + '</span>' +
+                    '<span class="tooltip-feed-title">' + esc(networkClean) + '</span>' +
                     '<span class="tooltip-feed-sub">Feed ' + esc(String(item.stream.streamNo || flatIndex)) + ' · ' + esc(language) + (item.stream.hd ? ' · HD' : '') + '</span>' +
                   '</div>'
                 : '';
 
             return '<button class="stream-toggle" type="button" role="radio" aria-checked="false"' +
                 multiAttr +
+                (item.sandbox ? ' data-sandbox="1"' : '') +
                 ' data-embed-url="' + esc(url) + '"' +
                 ' data-stream-label="' + esc(label) + '"' +
                 ' aria-label="' + esc(tip) + '">' +
                 '<div style="width:100%;display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">' +
-                    '<span style="font-size:14px;font-weight:800;color:inherit">Stream <span class="stream-toggle-num" aria-hidden="true">' + flatIndex + '</span></span>' +
+                    '<span style="font-family:\'Space Grotesk\',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:0.02em;color:inherit">Stream <span class="stream-toggle-num" aria-hidden="true">' + flatIndex + '</span></span>' +
                     '<span class="stream-toggle-tags" aria-hidden="true">' +
                         (item.stream.hd ? '<i class="stream-toggle-tag hd">HD</i>' : '<i class="stream-toggle-tag">SD</i>') +
                     '</span>' +
                 '</div>' +
                 '<span class="stream-toggle-label" aria-hidden="true">' +
                     '<b>' + esc(language) + '</b>' +
-                    '<span> • ' + esc(provider) + '</span>' +
+                    (networkClean ? '<span> • ' + esc(networkClean) + '</span>' : '') +
                 '</span>' +
                 '<span class="stream-toggle-tip" aria-hidden="true">' + esc(tip) + '</span>' +
                 multiTooltip +
@@ -2002,6 +2323,19 @@
                 });
                 chip.classList.add("selected");
                 chip.setAttribute("aria-checked", "true");
+
+                const playerIdle = document.getElementById("player-idle");
+                if (playerIdle) playerIdle.hidden = true;
+
+                const streamLabel = chip.dataset.streamLabel || "Stream";
+                const playerLoader = document.getElementById("player-loader");
+                const loaderText = document.getElementById("player-loader-text");
+                if (playerLoader) {
+                    if (loaderText) loaderText.textContent = "Loading " + streamLabel + "...";
+                    playerLoader.hidden = false;
+                    playerLoader.style.opacity = "1";
+                }
+
                 player.hidden = false;
                 player.replaceChildren();
                 const frame = document.createElement("iframe");
@@ -2009,7 +2343,22 @@
                 frame.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
                 frame.allowFullscreen = true;
                 frame.referrerPolicy = "no-referrer";
+                if (chip.dataset.sandbox === "1") frame.setAttribute("sandbox", MANUAL_STREAM_SANDBOX);
                 frame.title = chip.dataset.streamLabel || "Match stream";
+
+                frame.onload = function() {
+                    if (playerLoader) {
+                        playerLoader.style.opacity = "0";
+                        setTimeout(function() { playerLoader.hidden = true; }, 300);
+                    }
+                };
+                setTimeout(function() {
+                    if (playerLoader && !playerLoader.hidden) {
+                        playerLoader.style.opacity = "0";
+                        setTimeout(function() { playerLoader.hidden = true; }, 300);
+                    }
+                }, 4000);
+
                 player.appendChild(frame);
                 const barSource = document.getElementById("player-bar-source");
                 if (barSource) {
@@ -2218,10 +2567,27 @@
         const shareNote = document.getElementById("watch-share-note");
         if (shareNote) shareNote.textContent = "";
 
+        const playerIdle = document.getElementById("player-idle");
+        const playerLoader = document.getElementById("player-loader");
+        if (playerLoader) playerLoader.hidden = true;
+
         if (playable.length > 0) {
             player.hidden = false;
             player.replaceChildren();
+            if (playerIdle) {
+                playerIdle.hidden = false;
+                const idleBtn = document.getElementById("player-idle-play-btn");
+                if (idleBtn) {
+                    idleBtn.onclick = function() {
+                        const firstToggle = (picker.querySelectorAll ? picker.querySelectorAll(".stream-toggle")[0] : null) || picker.querySelector?.(".stream-toggle");
+                        if (firstToggle && typeof firstToggle.click === "function") {
+                            firstToggle.click();
+                        }
+                    };
+                }
+            }
         } else {
+            if (playerIdle) playerIdle.hidden = true;
             player.hidden = false;
             player.replaceChildren();
             const standby = document.createElement("div");
@@ -2242,7 +2608,7 @@
                   '</div>';
 
         picker.innerHTML =
-            '<p class="stream-sources-label">Available streams <em>· pick one to load it above</em></p>' +
+            '<p class="stream-sources-label">Available streams</p>' +
             '<div class="stream-toggle-strip" role="radiogroup" aria-label="Stream sources">' + streamRows + '</div>';
 
         attachStreamPicker();
@@ -2450,6 +2816,10 @@ function initCategoryCarousels(){
       const title=normalizeNav(section.dataset.category||section.querySelector("h2")?.textContent);
       section.style.display=(wanted==="ALL"||title===wanted)?"":"none";
     });
+    const heroLive=document.getElementById("sfy-hero-live");
+    if(heroLive){
+      heroLive.style.display=(wanted==="ALL"||wanted==="LIVE")?"":"none";
+    }
     document.querySelectorAll("[data-nav]").forEach(btn=>btn.classList.toggle("active",normalizeNav(btn.dataset.nav)===wanted));
     if(wanted!=="ALL"){
       const section=[...document.querySelectorAll(".category-section")].find(s=>normalizeNav(s.dataset.category||s.querySelector("h2")?.textContent)===wanted);
@@ -2464,6 +2834,8 @@ function initCategoryCarousels(){
 
   search?.addEventListener("input",()=>{
     const q=search.value.trim().toLowerCase();
+    const heroLive=document.getElementById("sfy-hero-live");
+    if(heroLive) heroLive.style.display=q?"none":"";
     document.querySelectorAll(".category-section").forEach(section=>{
       let visible=0;
       section.querySelectorAll(".match-card").forEach(card=>{

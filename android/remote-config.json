@@ -1,0 +1,18 @@
+{
+  "announcement": {
+    "message": "",
+    "url": ""
+  },
+  "featuredMatchId": "",
+  "hiddenCategories": [],
+  "adBlocking": false,
+  "extraBlockedHosts": [],
+  "playerMode": "direct",
+  "minVersionCode": 0,
+  "updateUrl": "",
+  "maintenance": {
+    "enabled": false,
+    "message": ""
+  },
+  "channelsUrl": "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"
+}
