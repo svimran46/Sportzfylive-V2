@@ -29,7 +29,7 @@ class EmbedFrameTest {
 
     @Test
     fun `player config follows the remote config`() {
-        // Embeds load directly, like a browser tab, referred by streamed.pk like its own embed.
+        // Embeds load directly with no referer, exactly like a browser tab.
         // The pop-up networks are always kept off the top-level page; the wider ad list only
         // with ad blocking on. No request is blocked unless the owner adds the host.
         assertEquals(
@@ -37,7 +37,7 @@ class EmbedFrameTest {
                 PlayerMode.DIRECT,
                 blockedHosts = AdHosts.ALWAYS_BLOCKED,
                 blockedResourceHosts = emptySet(),
-                referer = "https://streamed.pk/",
+                referer = null,
             ),
             PlayerConfig.from(AppConfig.Default),
         )

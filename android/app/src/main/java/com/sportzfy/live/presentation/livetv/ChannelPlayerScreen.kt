@@ -97,10 +97,7 @@ fun ChannelPlayerScreen(
                 // Channel pages load directly with no referer and no sandbox. The
                 // player keeps the page on the channel's own host and traps its
                 // pop-ups, as it does for every stream.
-                val config = PlayerConfig.from(LocalAppConfig.current).copy(
-                    mode = PlayerMode.DIRECT,
-                    referer = null,
-                )
+                val config = PlayerConfig.from(LocalAppConfig.current).copy(mode = PlayerMode.DIRECT)
                 BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
                     // Measured outside the scroll so the player can be capped to
                     // the viewport: on TV/landscape a full-width 16:9 player would
