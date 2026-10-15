@@ -23,9 +23,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.sportzfy.live.core.player.ChromeUserAgent
 import com.sportzfy.live.core.player.PlayerUrlPolicy
+import com.sportzfy.live.core.player.PopupShim
 import java.io.ByteArrayInputStream
 
 /** Callbacks from the player WebView, delivered on the main thread. */
@@ -83,7 +85,9 @@ internal class PageLanding {
  * - the page's own scripts (ad scripts included) are never blocked, because
  *   inline player setup code calls into them; only hosts the owner adds
  *   remotely get an empty response;
- * - no JavaScript is injected: `window.open` stays native;
+ * - one document-start script ([PopupShim]) keeps `window.open` from ever
+ *   answering `null`, which embed.st's player reads as a sandbox; a real
+ *   window still comes from the native call and is trapped as above;
  * - no file or content access, downloads, geolocation or permission grants.
  *
  * [policy] is read on every request, so a new stream or remote config change
@@ -120,6 +124,7 @@ internal fun createSandboxedWebView(
         userAgentString = ChromeUserAgent.from(userAgentString.orEmpty())
     }
     presentAsChrome(settings)
+    installPopupShim(this)
     // Embedded players sit in cross-site iframes and need their own cookies
     // for anti-bot checks and for the session the stream's playlist is tied to.
     val webView = this
@@ -183,6 +188,19 @@ private fun presentAsChrome(settings: WebSettings) {
     runCatching {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
             WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+        }
+    }
+}
+
+/**
+ * Registers [PopupShim] for every frame of every page this WebView loads.
+ * Needs a WebView with document-start scripts; older ones play without it.
+ */
+private fun installPopupShim(webView: WebView) {
+    // Best effort, like presentAsChrome: a missing feature must not stop playback.
+    runCatching {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(webView, PopupShim.SCRIPT, PopupShim.ALLOWED_ORIGINS)
         }
     }
 }
