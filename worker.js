@@ -21,14 +21,32 @@ const TV_CHANNELS_KEY = "tv_channels";           // Live TV catalog (channels + 
 const PLAY_INDEX_KEY = "play_index";             // matchId -> streamId -> playback URL, for /api/play redirects
 const ADMIN_CREDENTIAL_KEY = "admin_credential"; // salted hash of a password set from the admin panel
 
-const DEFAULT_TV_SOURCE_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
-const TV_AUTO_SYNC_EVERY_MS = 6 * 60 * 60 * 1000; // cron re-pulls the playlist this often
-const TV_AUTO_RETRY_MS = 60 * 60 * 1000;          // ...and waits this long after a failed pull
+// The Live TV catalog is the sports.m3u playlist (Xtream Codes live streams,
+// grouped by country). Settings that still point at the old channels.json
+// list are moved over to it, so every deployment ends up with the same list.
+const DEFAULT_TV_SOURCE_URL = "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u";
+const LEGACY_TV_SOURCE_URLS = ["https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"];
+const TV_AUTO_SYNC_EVERY_MS = 60 * 60 * 1000;     // cron re-pulls the playlist this often
+const TV_AUTO_RETRY_MS = 30 * 60 * 1000;          // ...and waits this long after a failed pull
 const TV_CHECK_TIMEOUT_MS = 8000;                 // per-URL health check timeout
 const TV_CHECK_BATCH = 25;                        // URLs per health-check request (subrequest budget)
-const MAX_PLAYLIST_ENTRIES = 2000;
+const TV_STATE_MEMO_MS = 30 * 1000;               // public routes reuse the parsed catalog this long per isolate
+const MAX_PLAYLIST_ENTRIES = 5000;
 const MAX_PLAYLIST_BYTES = 5 * 1024 * 1024;
 const CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+
+// Stream proxy: http streams (and any stream needing custom request headers)
+// are played through the Worker, so browsers never see the upstream URL or
+// the account login it carries. See "Stream proxy" below.
+const STREAM_PROXY_UA = "VLC/3.0.21 LibVLC/3.0.21";
+const STREAM_PROXY_SECRET_KEY = "stream_proxy_secret"; // KV fallback when no Worker secret is set
+const STREAM_PROXY_KEY_INFO = "|sportzfy-stream-proxy-v1";
+const STREAM_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;      // sealed upstream URLs stay valid this long
+const STREAM_UPSTREAM_TIMEOUT_MS = 15000;             // until upstream response headers arrive
+const MAX_PROXIED_PLAYLIST_BYTES = 4 * 1024 * 1024;   // HLS/DASH manifests rewritten in memory
+const LOGO_TIMEOUT_MS = 8000;
+const MAX_LOGO_BYTES = 1024 * 1024;
+const LOGO_CACHE_SECONDS = 24 * 60 * 60;
 
 // PBKDF2 cost for admin passwords. Kept low enough to fit the Workers free
 // plan CPU budget per request; online guessing is already rate limited, and
@@ -104,6 +122,19 @@ function safeHttpsUrl(value) {
   try {
     const url = new URL(text);
     return url.protocol === "https:" && url.hostname ? url.href : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+// Stream and logo URLs: http is allowed too (IPTV panels rarely have TLS).
+// Such streams are proxied by the Worker, never handed to the browser.
+function safeStreamUrl(value) {
+  const text = String(value ?? "").trim();
+  if (!text || text.length > 2000 || /\s/.test(text)) return "";
+  try {
+    const url = new URL(text);
+    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname ? url.href : "";
   } catch (_) {
     return "";
   }
@@ -211,7 +242,7 @@ const APP_SPORTS = [
 
 const DEFAULT_SETTINGS = {
   ingest: { autoSync: true, resolveBudget: MAX_SYNC_RESOLVE_OPS },
-  tvSource: { url: DEFAULT_TV_SOURCE_URL, timeoutSec: 120, concurrency: 6, autoSync: true },
+  tvSource: { url: DEFAULT_TV_SOURCE_URL, timeoutSec: 120, concurrency: 6, autoSync: true, defaultCategory: "Sports" },
   liveWindows: {
     defaultHours: 3,
     categories: {
@@ -268,11 +299,21 @@ const SETTINGS_SECTIONS = {
   },
 
   tvSource(input, options) {
+    let url = optionalUrl(input.url, "Playlist URL", options) || DEFAULT_TV_SOURCE_URL;
+    // The retired channels.json list is replaced by the default playlist.
+    if (LEGACY_TV_SOURCE_URLS.includes(url)) url = DEFAULT_TV_SOURCE_URL;
+    const wanted = String(input.defaultCategory ?? "").trim().toLowerCase();
+    let defaultCategory = TV_CATEGORIES.find(category => category.toLowerCase() === wanted);
+    if (!defaultCategory) {
+      if (wanted && !options.lenient) throw new InputError("Default category must be one of: " + TV_CATEGORIES.join(", "));
+      defaultCategory = "Sports";
+    }
     return {
-      url: optionalUrl(input.url, "Playlist URL", options) || DEFAULT_TV_SOURCE_URL,
+      url,
       timeoutSec: Math.round(clampNumber(input.timeoutSec, 5, 300, 120)),
       concurrency: Math.round(clampNumber(input.concurrency, 1, 10, 6)),
-      autoSync: input.autoSync !== false && input.autoSync !== "false"
+      autoSync: input.autoSync !== false && input.autoSync !== "false",
+      defaultCategory
     };
   },
 
@@ -612,7 +653,7 @@ function buildPlayIndex(matches) {
   for (const match of matches) {
     if (!match || match.active === false) continue;
     for (const stream of Array.isArray(match.streams) ? match.streams : []) {
-      const url = safeHttpsUrl(stream?.url);
+      const url = safeStreamUrl(stream?.url);
       if (!url || !stream.id) continue;
       (index[String(match.id)] ||= {})[String(stream.id)] = url;
     }
@@ -1232,13 +1273,42 @@ function publicStreamMeta(stream) {
   };
 }
 
-// Embed pages play in an iframe; .m3u8 manifests need a video player.
-function streamKind(url) {
+// How a stream plays: "embed" pages go in an iframe, every other kind plays in
+// player.html (hls.js, mpegts.js, dash.js or the native <video> element).
+// Decided by the path extension, then the Xtream live path shape, then a
+// type/format/output/extension query parameter.
+const STREAM_EXTENSIONS = {
+  m3u8: "hls", m3u: "hls",
+  mpd: "dash",
+  ts: "ts", mts: "ts", m2ts: "ts",
+  flv: "flv",
+  mp4: "video", m4v: "video", webm: "video", mov: "video", mkv: "video", ogv: "video",
+  mp3: "audio", aac: "audio", m4a: "audio", ogg: "audio", oga: "audio", opus: "audio", flac: "audio", wav: "audio"
+};
+const STREAM_QUERY_KINDS = {
+  m3u8: "hls", hls: "hls",
+  ts: "ts", mpegts: "ts",
+  mpd: "dash", dash: "dash",
+  flv: "flv",
+  mp4: "video"
+};
+
+function streamKind(value) {
+  let url;
   try {
-    return /\.m3u8$/i.test(new URL(url).pathname) ? "hls" : "embed";
+    url = new URL(String(value ?? "").split("|")[0].trim());
   } catch (_) {
     return "embed";
   }
+  const extension = ((url.pathname.match(/\.([a-z0-9]+)$/i) || [])[1] || "").toLowerCase();
+  if (Object.hasOwn(STREAM_EXTENSIONS, extension)) return STREAM_EXTENSIONS[extension];
+  // Xtream Codes live stream without an extension: /live/<user>/<pass>/<id>
+  if (/\/live\/[^/]+\/[^/]+\/\d+$/.test(url.pathname)) return "ts";
+  for (const key of ["type", "format", "output", "extension"]) {
+    const value = String(url.searchParams.get(key) ?? "").trim().toLowerCase();
+    if (Object.hasOwn(STREAM_QUERY_KINDS, value)) return STREAM_QUERY_KINDS[value];
+  }
+  return "embed";
 }
 
 function publicTeams(teams) {
@@ -1307,7 +1377,7 @@ function enrichMatchForPublic(match, now = Date.now()) {
     enriched.manual = {
       streamCount: match.streams.length,
       streams: match.streams
-        .filter(stream => stream && stream.id && safeHttpsUrl(stream.url))
+        .filter(stream => stream && stream.id && safeStreamUrl(stream.url))
         .map(stream => ({
           id: String(stream.id),
           name: String(stream.name ?? ""),
@@ -1508,8 +1578,8 @@ function cleanStreams(list) {
   return list.slice(0, 60).map((stream, index) => {
     const name = cleanText(stream?.name, 120) || "Stream " + (index + 1);
     const rawUrl = String(stream?.url ?? "").trim();
-    const url = rawUrl ? safeHttpsUrl(rawUrl) : "";
-    if (rawUrl && !url) throw new InputError("Stream URL for \"" + name + "\" must be an https link");
+    const url = rawUrl ? safeStreamUrl(rawUrl) : "";
+    if (rawUrl && !url) throw new InputError("Stream URL for \"" + name + "\" must be an http or https link");
     const quality = String(stream?.quality || "HD").toUpperCase();
     return {
       id: cleanText(stream?.id, 64) || crypto.randomUUID(),
@@ -1610,24 +1680,39 @@ async function clearLegacyFeatured(env, ids) {
 /*
  * Live TV catalog
  *
- * Channels come from a playlist (the channels.json list the Android app uses,
- * any JSON list, or an M3U file) plus channels the admin adds by hand. A
- * playlist sync replaces the synced channels and keeps manual ones; status,
- * order and an admin-picked category survive re-syncs. Stream URLs never
- * appear in public responses: the player goes through /api/play/tv/:id.
+ * Channels come from a playlist (by default sports.m3u: Xtream Codes live
+ * streams grouped by country; any JSON list or M3U file works) plus channels
+ * the admin adds by hand. A playlist sync replaces the synced channels and
+ * keeps manual ones; status, order, the proxy switch and an admin-picked
+ * category survive re-syncs. Stream URLs never appear in public responses:
+ * players go through /api/play/tv/:id, which redirects or proxies.
  */
-const TV_CATEGORIES = ["Sports", "Football", "Cricket", "Entertainment", "Kids", "News", "Movies"];
+const TV_CATEGORIES = [
+  "Sports", "Football", "Cricket", "Motorsport", "Fight", "Tennis", "Golf", "Basketball",
+  "Horse Racing", "Entertainment", "Kids", "News", "Movies"
+];
 
+// Checked in order against the lower-cased channel name; the first hit wins.
+// Specific sports come before the generic "Sports" rule.
 const TV_CATEGORY_RULES = [
-  ["Cricket", /\b(cricket|willow)\b/],
-  ["Football", /\b(football|fussball|fußball|soccer|footy|laliga|la liga|bundesliga|premier league|serie a|ligue 1|eredivisie|tudn)\b/],
-  ["Sports", /(sport|espn|dazn|bein|eleven|golf|\bnba\b|\bnfl\b|\bnhl\b|\bmlb\b|tennis|motogp|racer|racing|\bufc\b|fight|\btsn\d*\b|\btyc\b|deportes|\bf1\b|premiere|sec network|acc network|big ten)/],
+  ["Cricket", /\b(cricket|willow)\b|cric ?buzz|\bcr ?life\b|\bcric\b/],
+  ["Motorsport", /motorsport|motor ?vision|\bf1\b|formula ?1|moto ?gp|nascar|indycar|motowizja|automoto|\bmav ?tv\b|\bfuel ?tv\b|motors? tv/],
+  ["Horse Racing", /\bhorse|racing|equidia|\batg\b|\btvg\b|hpi ?tv|\btjk\b|fanduel/],
+  ["Fight", /\bufc\b|\bwwe\b|boxing|boxnation|fight|\bcombate?\b|\bmma\b|wrestling|\bpfl\b/],
+  ["Tennis", /tennis|\btenis\b/],
+  ["Golf", /\bgolf(?!o)/],
+  ["Basketball", /\bnba\b|basket/],
+  ["Football", /\b(football|fussball|fußball|soccer|footy|laliga|la liga|bundesliga|premier league|serie a|ligue 1|eredivisie|tudn)\b|fifa|calcio|f[uú]tbol|futebol|\bgol\b|goltv|uefa|champions league|\bmutv\b|lfc ?tv|chelsea ?tv|bar[cç]a ?tv|real madrid ?tv|benfica ?tv|bayern ?tv|premier league|\bhub premier/],
+  ["Sports", /(sport|espn|dazn|bein|eleven|golf|\bnba\b|\bnfl\b|\bnhl\b|\bmlb\b|tennis|motogp|racer|racing|\bufc\b|fight|\btsn\d*\b|\btyc\b|deportes|\bf1\b|premiere|sec network|acc network|big ten)|\bal kass\b|thmanyah|red ?bull ?tv|\barena\b|\bidman\b|\bnesn\b|\bmsg\b|\bstadium\b|\bbtn\b|\bssc\b/],
   ["Kids", /(cartoon|nick|disney|boomerang|cbeebies|kids|junior|baby)/],
   ["News", /(news|cnbc|\bcnn\b|weather|al jazeera)/],
   ["Movies", /(hbo|showtime|starz|cinema|movies|\bfxm\b|\bamc\b|\btcm\b|cinemax)/]
 ];
 
-function channelCategory(explicit, name) {
+// An explicit category (the playlist's `category`, or an M3U group-title)
+// wins when it names one; otherwise the name decides, and channels nothing
+// matches get the fallback (the tvSource "Default category" setting).
+function channelCategory(explicit, name, fallback = "Sports") {
   const wanted = String(explicit ?? "").trim().toLowerCase();
   const direct = TV_CATEGORIES.find(category => category.toLowerCase() === wanted);
   if (direct) return direct;
@@ -1636,7 +1721,63 @@ function channelCategory(explicit, name) {
   for (const [category, pattern] of TV_CATEGORY_RULES) {
     if (pattern.test(lower)) return category;
   }
-  return "Entertainment";
+  return TV_CATEGORIES.includes(fallback) ? fallback : "Sports";
+}
+
+// Request headers some streams need. `#EXTVLCOPT:http-…` lines and Kodi's
+// `URL|User-Agent=…&Referer=…` suffix use these names.
+const STREAM_HEADER_NAMES = {
+  "user-agent": "userAgent",
+  "referrer": "referer",
+  "referer": "referer",
+  "origin": "origin"
+};
+const STREAM_HEADER_FIELDS = ["userAgent", "referer", "origin"];
+
+// Merges header sets (later ones win) into { userAgent?, referer?, origin? },
+// printable ASCII only, or null when nothing is set.
+function cleanStreamHeaders(...sources) {
+  const headers = {};
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+    for (const field of STREAM_HEADER_FIELDS) {
+      if (typeof source[field] !== "string") continue;
+      const value = cleanText(source[field], 300).replace(/[^\x20-\x7e]+/g, "").trim();
+      if (value) headers[field] = value;
+    }
+  }
+  return Object.keys(headers).length ? headers : null;
+}
+
+// Splits Kodi's `URL|Name=value&Name=value` header suffix off a stream URL.
+function splitPipeHeaders(value) {
+  const text = String(value ?? "").trim();
+  const pipe = text.indexOf("|");
+  if (pipe < 0 || !/^[A-Za-z][A-Za-z0-9-]*=/.test(text.slice(pipe + 1))) return { url: text, headers: {} };
+  const headers = {};
+  for (const part of text.slice(pipe + 1).split("&")) {
+    const eq = part.indexOf("=");
+    if (eq <= 0) continue;
+    const name = part.slice(0, eq).trim().toLowerCase();
+    if (!Object.hasOwn(STREAM_HEADER_NAMES, name)) continue;
+    const field = STREAM_HEADER_NAMES[name];
+    let headerValue = part.slice(eq + 1);
+    try {
+      headerValue = decodeURIComponent(headerValue);
+    } catch (_) {}
+    headers[field] = headerValue;
+  }
+  return { url: text.slice(0, pipe).trim(), headers };
+}
+
+function cleanGroup(value) {
+  return typeof value === "string" || typeof value === "number" ? cleanText(decodeEntities(value), 60) : "";
+}
+
+// Ids include the group: playlists repeat names across countries
+// ("EUROSPORT 2 HD" in Italy and in France).
+function channelIdName(group, name) {
+  return group ? group + " " + name : String(name ?? "");
 }
 
 // Finds the first comma outside double quotes: the channel name follows it.
@@ -1649,27 +1790,44 @@ function m3uNameStart(line) {
   return -1;
 }
 
+// #EXTINF carries name, logo and group-title; #EXTVLCOPT lines before the
+// URL carry request headers; #EXTGRP is an alternative group line.
 function parseM3u(text) {
   const entries = [];
   let pending = null;
+  let headers = {};
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
     if (/^#EXTINF/i.test(line)) {
       const attr = (name) => (line.match(new RegExp(name + "=\"([^\"]*)\"", "i")) || [])[1] || "";
       const start = m3uNameStart(line);
+      const group = attr("group-title");
       pending = {
         name: (start > 0 ? line.slice(start) : "").trim() || attr("tvg-name"),
         logo: attr("tvg-logo"),
-        category: attr("group-title")
+        category: group,
+        group
       };
+      continue;
+    }
+    const option = line.match(/^#EXTVLCOPT:\s*http-(user-agent|referrer|referer|origin)\s*=\s*(.*)$/i);
+    if (option) {
+      headers[STREAM_HEADER_NAMES[option[1].toLowerCase()]] = option[2].trim();
+      continue;
+    }
+    const extgrp = line.match(/^#EXTGRP:\s*(.*)$/i);
+    if (extgrp && pending && !pending.group) {
+      pending.group = extgrp[1].trim();
+      if (!pending.category) pending.category = pending.group;
       continue;
     }
     if (line.startsWith("#")) continue;
     if (pending) {
-      entries.push({ ...pending, url: line });
+      entries.push({ ...pending, headers, url: line });
       pending = null;
     }
+    headers = {};
   }
   return entries;
 }
@@ -1694,6 +1852,12 @@ function parsePlaylist(raw) {
     logo: entry?.logo ?? entry?.tvg_logo ?? entry?.image ?? "",
     url: entry?.url ?? entry?.stream ?? entry?.link ?? "",
     category: entry?.category ?? entry?.group ?? "",
+    group: entry?.group ?? entry?.country ?? "",
+    headers: {
+      userAgent: entry?.userAgent ?? entry?.user_agent,
+      referer: entry?.referer ?? entry?.referrer,
+      origin: entry?.origin
+    },
     sandbox: entry?.sandbox
   }));
 }
@@ -1706,10 +1870,11 @@ function sandboxFlag(value) {
   return value === true || (typeof value === "string" && value.trim().toLowerCase() === "true");
 }
 
-// Entries without a name or an https stream URL are skipped, as are repeated
-// stream URLs. `genre` is ignored on purpose: upstream marks every channel
-// (cartoons included) "Sports", so categories come from `category` or the name.
-function cleanPlaylistEntries(entries) {
+// Entries without a name or an http(s) stream URL are skipped, as are
+// repeated stream URLs. `genre` is ignored on purpose: upstream marks every
+// channel (cartoons included) "Sports", so categories come from `category`
+// (or the M3U group-title) or the name, then options.defaultCategory.
+function cleanPlaylistEntries(entries, options = {}) {
   const seen = new Set();
   const out = [];
   let skipped = 0;
@@ -1719,24 +1884,28 @@ function cleanPlaylistEntries(entries) {
       continue;
     }
     const name = cleanText(decodeEntities(entry?.name), 120);
-    const url = safeHttpsUrl(decodeEntities(entry?.url));
+    const piped = splitPipeHeaders(decodeEntities(entry?.url));
+    const url = safeStreamUrl(piped.url);
     if (!name || !url || seen.has(url)) {
       skipped++;
       continue;
     }
     seen.add(url);
+    const headers = cleanStreamHeaders(piped.headers, entry?.headers);
     out.push({
       name,
-      logo: safeHttpsUrl(decodeEntities(entry?.logo)),
+      group: cleanGroup(entry?.group),
+      logo: safeStreamUrl(decodeEntities(entry?.logo)),
       url,
-      category: channelCategory(entry?.category, name),
-      sandbox: sandboxFlag(entry?.sandbox)
+      category: channelCategory(entry?.category, name, options.defaultCategory),
+      sandbox: sandboxFlag(entry?.sandbox),
+      ...(headers ? { headers } : {})
     });
   }
   return { entries: out, skipped };
 }
 
-async function fetchPlaylist(url, timeoutMs) {
+async function fetchPlaylist(url, timeoutMs, options = {}) {
   let response;
   try {
     response = await fetchWithTimeout(
@@ -1750,7 +1919,7 @@ async function fetchPlaylist(url, timeoutMs) {
   if (!response.ok) throw new InputError("The playlist URL returned HTTP " + response.status);
   const text = await response.text();
   if (text.length > MAX_PLAYLIST_BYTES) throw new InputError("The playlist is larger than 5 MB");
-  return cleanPlaylistEntries(parsePlaylist(text));
+  return cleanPlaylistEntries(parsePlaylist(text), options);
 }
 
 function emptyTvState() {
@@ -1774,8 +1943,34 @@ async function readTvState(env) {
   };
 }
 
+// The public routes (channel list, playback, logos) read the catalog — about
+// 1 MB with the sports playlist — through a short per-isolate memo instead of
+// parsing it from KV on every request. Treat the result as read-only.
+// writeTvState drops the memo; the generation check stops a read that started
+// before a write from storing the old catalog after it.
+let tvStateMemo = null;
+let tvStateGeneration = 0;
+
+async function readTvStateCached(env) {
+  const now = Date.now();
+  if (tvStateMemo && tvStateMemo.db === env.SPORTZFY_DB && now - tvStateMemo.at < TV_STATE_MEMO_MS) {
+    return tvStateMemo.state;
+  }
+  const generation = tvStateGeneration;
+  const state = await readTvState(env);
+  if (generation === tvStateGeneration) tvStateMemo = { db: env.SPORTZFY_DB, at: now, state };
+  return state;
+}
+
 async function writeTvState(env, state) {
-  await env.SPORTZFY_DB.put(TV_CHANNELS_KEY, JSON.stringify(state));
+  tvStateGeneration++;
+  tvStateMemo = null;
+  try {
+    await env.SPORTZFY_DB.put(TV_CHANNELS_KEY, JSON.stringify(state));
+  } finally {
+    tvStateGeneration++;
+    tvStateMemo = null;
+  }
 }
 
 function uniqueChannelId(name, taken) {
@@ -1801,8 +1996,8 @@ async function syncTvChannels(env, tvSource, options = {}) {
   let entries;
   let skipped;
   try {
-    ({ entries, skipped } = await fetchPlaylist(tvSource.url, tvSource.timeoutSec * 1000));
-    if (!entries.length) throw new InputError("The playlist has no channels with an https stream URL");
+    ({ entries, skipped } = await fetchPlaylist(tvSource.url, tvSource.timeoutSec * 1000, { defaultCategory: tvSource.defaultCategory }));
+    if (!entries.length) throw new InputError("The playlist has no channels with an http or https stream URL");
   } catch (error) {
     // Record the failure on an existing catalog; a first-time seed that fails
     // leaves nothing behind so the next request tries again.
@@ -1814,45 +2009,57 @@ async function syncTvChannels(env, tvSource, options = {}) {
     throw error;
   }
 
+  // Previous synced channels are matched by stream URL, then by group + name,
+  // then (records saved before groups existed) by name alone.
   const state = existing || emptyTvState();
   const manual = state.channels.filter(channel => channel.origin !== "synced");
   const previousSynced = state.channels.filter(channel => channel.origin === "synced");
   const byUrl = new Map(previousSynced.map(channel => [channel.url, channel]));
-  const bySlug = new Map();
+  const byKey = new Map();
+  const byName = new Map();
   for (const channel of previousSynced) {
-    const key = slugify(channel.name);
-    if (!bySlug.has(key)) bySlug.set(key, channel);
+    const key = slugify(channelIdName(channel.group, channel.name));
+    if (!byKey.has(key)) byKey.set(key, channel);
+    const nameKey = slugify(channel.name);
+    if (!channel.group && !byName.has(nameKey)) byName.set(nameKey, channel);
   }
   const manualUrls = new Set(manual.map(channel => channel.url));
   const taken = new Set(manual.map(channel => channel.id));
   const matched = new Set();
+  const unmatched = (channel) => (channel && !matched.has(channel.id) ? channel : null);
   let added = 0;
   let updated = 0;
   const synced = [];
 
   for (const entry of entries) {
     if (manualUrls.has(entry.url)) continue; // a hand-made copy of the same stream wins
-    let previous = byUrl.get(entry.url);
-    if (!previous || matched.has(previous.id)) previous = bySlug.get(slugify(entry.name));
-    if (previous && matched.has(previous.id)) previous = null;
+    const previous = unmatched(byUrl.get(entry.url)) ||
+      unmatched(byKey.get(slugify(channelIdName(entry.group, entry.name)))) ||
+      unmatched(byName.get(slugify(entry.name)));
     if (previous) matched.add(previous.id);
 
-    const id = previous && !taken.has(previous.id) ? previous.id : uniqueChannelId(entry.name, taken);
+    const id = previous && !taken.has(previous.id) ? previous.id : uniqueChannelId(channelIdName(entry.group, entry.name), taken);
     taken.add(id);
     const category = previous?.categoryLocked ? previous.category : entry.category;
-    const changed = !previous || previous.name !== entry.name || previous.url !== entry.url ||
-      previous.logo !== entry.logo || previous.category !== category || Boolean(previous.sandbox) !== entry.sandbox;
+    const headers = entry.headers || null;
+    const changed = !previous || previous.name !== entry.name || String(previous.group ?? "") !== entry.group ||
+      previous.url !== entry.url || previous.logo !== entry.logo || previous.category !== category ||
+      Boolean(previous.sandbox) !== entry.sandbox ||
+      JSON.stringify(previous.headers || null) !== JSON.stringify(headers);
     if (!previous) added++;
     else if (changed) updated++;
 
     synced.push({
       id,
       name: entry.name,
+      group: entry.group,
       logo: entry.logo,
       url: entry.url,
+      ...(headers ? { headers } : {}),
       category,
       categoryLocked: Boolean(previous?.categoryLocked),
       sandbox: entry.sandbox,
+      proxy: previous?.proxy === true, // admin-owned: the playlist never sets it
       sort: Number.isFinite(previous?.sort) ? previous.sort : null,
       active: previous ? previous.active !== false : true,
       origin: "synced",
@@ -1873,6 +2080,9 @@ async function syncTvChannels(env, tvSource, options = {}) {
   return next;
 }
 
+// Cron: re-pull the playlist hourly, at once when the configured source is
+// not the one the catalog came from, and no sooner than TV_AUTO_RETRY_MS
+// after a failed pull.
 async function maybeAutoSyncTv(env, settings) {
   if (!settings.tvSource.autoSync) return null;
   const state = await readTvState(env);
@@ -1880,9 +2090,18 @@ async function maybeAutoSyncTv(env, settings) {
   if (state) {
     const syncedAt = Date.parse(state.syncedAt || "") || 0;
     const attemptAt = Date.parse(state.lastAttemptAt || "") || 0;
-    if (now - syncedAt < TV_AUTO_SYNC_EVERY_MS || now - attemptAt < TV_AUTO_RETRY_MS) return null;
+    if (state.lastSync?.ok === false && now - attemptAt < TV_AUTO_RETRY_MS) return null;
+    if (state.source === settings.tvSource.url && now - syncedAt < TV_AUTO_SYNC_EVERY_MS) return null;
   }
   return syncTvChannels(env, settings.tvSource, { trigger: "cron" });
+}
+
+// Drops a response body without reading it.
+function discardBody(response) {
+  try {
+    const cancelled = response?.body?.cancel?.();
+    if (cancelled && typeof cancelled.catch === "function") cancelled.catch(() => {});
+  } catch (_) {}
 }
 
 // Reachability check for one stream. A dead host, a timeout, 404/410 or a
@@ -1891,19 +2110,17 @@ async function maybeAutoSyncTv(env, settings) {
 // playing fine in a browser.
 async function checkStreamUrl(url, timeoutMs = TV_CHECK_TIMEOUT_MS) {
   const started = Date.now();
-  const target = safeHttpsUrl(url);
-  if (!target) return { url: String(url ?? ""), ok: false, status: 0, ms: 0, error: "not an https URL" };
+  const target = safeStreamUrl(url);
+  if (!target) return { url: String(url ?? ""), ok: false, status: 0, ms: 0, error: "not an http(s) URL" };
   try {
     const response = await fetchWithTimeout(
       target,
       { method: "GET", redirect: "follow", headers: { "User-Agent": CHROME_UA, "Accept": "text/html,application/vnd.apple.mpegurl,*/*" } },
       timeoutMs
     );
-    // Only the status matters; drop the body without reading it.
-    try {
-      const cancelled = response.body?.cancel?.();
-      if (cancelled && typeof cancelled.catch === "function") cancelled.catch(() => {});
-    } catch (_) {}
+    // Only the status matters; drop the body without reading it (live
+    // MPEG-TS streams never end).
+    discardBody(response);
     const status = Number(response.status) || 0;
     const ok = (status >= 200 && status < 400) || [401, 403, 405, 429].includes(status);
     return { url: target, ok, status, ms: Date.now() - started, ...(ok ? {} : { error: "HTTP " + status }) };
@@ -1925,38 +2142,79 @@ async function checkStreamUrls(urls, concurrency) {
   return results;
 }
 
+// FNV-1a: a short, stable cache-buster for logo URLs.
+function shortHash(value) {
+  const text = String(value ?? "");
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+// https logos load directly; http ones (no TLS on most IPTV logo hosts) go
+// through /api/tv/logo/:id, a root-relative path clients prefix with their
+// API origin, so the logo host never reaches the browser either.
+function channelLogoSrc(channel) {
+  const logo = safeStreamUrl(channel?.logo);
+  if (!logo) return "";
+  if (logo.startsWith("https:")) return logo;
+  return "/api/tv/logo/" + encodeURIComponent(String(channel.id)) + "?v=" + shortHash(logo);
+}
+
 function publicChannel(channel) {
   return {
     id: String(channel.id),
     name: String(channel.name ?? ""),
-    logo: String(channel.logo ?? ""),
-    category: TV_CATEGORIES.includes(channel.category) ? channel.category : channelCategory("", channel.name),
+    logo: channelLogoSrc(channel),
+    category: TV_CATEGORIES.includes(channel.category) ? channel.category : channelCategory(channel.group, channel.name),
+    group: String(channel.group ?? ""),
     kind: streamKind(channel.url),
     sandbox: Boolean(channel.sandbox)
   };
 }
 
 function adminChannel(channel) {
-  return { ...channel, kind: streamKind(channel.url) };
+  return { ...channel, kind: streamKind(channel.url), logoSrc: channelLogoSrc(channel), proxied: needsProxy(channel) };
 }
 
-// Fields an admin can set on a channel, applied over current.
-function editableChannelFields(body, current = {}) {
+function optionalStreamUrl(value, field) {
+  const text = decodeEntities(String(value ?? "").trim());
+  if (!text) return "";
+  const url = safeStreamUrl(text);
+  if (!url) throw new InputError(field + " must be an http or https link");
+  return url;
+}
+
+// Fields an admin can set on a channel, applied over current. Request
+// headers come only from the playlist or a Kodi `URL|User-Agent=…` suffix.
+function editableChannelFields(body, current = {}, options = {}) {
   const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
   const name = has("name") ? cleanText(decodeEntities(body.name), 120) : String(current.name ?? "");
   if (!name) throw new InputError("Channel name is required");
-  const url = has("url") ? safeHttpsUrl(body.url) : String(current.url ?? "");
-  if (!url) throw new InputError("Stream URL must be an https link — an m3u8 manifest or an embed page");
-  const logo = has("logo") ? optionalUrl(body.logo, "Logo URL") : String(current.logo ?? "");
+  const group = has("group") ? cleanGroup(body.group) : String(current.group ?? "");
+  let url = String(current.url ?? "");
+  let headers = cleanStreamHeaders(current.headers);
+  if (has("url")) {
+    const piped = splitPipeHeaders(body.url);
+    url = safeStreamUrl(piped.url);
+    headers = cleanStreamHeaders(piped.headers) || headers;
+  }
+  if (!url) throw new InputError("Stream URL must be an http or https link — a stream (m3u8, ts, mpd, mp4…) or an embed page");
+  const logo = has("logo") ? optionalStreamUrl(body.logo, "Logo URL") : String(current.logo ?? "");
 
+  // Unlocked categories follow the group and name, so they are only
+  // recomputed when one of those changes (a playlist category survives).
   let category = current.category;
   let categoryLocked = Boolean(current.categoryLocked);
+  const renamed = name !== String(current.name ?? "") || group !== String(current.group ?? "");
   if (has("category")) {
     const wanted = TV_CATEGORIES.find(item => item.toLowerCase() === String(body.category ?? "").trim().toLowerCase());
     categoryLocked = Boolean(wanted);
-    category = wanted || channelCategory("", name);
-  } else if (!categoryLocked) {
-    category = channelCategory("", name);
+    category = wanted || channelCategory(group, name, options.defaultCategory);
+  } else if (!categoryLocked && (renamed || !TV_CATEGORIES.includes(category))) {
+    category = channelCategory(group, name, options.defaultCategory);
   }
 
   let sort = Number.isFinite(current.sort) ? current.sort : null;
@@ -1972,20 +2230,24 @@ function editableChannelFields(body, current = {}) {
 
   return {
     name,
+    group,
     url,
+    ...(headers ? { headers } : {}),
     logo,
     category,
     categoryLocked,
     sort,
     sandbox: has("sandbox") ? sandboxFlag(body.sandbox) : Boolean(current.sandbox),
+    proxy: has("proxy") ? truthy(body.proxy) : current.proxy === true,
     active: has("active") ? body.active !== false && body.active !== "false" : current.active !== false
   };
 }
 
 /*
- * Playback redirects. Public lists carry ids only; the player frame points
- * here and is sent on to the stream. Errors answer as sandboxed plain text so
- * nothing can run on this origin inside a player frame.
+ * Playback. Public lists carry ids only; players point at /api/play/... and
+ * are either redirected to the stream (https streams that browsers can load
+ * themselves) or served by the stream proxy below. Errors answer as
+ * sandboxed plain text so nothing can run on this origin inside a player frame.
  */
 function redirectTo(url) {
   return new Response(null, {
@@ -2013,6 +2275,605 @@ function playUnavailable() {
   });
 }
 
+// The upstream failed (unreachable, timeout, HTTP error, or an HTML page).
+function streamFailed() {
+  return new Response("This stream could not be loaded.", {
+    status: 502,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Security-Policy": "sandbox",
+      "Access-Control-Allow-Origin": "*",
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
+}
+
+/*
+ * Stream proxy
+ *
+ * Streams a browser cannot (or must not) load directly play through the
+ * Worker: plain http (mixed content on an https site, and Xtream URLs carry
+ * the account login), raw MPEG-TS/FLV (rarely CORS-enabled), anything that
+ * needs request headers, and channels the admin marks "proxy".
+ *
+ * Playlists are rewritten so every segment, key and variant URL points back
+ * here as /s/<token>, where the token is the upstream URL (plus headers)
+ * sealed with AES-GCM — opaque to viewers, bound to one channel or match
+ * stream, and valid for 12 hours. DASH manifests are served from
+ * /b/<token>/<file>, the token sealing their directory, so the relative
+ * segment templates inside resolve without rewriting. Media bodies stream
+ * straight through and are never buffered.
+ */
+function needsProxy(channel) {
+  const url = String(channel?.url ?? "");
+  if (/^http:/i.test(url)) return true;
+  if (channel?.proxy === true) return true;
+  if (cleanStreamHeaders(channel?.headers)) return true;
+  const kind = streamKind(url);
+  return kind === "ts" || kind === "flv";
+}
+
+const textEncoder = new TextEncoder();
+const streamKeys = new Map();             // secret -> Promise<CryptoKey>
+const generatedSecrets = new WeakMap();   // KV binding -> secret kept in KV
+let isolateSecret = "";                   // no KV binding at all (tests)
+
+// STREAM_PROXY_SECRET, else ADMIN_TOKEN; with neither, a random secret is
+// generated once and kept in KV so every isolate opens the same tokens.
+async function streamProxySecret(env) {
+  const configured = String(env.STREAM_PROXY_SECRET || env.ADMIN_TOKEN || "").trim();
+  if (configured) return configured;
+  const db = env.SPORTZFY_DB && typeof env.SPORTZFY_DB === "object" ? env.SPORTZFY_DB : null;
+  if (!db) return isolateSecret || (isolateSecret = toHex(crypto.getRandomValues(new Uint8Array(32))));
+  if (generatedSecrets.has(db)) return generatedSecrets.get(db);
+  let secret = null;
+  try {
+    secret = await db.get(STREAM_PROXY_SECRET_KEY, "text");
+  } catch (_) {}
+  if (!secret) {
+    secret = toHex(crypto.getRandomValues(new Uint8Array(32)));
+    try {
+      await db.put(STREAM_PROXY_SECRET_KEY, secret);
+    } catch (_) {}
+  }
+  generatedSecrets.set(db, secret);
+  return secret;
+}
+
+function streamKey(secret) {
+  let key = streamKeys.get(secret);
+  if (!key) {
+    key = crypto.subtle.digest("SHA-256", textEncoder.encode(secret + STREAM_PROXY_KEY_INFO))
+      .then(digest => crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]));
+    key.catch(() => streamKeys.delete(secret));
+    streamKeys.set(secret, key);
+  }
+  return key;
+}
+
+function toBase64Url(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(text) {
+  const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((text.length + 3) % 4));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// Returns seal(url) -> token for one scope ("tv/<id>" or
+// "stream/<matchId>/<streamId>"); the scope is the AES-GCM additional data.
+async function streamSealer(env, scope, headers) {
+  const key = await streamKey(await streamProxySecret(env));
+  const additionalData = textEncoder.encode(scope);
+  return async (url) => {
+    const payload = { u: url, e: Date.now() + STREAM_TOKEN_TTL_MS, ...(headers ? { h: headers } : {}) };
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const sealed = new Uint8Array(await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData },
+      key,
+      textEncoder.encode(JSON.stringify(payload))
+    ));
+    const token = new Uint8Array(iv.length + sealed.length);
+    token.set(iv);
+    token.set(sealed, iv.length);
+    return toBase64Url(token);
+  };
+}
+
+// { url, headers } for a valid, unexpired token of this scope, else null.
+async function openStreamToken(env, scope, token) {
+  if (!token || token.length > 8192 || !/^[A-Za-z0-9_-]+$/.test(token)) return null;
+  try {
+    const bytes = fromBase64Url(token);
+    if (bytes.length < 12 + 16 + 2) return null;
+    const key = await streamKey(await streamProxySecret(env));
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: bytes.subarray(0, 12), additionalData: textEncoder.encode(scope) },
+      key,
+      bytes.subarray(12)
+    );
+    const data = JSON.parse(new TextDecoder().decode(plain));
+    if (!data || typeof data !== "object" || !(Number(data.e) > Date.now())) return null;
+    const url = safeStreamUrl(data.u);
+    return url ? { url, headers: cleanStreamHeaders(data.h) } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function proxyHeaders(extra = {}) {
+  return {
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "sandbox; default-src 'none'",
+    "Referrer-Policy": "no-referrer",
+    ...extra
+  };
+}
+
+// The fetch timeout covers the wait for response headers only; it is cleared
+// once they arrive, so a long live stream is never cut off.
+function fetchUpstream(target, headers, request) {
+  const outgoing = { "User-Agent": headers?.userAgent || STREAM_PROXY_UA, "Accept": "*/*" };
+  if (headers?.referer) outgoing["Referer"] = headers.referer;
+  if (headers?.origin) outgoing["Origin"] = headers.origin;
+  const range = request.headers.get("Range");
+  if (range && range.length <= 200 && /^bytes=[\d\s,-]+$/i.test(range)) outgoing["Range"] = range;
+  return fetchWithTimeout(target, { method: "GET", redirect: "follow", headers: outgoing }, STREAM_UPSTREAM_TIMEOUT_MS);
+}
+
+// Incremental body reader: pull(limit) reads until at least `limit` bytes
+// (or the end) have arrived; rest() rebuilds a stream of everything, read or not.
+function bodyReader(body) {
+  const reader = body && typeof body.getReader === "function" ? body.getReader() : null;
+  const state = { chunks: [], size: 0, done: !reader };
+  state.pull = async (limit) => {
+    while (!state.done && state.size < limit) {
+      const { done, value } = await reader.read();
+      if (done) state.done = true;
+      else if (value && value.byteLength) {
+        state.chunks.push(value);
+        state.size += value.byteLength;
+      }
+    }
+  };
+  state.bytes = () => {
+    const out = new Uint8Array(state.size);
+    let offset = 0;
+    for (const chunk of state.chunks) {
+      out.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return out;
+  };
+  state.cancel = () => {
+    if (!reader) return;
+    try { reader.cancel().catch(() => {}); } catch (_) {}
+  };
+  state.rest = () => {
+    const chunks = state.chunks;
+    return new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(chunk);
+        if (state.done) controller.close();
+      },
+      async pull(controller) {
+        const { done, value } = await reader.read();
+        if (done) controller.close();
+        else controller.enqueue(value);
+      },
+      cancel(reason) {
+        return reader ? reader.cancel(reason) : undefined;
+      }
+    });
+  };
+  return state;
+}
+
+// Reads a whole body into memory; null when it is larger than max bytes.
+async function readCapped(body, max) {
+  const reader = bodyReader(body);
+  await reader.pull(max + 1);
+  if (reader.size > max) {
+    reader.cancel();
+    return null;
+  }
+  return reader.bytes();
+}
+
+function isPlaylistText(text) {
+  return /^﻿?\s*#EXTM3U/.test(text);
+}
+
+// Points every URI line and URI="…" attribute (variants, segments, keys,
+// init sections, renditions) back at /s/<token>; data: and skd: stay as-is.
+const HLS_URI_ATTRIBUTE = /(^|[:,\s])(URI=")([^"]*)(")/gi;
+
+async function rewriteHlsPlaylist(text, baseUrl, seal, scopePath) {
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/);
+  const tokens = new Map();
+  const resolve = (raw) => {
+    const value = String(raw ?? "").trim();
+    if (!value || /^(data|skd):/i.test(value)) return null;
+    let absolute;
+    try {
+      absolute = new URL(value, baseUrl);
+    } catch (_) {
+      return null;
+    }
+    if (absolute.protocol !== "http:" && absolute.protocol !== "https:") return null;
+    if (!tokens.has(absolute.href)) tokens.set(absolute.href, null);
+    return absolute.href;
+  };
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("#")) {
+      for (const match of trimmed.matchAll(HLS_URI_ATTRIBUTE)) resolve(match[3]);
+    } else {
+      resolve(trimmed);
+    }
+  }
+  await Promise.all([...tokens.keys()].map(async href => tokens.set(href, await seal(href))));
+  const proxied = (raw) => {
+    const href = resolve(raw);
+    return href ? scopePath + "/s/" + tokens.get(href) : null;
+  };
+  return lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+    if (trimmed.startsWith("#")) {
+      return trimmed.replace(HLS_URI_ATTRIBUTE, (all, lead, open, value, close) => {
+        const path = proxied(value);
+        return path ? lead + open + path + close : all;
+      });
+    }
+    return proxied(trimmed) ?? line;
+  }).join("\n");
+}
+
+function decodeXmlText(value) {
+  return decodeEntities(value).replace(/&apos;/g, "'");
+}
+
+function escapeXmlText(value) {
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Splits a URL into its directory (ending in "/") and the rest (file name
+// plus query): the /b/<token>/<rest> route form.
+function splitDirectory(url) {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  const directory = new URL("./", parsed).href;
+  return { directory, rest: parsed.href.slice(directory.length) };
+}
+
+// Absolute <BaseURL>s would send the player off-site; they become /b/ routes.
+// Relative ones already resolve against the /b/ path the manifest came from.
+const DASH_BASE_URL = /(<BaseURL\b[^>]*>)\s*(https?:\/\/[^<\s]+?)\s*(<\/BaseURL>)/gi;
+
+async function rewriteDashBaseUrls(text, seal, scopePath) {
+  const found = [...text.matchAll(DASH_BASE_URL)];
+  if (!found.length) return text;
+  const replacements = await Promise.all(found.map(async (match) => {
+    const url = safeStreamUrl(decodeXmlText(match[2]));
+    if (!url) return match[0];
+    const { directory, rest } = splitDirectory(url);
+    return match[1] + scopePath + "/b/" + await seal(directory) + "/" + escapeXmlText(rest) + match[3];
+  }));
+  let index = 0;
+  return text.replace(DASH_BASE_URL, () => replacements[index++]);
+}
+
+const PASSTHROUGH_TYPES = { ts: "video/mp2t", flv: "video/x-flv", video: "video/mp4", audio: "audio/mpeg" };
+
+// route: { scope, scopePath, via ("play" | "s" | "b"), target, headers, kind }
+async function proxyStream(request, env, route) {
+  let upstream;
+  try {
+    upstream = await fetchUpstream(route.target, route.headers, request);
+  } catch (_) {
+    return streamFailed();
+  }
+  if (!upstream || upstream.status >= 400) {
+    discardBody(upstream);
+    return streamFailed();
+  }
+  const rawType = String(upstream.headers.get("Content-Type") || "");
+  const type = rawType.toLowerCase();
+  // Never re-serve an HTML page (a login wall, an error page) on this origin.
+  if (/html/.test(type)) {
+    discardBody(upstream);
+    return streamFailed();
+  }
+
+  // Relative playlist entries resolve against where the upstream ended up.
+  const finalUrl = safeStreamUrl(upstream.url) || route.target;
+  const finalPath = new URL(finalUrl).pathname;
+  const kind = [finalUrl, route.target].map(streamKind).find(value => value !== "embed") || route.kind || "embed";
+  const head = request.method === "HEAD";
+  const genericType = !type || /^(text\/plain|application\/octet-stream|binary\/octet-stream)\b/.test(type);
+  // The content type decides; the file extension only when the type is generic.
+  const isHlsType = /mpegurl/.test(type);
+  const isDash = !isHlsType && (/dash\+xml/.test(type) || ((genericType || /xml/.test(type)) && /\.mpd$/i.test(finalPath)));
+  const isHls = !isDash && (isHlsType || (genericType && /\.m3u8?$/i.test(finalPath)));
+  const maybeHls = !isHls && !isDash && kind === "hls" && genericType;
+  const seal = (isHls || isDash || maybeHls) ? await streamSealer(env, route.scope, route.headers) : null;
+
+  if (isDash) {
+    if (route.via !== "b") {
+      // Serve the manifest from a /b/ path so its relative segment
+      // templates resolve against a sealed copy of its directory.
+      discardBody(upstream);
+      const { directory, rest } = splitDirectory(finalUrl);
+      return new Response(null, {
+        status: 302,
+        headers: proxyHeaders({ "Location": route.scopePath + "/b/" + await seal(directory) + "/" + rest })
+      });
+    }
+    const headers = proxyHeaders({ "Content-Type": "application/dash+xml" });
+    if (head) {
+      discardBody(upstream);
+      return new Response(null, { status: 200, headers });
+    }
+    const bytes = await readCapped(upstream.body, MAX_PROXIED_PLAYLIST_BYTES);
+    if (!bytes) return streamFailed();
+    const manifest = await rewriteDashBaseUrls(new TextDecoder().decode(bytes), seal, route.scopePath);
+    return new Response(manifest, { status: 200, headers });
+  }
+
+  // Playlists are recognised by their first bytes; a body that turns out not
+  // to be one is passed on with the peeked bytes put back in front.
+  let body = null;
+  if (isHls || maybeHls) {
+    body = bodyReader(upstream.body);
+    await body.pull(64);
+    const playlist = isPlaylistText(new TextDecoder().decode(body.bytes()));
+    if (!playlist && isHls) {
+      body.cancel();
+      return streamFailed();
+    }
+    if (playlist) {
+      const headers = proxyHeaders({ "Content-Type": "application/vnd.apple.mpegurl" });
+      if (head) {
+        body.cancel();
+        return new Response(null, { status: 200, headers });
+      }
+      await body.pull(MAX_PROXIED_PLAYLIST_BYTES + 1);
+      if (body.size > MAX_PROXIED_PLAYLIST_BYTES) {
+        body.cancel();
+        return streamFailed();
+      }
+      const text = new TextDecoder().decode(body.bytes());
+      return new Response(await rewriteHlsPlaylist(text, finalUrl, seal, route.scopePath), { status: 200, headers });
+    }
+  }
+
+  // Media: straight through, so a client disconnect closes the upstream too.
+  const headers = proxyHeaders({
+    "Content-Type": genericType ? (PASSTHROUGH_TYPES[kind] || rawType || "application/octet-stream") : rawType
+  });
+  // A body fetch already decoded (gzip, br) no longer matches its length.
+  const encoded = !/^(identity)?$/i.test(String(upstream.headers.get("Content-Encoding") || "").trim());
+  for (const name of encoded ? ["Accept-Ranges"] : ["Content-Length", "Content-Range", "Accept-Ranges"]) {
+    const value = upstream.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  const status = upstream.status === 206 ? 206 : 200;
+  if (head) {
+    if (body) body.cancel();
+    else discardBody(upstream);
+    return new Response(null, { status, headers });
+  }
+  return new Response(body ? body.rest() : upstream.body, { status, headers });
+}
+
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (_) {
+    return null;
+  }
+}
+
+// /api/play/tv/:id and /api/play/stream/:matchId/:streamId, each optionally
+// followed by /s/<token> or /b/<token>/<path>.
+const TV_PLAY_ROUTE = /^\/api\/play\/tv\/([^/]+)(?:\/(s|b)\/([A-Za-z0-9_-]+)(\/.*)?)?$/;
+const STREAM_PLAY_ROUTE = /^\/api\/play\/stream\/([^/]+)\/([^/]+)(?:\/(s|b)\/([A-Za-z0-9_-]+)(\/.*)?)?$/;
+
+function parsePlayRoute(pathname) {
+  let match = pathname.match(TV_PLAY_ROUTE);
+  if (match) {
+    const id = safeDecode(match[1]);
+    if (id === null) return { invalid: true };
+    return {
+      type: "tv",
+      id,
+      scope: "tv/" + id,
+      scopePath: "/api/play/tv/" + encodeURIComponent(id),
+      via: match[2] || "play",
+      token: match[3],
+      rest: match[4]
+    };
+  }
+  match = pathname.match(STREAM_PLAY_ROUTE);
+  if (match) {
+    const matchId = safeDecode(match[1]);
+    const streamId = safeDecode(match[2]);
+    if (matchId === null || streamId === null) return { invalid: true };
+    return {
+      type: "stream",
+      matchId,
+      streamId,
+      scope: "stream/" + matchId + "/" + streamId,
+      scopePath: "/api/play/stream/" + encodeURIComponent(matchId) + "/" + encodeURIComponent(streamId),
+      via: match[3] || "play",
+      token: match[4],
+      rest: match[5]
+    };
+  }
+  return null;
+}
+
+async function servePlayRoute(request, env, url, route) {
+  if (route.invalid) return playUnavailable();
+
+  if (route.via === "s" || route.via === "b") {
+    if ((route.via === "s") !== (route.rest === undefined)) return playUnavailable();
+    const opened = await openStreamToken(env, route.scope, route.token);
+    if (!opened) return playUnavailable();
+    let target = opened.url;
+    if (route.via === "b") {
+      // The token seals a directory; the rest of the path (and the query)
+      // must resolve inside the same origin.
+      if (!target.endsWith("/")) return playUnavailable();
+      let resolved;
+      try {
+        resolved = new URL(route.rest.slice(1) + url.search, target);
+      } catch (_) {
+        return playUnavailable();
+      }
+      if (resolved.origin !== new URL(target).origin) return playUnavailable();
+      target = safeStreamUrl(resolved.href);
+      if (!target) return playUnavailable();
+    }
+    return proxyStream(request, env, { ...route, target, headers: opened.headers, kind: streamKind(target) });
+  }
+
+  let source = null;
+  if (route.type === "tv") {
+    const state = await readTvStateCached(env);
+    source = state?.channels.find(item => String(item.id) === route.id && item.active !== false) || null;
+  } else {
+    let index = null;
+    try {
+      index = await env.SPORTZFY_DB.get(PLAY_INDEX_KEY, "json");
+    } catch (_) {}
+    if (!index) index = buildPlayIndex(await readArray(env, "matches"));
+    const streamUrl = index?.[route.matchId]?.[route.streamId];
+    source = streamUrl ? { url: streamUrl } : null;
+  }
+  const target = source ? safeStreamUrl(source.url) : "";
+  if (!target) return playUnavailable();
+  if (!needsProxy(source)) return redirectTo(target);
+
+  // ?format=hls (iPhones without MSE): Xtream serves every live channel as
+  // HLS too, at the same path with .m3u8 instead of .ts.
+  let upstreamUrl = target;
+  if (url.searchParams.get("format") === "hls") {
+    const parsed = new URL(target);
+    if (/\.ts$/i.test(parsed.pathname)) parsed.pathname = parsed.pathname.replace(/\.ts$/i, ".m3u8");
+    else if (/\/live\/[^/]+\/[^/]+\/\d+$/.test(parsed.pathname)) parsed.pathname += ".m3u8";
+    upstreamUrl = parsed.href;
+  }
+  return proxyStream(request, env, {
+    ...route,
+    target: upstreamUrl,
+    headers: cleanStreamHeaders(source.headers),
+    kind: streamKind(upstreamUrl)
+  });
+}
+
+/*
+ * Channel logos over http (no TLS on most IPTV logo hosts) are re-served from
+ * this origin, edge-cached per URL (the ?v= hash changes with the logo).
+ */
+function logoUnavailable(status) {
+  return new Response("Logo not available.", {
+    status,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=600",
+      "Content-Security-Policy": "sandbox",
+      "Access-Control-Allow-Origin": "*",
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
+}
+
+// Image type from the first bytes, for hosts that send application/octet-stream.
+function sniffImageType(bytes) {
+  const startsWith = (...values) => values.every((value, i) => bytes[i] === value);
+  if (startsWith(0x89, 0x50, 0x4e, 0x47)) return "image/png";
+  if (startsWith(0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (startsWith(0x47, 0x49, 0x46, 0x38)) return "image/gif";
+  if (startsWith(0x52, 0x49, 0x46, 0x46) && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
+  if (startsWith(0x00, 0x00, 0x01, 0x00)) return "image/x-icon";
+  return "";
+}
+
+async function fetchChannelLogo(logo) {
+  const upstream = await fetchWithTimeout(
+    logo,
+    { method: "GET", redirect: "follow", headers: { "Accept": "image/*", "User-Agent": CHROME_UA } },
+    LOGO_TIMEOUT_MS
+  );
+  if (!upstream.ok) {
+    discardBody(upstream);
+    return null;
+  }
+  let type = String(upstream.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  const generic = !type || type === "application/octet-stream" || type === "binary/octet-stream";
+  // SVG can carry script; only raster images are re-served.
+  if (/svg/.test(type) || (!type.startsWith("image/") && !generic) ||
+      Number(upstream.headers.get("Content-Length")) > MAX_LOGO_BYTES) {
+    discardBody(upstream);
+    return null;
+  }
+  const bytes = await readCapped(upstream.body, MAX_LOGO_BYTES);
+  if (!bytes || !bytes.length) return null;
+  if (generic) type = sniffImageType(bytes);
+  if (!type) return null;
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": type,
+      "Cache-Control": "public, max-age=" + LOGO_CACHE_SECONDS,
+      "Access-Control-Allow-Origin": "*",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "sandbox; default-src 'none'"
+    }
+  });
+}
+
+async function serveChannelLogo(request, env, rawId, ctx) {
+  // The edge cache is checked before anything touches KV.
+  const cache = typeof caches !== "undefined" && caches && caches.default ? caches.default : null;
+  if (cache) {
+    try {
+      const hit = await cache.match(request.url);
+      if (hit) return hit;
+    } catch (_) {}
+  }
+  const id = safeDecode(rawId);
+  const state = id === null ? null : await readTvStateCached(env);
+  const channel = state?.channels.find(item => String(item.id) === id && item.active !== false);
+  const logo = channel ? safeStreamUrl(channel.logo) : "";
+  if (!logo) return logoUnavailable(404);
+
+  let response = null;
+  try {
+    response = await fetchChannelLogo(logo);
+  } catch (_) {
+    response = null;
+  }
+  response ||= logoUnavailable(502);
+  if (cache) {
+    const stored = cache.put(request.url, response.clone()).catch(() => {});
+    if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(stored);
+    else await stored;
+  }
+  return response;
+}
+
 /*
  * Data storage report for the admin panel: which records exist in the KV
  * namespace and how large they are. Read-only.
@@ -2025,7 +2886,8 @@ const STORAGE_RECORDS = [
   [SYNC_STATE_KEY, "Sync cursor & fetch log"],
   [PLAY_INDEX_KEY, "Stream playback index"],
   [SNAPSHOT_FEATURED, "Featured snapshot"],
-  [ADMIN_CREDENTIAL_KEY, "Admin password (hash)"]
+  [ADMIN_CREDENTIAL_KEY, "Admin password (hash)"],
+  [STREAM_PROXY_SECRET_KEY, "Stream proxy key (used when no Worker secret is set)"]
 ];
 
 async function storageReport(env) {
@@ -2051,9 +2913,9 @@ async function storageReport(env) {
 /*
  * Route handlers
  */
-async function handlePublicTv(request, env, url) {
+async function handlePublicTv(request, env, url, ctx) {
   if (request.method === "GET" && url.pathname === "/api/tv/channels") {
-    let state = await readTvState(env);
+    let state = await readTvStateCached(env);
     if (!state) {
       // First use: seed the catalog from the configured playlist.
       try {
@@ -2068,31 +2930,26 @@ async function handlePublicTv(request, env, url) {
     return cachedJson({
       channels,
       categories: TV_CATEGORIES.filter(category => present.has(category)),
+      groups: [...new Set(channels.map(channel => channel.group).filter(Boolean))],
       updatedAt: state.syncedAt || null
     }, 60);
   }
 
-  const readable = request.method === "GET" || request.method === "HEAD";
-  const tvPlay = url.pathname.match(/^\/api\/play\/tv\/([^/]+)$/);
-  if (readable && tvPlay) {
-    const id = decodeURIComponent(tvPlay[1]);
-    const state = await readTvState(env);
-    const channel = state?.channels.find(item => String(item.id) === id && item.active !== false);
-    const target = channel ? safeHttpsUrl(channel.url) : "";
-    return target ? redirectTo(target) : playUnavailable();
-  }
+  const logo = url.pathname.match(/^\/api\/tv\/logo\/([^/]+)$/);
+  if (request.method === "GET" && logo) return serveChannelLogo(request, env, logo[1], ctx);
 
-  const streamPlay = url.pathname.match(/^\/api\/play\/stream\/([^/]+)\/([^/]+)$/);
-  if (readable && streamPlay) {
-    const matchId = decodeURIComponent(streamPlay[1]);
-    const streamId = decodeURIComponent(streamPlay[2]);
-    let index = null;
-    try {
-      index = await env.SPORTZFY_DB.get(PLAY_INDEX_KEY, "json");
-    } catch (_) {}
-    if (!index) index = buildPlayIndex(await readArray(env, "matches"));
-    const target = safeHttpsUrl(index?.[matchId]?.[streamId]);
-    return target ? redirectTo(target) : playUnavailable();
+  if (request.method === "GET" || request.method === "HEAD") {
+    const route = parsePlayRoute(url.pathname);
+    if (route) {
+      try {
+        return await servePlayRoute(request, env, url, route);
+      } catch (error) {
+        // Never let an exception message (which may quote an upstream URL)
+        // reach the generic 500 handler.
+        console.error("Stream proxy failed:", error?.name || "Error");
+        return streamFailed();
+      }
+    }
   }
 
   return null;
@@ -2116,16 +2973,17 @@ async function handleAdminTv(request, env, url) {
   if (path === "/api/admin/tv/channels" && method === "POST") {
     const body = await safeJson(request);
     if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
-    const state = await readTvState(env) || emptyTvState();
-    const fields = editableChannelFields(body, {});
-    if (state.channels.some(channel => channel.url === fields.url)) {
+    const [state, settings] = await Promise.all([readTvState(env), readSettings(env)]);
+    const catalog = state || emptyTvState();
+    const fields = editableChannelFields(body, {}, { defaultCategory: settings.tvSource.defaultCategory });
+    if (catalog.channels.some(channel => channel.url === fields.url)) {
       return adminJson({ error: "A channel with this stream URL already exists" }, 409);
     }
     const now = new Date().toISOString();
-    const taken = new Set(state.channels.map(channel => channel.id));
-    const channel = { id: uniqueChannelId(fields.name, taken), ...fields, origin: "manual", createdAt: now, updatedAt: now };
-    state.channels.push(channel);
-    await writeTvState(env, state);
+    const taken = new Set(catalog.channels.map(channel => channel.id));
+    const channel = { id: uniqueChannelId(channelIdName(fields.group, fields.name), taken), ...fields, origin: "manual", createdAt: now, updatedAt: now };
+    catalog.channels.push(channel);
+    await writeTvState(env, catalog);
     return adminJson({ success: true, channel: adminChannel(channel) }, 201);
   }
 
@@ -2179,11 +3037,14 @@ async function handleAdminTv(request, env, url) {
     const body = await safeJson(request);
     if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
     const current = state.channels[index];
-    const fields = editableChannelFields(body, current);
+    const settings = await readSettings(env);
+    const fields = editableChannelFields(body, current, { defaultCategory: settings.tvSource.defaultCategory });
     if (state.channels.some((channel, i) => i !== index && channel.url === fields.url)) {
       return adminJson({ error: "Another channel already uses this stream URL" }, 409);
     }
-    state.channels[index] = { ...current, ...fields, updatedAt: new Date().toISOString() };
+    const next = { ...current, ...fields, updatedAt: new Date().toISOString() };
+    if (!fields.headers) delete next.headers;
+    state.channels[index] = next;
     await writeTvState(env, state);
     return adminJson({ success: true, channel: adminChannel(state.channels[index]) });
   }
@@ -2200,7 +3061,7 @@ async function handleAdminTv(request, env, url) {
     const playlistUrl = safeHttpsUrl(body.url);
     if (!playlistUrl) return adminJson({ error: "Paste an https link to an M3U or JSON playlist" }, 400);
     const settings = await readSettings(env);
-    const { entries, skipped } = await fetchPlaylist(playlistUrl, settings.tvSource.timeoutSec * 1000);
+    const { entries, skipped } = await fetchPlaylist(playlistUrl, settings.tvSource.timeoutSec * 1000, { defaultCategory: settings.tvSource.defaultCategory });
     const state = await readTvState(env) || emptyTvState();
     const known = new Set(state.channels.map(channel => channel.url));
     return adminJson({
@@ -2223,7 +3084,8 @@ async function handleAdminTv(request, env, url) {
   if (path === "/api/admin/tv/import" && method === "POST") {
     const body = await safeJson(request);
     if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
-    const { entries } = cleanPlaylistEntries(body.channels);
+    const settings = await readSettings(env);
+    const { entries } = cleanPlaylistEntries(body.channels, { defaultCategory: settings.tvSource.defaultCategory });
     const state = await readTvState(env) || emptyTvState();
     const known = new Set(state.channels.map(channel => channel.url));
     const taken = new Set(state.channels.map(channel => channel.id));
@@ -2233,13 +3095,16 @@ async function handleAdminTv(request, env, url) {
       if (known.has(entry.url)) continue;
       known.add(entry.url);
       state.channels.push({
-        id: uniqueChannelId(entry.name, taken),
+        id: uniqueChannelId(channelIdName(entry.group, entry.name), taken),
         name: entry.name,
+        group: entry.group,
         logo: entry.logo,
         url: entry.url,
+        ...(entry.headers ? { headers: entry.headers } : {}),
         category: entry.category,
         categoryLocked: false,
         sandbox: entry.sandbox,
+        proxy: false,
         sort: null,
         active: true,
         origin: "manual",
@@ -2284,6 +3149,18 @@ async function handleAdminSystem(request, env, url, ctx) {
     const body = await safeJson(request);
     if (!body || typeof body !== "object") return adminJson({ error: "Invalid JSON body" }, 400);
     const settings = await saveSettingsSection(env, section, body);
+    let tvSync = null;
+    if (section === "tvSource") {
+      // A new playlist source replaces the synced channels straight away.
+      const tv = await readTvState(env);
+      if (!tv || tv.source !== settings.tvSource.url) {
+        try {
+          tvSync = { ok: true, ...(await syncTvChannels(env, settings.tvSource, { trigger: "settings" })).lastSync };
+        } catch (error) {
+          tvSync = { ok: false, error: String(error?.message || error).slice(0, 300) };
+        }
+      }
+    }
     let matchesUpdated = 0;
     if (section === "liveWindows") {
       // New rules move every match's expiry; stored expiries follow at once.
@@ -2294,7 +3171,12 @@ async function handleAdminSystem(request, env, url, ctx) {
         await saveMatches(env, timed.matches);
       }
     }
-    return adminJson({ success: true, settings, ...(section === "liveWindows" ? { matchesUpdated } : {}) });
+    return adminJson({
+      success: true,
+      settings,
+      ...(section === "liveWindows" ? { matchesUpdated } : {}),
+      ...(tvSync ? { tvSync } : {})
+    });
   }
 
   if (path === "/api/admin/sync-log" && method === "GET") {
@@ -2556,7 +3438,7 @@ async function apiHandler(request, env, ctx) {
     return json({ status: "online", worker: "sportzfylive" });
   }
 
-  const publicTv = await handlePublicTv(request, env, url);
+  const publicTv = await handlePublicTv(request, env, url, ctx);
   if (publicTv) return publicTv;
 
   // The Android app's remote config, edited from the admin "App" page.

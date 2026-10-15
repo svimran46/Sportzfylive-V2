@@ -5,16 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#08090C">
   <title>Live TV - Sportzfylive</title>
-  <meta name="description" content="Watch live TV channels 24/7 — sports networks, news, entertainment and kids channels, free in your browser.">
+  <meta name="description" content="Watch live sports TV channels from around the world 24/7 — football, cricket, motorsport, fight sports and more, free in your browser.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%2383FF00'/%3E%3Cpath d='M12 5.25 14.35 8.1l.65 3.65-3 1.75-3-1.75.65-3.65L12 5.25Z' fill='%2308090C'/%3E%3C/svg%3E">
   <link rel="canonical" href="https://sportzfylive.svimranmy.workers.dev/live-tv">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Sportzfylive">
   <meta property="og:title" content="Live TV — Sportzfylive">
-  <meta property="og:description" content="Live TV channels 24/7 — sports, news, entertainment and kids channels, free in your browser.">
+  <meta property="og:description" content="Live sports TV channels from around the world, 24/7 — football, cricket, motorsport, fight sports and more, free in your browser.">
   <meta property="og:url" content="https://sportzfylive.svimranmy.workers.dev/live-tv">
   <meta property="og:image" content="https://sportzfylive.svimranmy.workers.dev/og-card.png">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Live TV — Sportzfylive">
+  <meta name="twitter:description" content="Live sports TV channels from around the world, 24/7 — football, cricket, motorsport, fight sports and more, free in your browser.">
+  <meta name="twitter:image" content="https://sportzfylive.svimranmy.workers.dev/og-card.png">
   <link rel="preload" href="/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preconnect" href="https://sportzfylive.svimranmy.workers.dev" crossorigin>
@@ -59,6 +62,7 @@
     .sfy-search input{width:100%;height:38px;padding:0 14px 0 34px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-pill);color:var(--ink);font:inherit;font-size:14px;outline:none}
     .sfy-search input:focus{background:var(--surface-focus);border-color:var(--accent)}
     .sfy-search input::placeholder{color:var(--ink-faint)}
+    @media(max-width:639px){.sfy-search input{font-size:16px}}
     .sfy-nav{display:none;align-items:center;gap:20px;margin-left:auto}
     @media(min-width:900px){.sfy-nav{display:flex}}
     .sfy-nav a{display:inline-flex;align-items:center;gap:6px;color:var(--ink-muted);font-size:14px;font-weight:500}
@@ -130,8 +134,18 @@
 
     /* Toolbar + grid */
     .tv-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+    .tv-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;flex:1 1 auto;min-width:0;max-width:100%}
+    .tv-filters .tv-chips{flex:1 1 240px;min-width:0}
     .tv-chips{display:flex;gap:9px;overflow-x:auto;scrollbar-width:none;padding:2px;max-width:100%}
     .tv-chips::-webkit-scrollbar{display:none}
+    /* Country select: same pill as the chips. 16px text on phones keeps iOS
+       Safari from zooming the page when it opens. */
+    .tv-select{flex:0 1 auto;min-width:0;max-width:min(100%,280px);height:38px;padding:0 36px 0 16px;border-radius:var(--radius-pill);border:1px solid var(--border-strong);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A8B3CF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 13px center/13px;color:var(--ink);font-family:"Space Grotesk",sans-serif;font-size:16px;font-weight:600;text-overflow:ellipsis;cursor:pointer;-webkit-appearance:none;appearance:none}
+    @media(min-width:640px){.tv-select{font-size:13px}}
+    .tv-select:hover{background-color:var(--surface-hover)}
+    .tv-select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-color:var(--accent)}
+    .tv-select.active{border-color:var(--accent);color:var(--accent)}
+    .tv-select option{background:var(--surface);color:var(--ink)}
     .tv-chip{flex:0 0 auto;min-height:38px;padding:0 16px;border-radius:var(--radius-pill);background:var(--surface);color:var(--ink-muted);border:1px solid var(--border);font-family:"Space Grotesk",sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.02em;cursor:pointer;white-space:nowrap}
     .tv-chip:hover{color:var(--ink);border-color:var(--border-strong)}
     .tv-chip[aria-pressed="true"]{background:var(--accent);color:var(--brand-ink);border-color:var(--accent);font-weight:700;box-shadow:0 0 20px var(--accent-dim)}
@@ -158,6 +172,7 @@
     .tv-empty{grid-column:1/-1;padding:48px 20px;text-align:center;border:1px dashed var(--border-strong);border-radius:var(--radius-card);color:var(--ink-muted)}
     .tv-empty h3{margin:0 0 6px;color:var(--ink);font-family:"Space Grotesk",sans-serif}
     .tv-empty button{margin-top:14px}
+    .tv-more{display:flex;justify-content:center;margin-top:20px}
 
     /* Footer */
     .sfy-footer{margin-top:48px;padding:30px 0 40px;border-top:1px solid var(--border);text-align:center}
@@ -200,7 +215,7 @@
   <section class="tv-hero" aria-labelledby="tv-title">
     <span class="tv-pill"><i aria-hidden="true"></i>LIVE 24/7</span>
     <h1 id="tv-title">Live <span>TV</span></h1>
-    <p id="tv-sub">Sports networks, news, entertainment and kids channels — streaming around the clock. Pick a channel to start watching.</p>
+    <p id="tv-sub">Live sports TV channels from around the world — football, cricket, motorsport, fight sports and more, streaming around the clock. Pick a channel to start watching.</p>
   </section>
 
   <section class="tv-stage" id="tv-stage" aria-label="Player" hidden>
@@ -235,12 +250,21 @@
   </section>
 
   <div class="tv-toolbar">
-    <div class="tv-chips" id="tv-chips" role="group" aria-label="Channel categories"></div>
-    <span class="tv-count" id="tv-count" role="status"></span>
+    <div class="tv-filters">
+      <label class="sr-only" for="tv-group">Filter channels by country</label>
+      <select class="tv-select" id="tv-group" hidden></select>
+      <div class="tv-chips" id="tv-chips" role="group" aria-label="Channel categories"></div>
+    </div>
+    <span class="tv-count" id="tv-count" role="status" aria-live="polite"></span>
   </div>
   <div class="tv-grid" id="tv-grid" aria-label="Channels">
     <div class="tv-skeleton"></div><div class="tv-skeleton"></div><div class="tv-skeleton"></div><div class="tv-skeleton"></div>
     <div class="tv-skeleton"></div><div class="tv-skeleton"></div><div class="tv-skeleton"></div><div class="tv-skeleton"></div>
+  </div>
+  <!-- Long lists render in batches: scrolling near this block (or the button,
+       where IntersectionObserver is missing) appends the next batch. -->
+  <div class="tv-more" id="tv-more" hidden>
+    <button class="tv-btn" type="button" id="tv-more-btn">Show more channels</button>
   </div>
 </main>
 
@@ -266,7 +290,7 @@
     ? location.origin
     : "https://sportzfylive.svimranmy.workers.dev";
 
-  // Channels marked "sandbox": true in channels.json run sandboxed: no
+  // Embed channels flagged "sandbox" in the catalog run sandboxed: no
   // pop-ups and no top-level navigation. Scripts and same-origin stay on so
   // the player works; channels live on other origins, so they cannot lift the
   // sandbox. Other channels load directly — some render a black frame in one.
@@ -282,12 +306,29 @@
     return words.slice(0, 2).map(p => p[0]).join("").toUpperCase() || "TV";
   };
 
+  // Kinds the universal player page plays (HLS is its default engine, so
+  // only the others are named in the URL). "embed" — and anything this page
+  // does not recognise — is a web page framed straight from /api/play.
+  const PLAYER_KINDS = ["hls", "dash", "ts", "flv", "video", "audio"];
+  // The catalog holds thousands of channels: the grid renders this many cards
+  // at a time and appends the next batch as the visitor scrolls.
+  const BATCH_SIZE = 96;
+  const UP_NEXT_LIMIT = 40;
+
+  const fmt = (n) => Number(n).toLocaleString("en-US");
+  const plural = (n, one, many = one + "s") => fmt(n) + " " + (n === 1 ? one : many);
+
   let channels = [];
   let categories = [];
+  let groups = [];
   let activeCategory = "All";
+  let activeGroup = "";
   let query = "";
   let current = null;
   let loaderTimer = null;
+  let visible = [];
+  let rendered = 0;
+  let moreObserver = null;
 
   async function fetchJson(url, timeoutMs = 15000) {
     const controller = new AbortController();
@@ -301,11 +342,39 @@
     }
   }
 
-  function visibleChannels() {
+  // http logos come back as Worker paths ("/api/tv/logo/…"), served by the
+  // API origin. Anything that is neither that nor https would be blocked as
+  // mixed content, so it falls back to the channel's initials.
+  function logoUrl(logo) {
+    const value = String(logo || "").trim();
+    if (value.startsWith("/") && !value.startsWith("//")) return PROXY_URL + value;
+    return /^https:\/\//i.test(value) ? value : "";
+  }
+
+  function normalizeChannel(raw) {
+    const id = String(raw?.id ?? "");
+    if (!id) return null;
+    const name = String(raw.name || id);
+    const category = String(raw.category || "");
+    const group = String(raw.group || "");
+    return {
+      id, name, category, group,
+      logo: logoUrl(raw.logo),
+      kind: String(raw.kind || ""),
+      sandbox: Boolean(raw.sandbox),
+      search: (name + " " + category + " " + group).toLowerCase()
+    };
+  }
+
+  // "Italy · Football" — the parts a channel has, never an empty separator.
+  const metaLine = (c, ...extra) => [c.group, c.category, ...extra].filter(Boolean).join(" · ");
+
+  function filterChannels() {
     const q = query.trim().toLowerCase();
-    return channels.filter(c =>
+    visible = channels.filter(c =>
       (activeCategory === "All" || c.category === activeCategory) &&
-      (!q || c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)));
+      (!activeGroup || c.group === activeGroup) &&
+      (!q || c.search.includes(q)));
   }
 
   function renderChips() {
@@ -313,26 +382,75 @@
       '<button class="tv-chip" type="button" data-category="' + esc(cat) + '" aria-pressed="' + (cat === activeCategory) + '">' + esc(cat) + "</button>").join("");
   }
 
-  function renderGrid() {
-    const list = visibleChannels();
-    $("tv-count").textContent = list.length === channels.length
-      ? channels.length + " channels"
-      : list.length + " of " + channels.length + " channels";
-    if (!list.length) {
-      $("tv-grid").innerHTML = '<div class="tv-empty"><h3>No channels found</h3><p>Try another category or search.</p></div>';
-      return;
-    }
-    $("tv-grid").innerHTML = list.map(c =>
-      '<button class="tv-card' + (current && current.id === c.id ? " playing" : "") + '" type="button" data-channel-id="' + esc(c.id) + '" aria-label="Watch ' + esc(c.name) + '">' +
+  // Country / group filter: one option per group with its channel count,
+  // hidden entirely when the catalog carries no groups.
+  function renderGroups() {
+    const select = $("tv-group");
+    select.hidden = !groups.length;
+    if (!groups.length) return;
+    const counts = new Map();
+    for (const c of channels) if (c.group) counts.set(c.group, (counts.get(c.group) || 0) + 1);
+    select.innerHTML = '<option value="">All countries</option>' + groups.map(group =>
+      '<option value="' + esc(group) + '">' + esc(group) + " (" + fmt(counts.get(group) || 0) + ")</option>").join("");
+    select.value = activeGroup;
+    select.classList.toggle("active", Boolean(activeGroup));
+  }
+
+  function cardHtml(c) {
+    const playing = Boolean(current && current.id === c.id);
+    return '<button class="tv-card' + (playing ? " playing" : "") + '" type="button" data-channel-id="' + esc(c.id) + '" aria-label="Watch ' + esc(c.name) + '">' +
         '<span class="tv-card-logo">' +
-          '<span class="tv-badge"><i aria-hidden="true"></i>' + (current && current.id === c.id ? "PLAYING" : "LIVE") + "</span>" +
+          '<span class="tv-badge"><i aria-hidden="true"></i>' + (playing ? "PLAYING" : "LIVE") + "</span>" +
           (c.logo
             ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(\'loaded\')" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'tv-initials\',textContent:this.dataset.initials}))" data-initials="' + esc(initials(c.name)) + '">'
             : '<span class="tv-initials">' + esc(initials(c.name)) + "</span>") +
         "</span>" +
         '<span class="tv-card-name">' + esc(c.name) + "</span>" +
-        '<span class="tv-card-cat">' + esc(c.category) + "</span>" +
-      "</button>").join("");
+        '<span class="tv-card-cat">' + esc(metaLine(c)) + "</span>" +
+      "</button>";
+  }
+
+  // Appends the next batch of the filtered list. Cards render with the
+  // "playing" state baked in, so a channel opened from a deep link far down
+  // the list is highlighted whenever its card arrives.
+  function renderMore() {
+    const batch = visible.slice(rendered, rendered + BATCH_SIZE);
+    if (batch.length) $("tv-grid").insertAdjacentHTML("beforeend", batch.map(cardHtml).join(""));
+    rendered += batch.length;
+    const left = visible.length - rendered;
+    $("tv-more").hidden = left <= 0;
+    $("tv-more-btn").textContent = "Show more channels (" + fmt(left) + " left)";
+    // Re-observing makes the observer report again: while the bottom of the
+    // grid is still in view, the next batch follows straight away.
+    if (moreObserver && left > 0) {
+      moreObserver.unobserve($("tv-more"));
+      moreObserver.observe($("tv-more"));
+    }
+  }
+
+  function renderGrid() {
+    filterChannels();
+    rendered = 0;
+    $("tv-count").textContent = visible.length === channels.length
+      ? plural(channels.length, "channel")
+      : fmt(visible.length) + " of " + plural(channels.length, "channel");
+    if (!visible.length) {
+      $("tv-more").hidden = true;
+      $("tv-grid").innerHTML = '<div class="tv-empty"><h3>No channels found</h3><p>Try another country, category or search.</p><button class="tv-btn" type="button" id="tv-clear">Show all channels</button></div>';
+      return;
+    }
+    $("tv-grid").innerHTML = "";
+    renderMore();
+  }
+
+  function clearFilters() {
+    activeCategory = "All";
+    activeGroup = "";
+    query = "";
+    $("tv-search").value = "";
+    renderChips();
+    renderGroups();
+    renderGrid();
   }
 
   function hideLoader() {
@@ -351,13 +469,15 @@
     $("tv-loader-text").textContent = "Tuning in to " + channel.name + "…";
 
     const path = "/api/play/tv/" + encodeURIComponent(channel.id);
+    const kind = PLAYER_KINDS.includes(channel.kind) ? channel.kind : "embed";
     const frame = document.createElement("iframe");
-    if (channel.kind === "hls") {
-      // .m3u8 streams play in the first-party HLS player page.
-      frame.src = PROXY_URL + "/player.html?src=" + encodeURIComponent(path);
-    } else {
+    if (kind === "embed") {
       if (channel.sandbox) frame.setAttribute("sandbox", SANDBOX);
       frame.src = PROXY_URL + path;
+    } else {
+      // Streams (HLS, MPEG-TS, DASH, FLV, video, audio) play in the
+      // first-party player page, which picks the engine from the type.
+      frame.src = PROXY_URL + "/player.html?src=" + encodeURIComponent(path) + (kind !== "hls" ? "&type=" + kind : "");
     }
     frame.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
     frame.allowFullscreen = true;
@@ -369,19 +489,46 @@
     player.appendChild(frame);
   }
 
-  // Up next: the rest of the playing channel's category, then everything else.
+  // Up next: the playing channel's country/group first, then the rest of its
+  // category, then everything else.
   function renderSide() {
     if (!current) return;
-    const same = channels.filter(c => c.id !== current.id && c.category === current.category);
-    const rest = channels.filter(c => c.id !== current.id && c.category !== current.category);
-    $("tv-side-list").innerHTML = same.concat(rest).slice(0, 40).map(c =>
+    const sameGroup = [];
+    const sameCategory = [];
+    const rest = [];
+    for (const c of channels) {
+      if (c.id === current.id) continue;
+      if (current.group && c.group === current.group) {
+        if (sameGroup.length < UP_NEXT_LIMIT) sameGroup.push(c);
+      } else if (c.category === current.category) {
+        if (sameCategory.length < UP_NEXT_LIMIT) sameCategory.push(c);
+      } else if (rest.length < UP_NEXT_LIMIT) {
+        rest.push(c);
+      }
+    }
+    $("tv-side-list").innerHTML = sameGroup.concat(sameCategory, rest).slice(0, UP_NEXT_LIMIT).map(c =>
       '<button class="tv-row" type="button" data-channel-id="' + esc(c.id) + '" aria-label="Watch ' + esc(c.name) + '">' +
         '<span class="tv-row-logo">' + (c.logo
           ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode(this.dataset.initials))" data-initials="' + esc(initials(c.name)) + '">'
           : esc(initials(c.name))) + "</span>" +
-        '<span style="min-width:0"><span class="tv-row-name" style="display:block">' + esc(c.name) + '</span><span class="tv-row-cat">' + esc(c.category) + "</span></span>" +
+        '<span style="min-width:0"><span class="tv-row-name" style="display:block">' + esc(c.name) + '</span><span class="tv-row-cat">' + esc(metaLine(c)) + "</span></span>" +
       "</button>").join("");
     $("tv-side-list").scrollTop = 0;
+  }
+
+  // Moves the "playing" highlight to the current channel's card, if it has
+  // been rendered yet (later batches pick the state up as they render).
+  function markPlaying() {
+    document.querySelectorAll(".tv-card.playing").forEach(card => {
+      card.classList.remove("playing");
+      card.querySelector(".tv-badge").lastChild.textContent = "LIVE";
+    });
+    if (!current) return;
+    const card = document.querySelector('.tv-card[data-channel-id="' + CSS.escape(current.id) + '"]');
+    if (card) {
+      card.classList.add("playing");
+      card.querySelector(".tv-badge").lastChild.textContent = "PLAYING";
+    }
   }
 
   function play(channel, options = {}) {
@@ -390,22 +537,14 @@
     $("tv-stage").hidden = false;
     mountFrame(channel);
     $("tv-now-name").textContent = channel.name;
-    $("tv-now-cat").textContent = channel.category + " · 24/7";
+    $("tv-now-cat").textContent = metaLine(channel, "24/7");
     $("tv-now-logo").innerHTML = channel.logo
       ? '<img src="' + esc(channel.logo) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">'
       : esc(initials(channel.name));
     document.title = channel.name + " — Live TV";
     renderSide();
     try { history.replaceState(null, "", "#ch=" + encodeURIComponent(channel.id)); } catch (_) {}
-    document.querySelectorAll(".tv-card.playing").forEach(card => {
-      card.classList.remove("playing");
-      card.querySelector(".tv-badge").lastChild.textContent = "LIVE";
-    });
-    const card = document.querySelector('.tv-card[data-channel-id="' + CSS.escape(channel.id) + '"]');
-    if (card) {
-      card.classList.add("playing");
-      card.querySelector(".tv-badge").lastChild.textContent = "PLAYING";
-    }
+    markPlaying();
     if (options.scroll !== false) $("tv-stage").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -415,14 +554,19 @@
     $("tv-stage").hidden = true;
     document.title = baseTitle;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (_) {}
-    renderGrid();
+    markPlaying();
   }
 
+  // Previous / next walk the list as filtered right now (the whole catalog
+  // when the filters match nothing).
   function step(direction) {
-    const list = visibleChannels().length ? visibleChannels() : channels;
+    const list = visible.length ? visible : channels;
     if (!list.length) return;
     const index = current ? list.findIndex(c => c.id === current.id) : -1;
-    play(list[(index + direction + list.length) % list.length], { scroll: false });
+    const next = index === -1
+      ? (direction > 0 ? 0 : list.length - 1)
+      : (index + direction + list.length) % list.length;
+    play(list[next], { scroll: false });
   }
 
   async function share() {
@@ -442,32 +586,53 @@
     setTimeout(() => { label.textContent = "Share"; }, 1800);
   }
 
+  // #ch=<id> plays any channel in the catalog, rendered in the grid or not.
   function openFromHash() {
     const found = /^#ch=(.+)$/.exec(location.hash);
     if (!found) return;
-    const channel = channels.find(c => c.id === decodeURIComponent(found[1]));
+    let id = "";
+    try { id = decodeURIComponent(found[1]); } catch (_) { return; }
+    if (current && current.id === id) return;
+    const channel = channels.find(c => c.id === id);
     if (channel) play(channel);
+  }
+
+  // Groups named after a category ("Cricket") or "World" are collections,
+  // not countries; the subtitle counts only the countries.
+  function heroText() {
+    if (!channels.length) return "No channels are on air right now. Check back soon.";
+    const countries = groups.filter(g => g.toLowerCase() !== "world" && !categories.includes(g)).length;
+    return plural(channels.length, "live sports channel") +
+      (countries ? " from " + plural(countries, "country", "countries") : "") +
+      " — streaming around the clock. Pick one to start watching.";
   }
 
   async function loadChannels() {
     try {
       const data = await fetchJson(PROXY_URL + "/api/tv/channels");
-      channels = Array.isArray(data.channels) ? data.channels : [];
-      categories = Array.isArray(data.categories) ? data.categories : [];
+      channels = (Array.isArray(data.channels) ? data.channels : []).map(normalizeChannel).filter(Boolean);
+      // Only categories and groups that hold a channel, in the API's order
+      // (anything the API left out is appended in catalog order).
+      const presentCategories = new Set(channels.map(c => c.category).filter(Boolean));
+      const presentGroups = new Set(channels.map(c => c.group).filter(Boolean));
+      categories = [...new Set((Array.isArray(data.categories) ? data.categories : []).map(String).concat([...presentCategories]))]
+        .filter(cat => presentCategories.has(cat));
+      groups = [...new Set((Array.isArray(data.groups) ? data.groups : []).map(String).concat([...presentGroups]))]
+        .filter(group => presentGroups.has(group));
       if (!categories.includes(activeCategory)) activeCategory = "All";
-      $("tv-sub").textContent = channels.length
-        ? channels.length + " channels — sports networks, news, entertainment and kids TV, streaming around the clock. Pick one to start watching."
-        : "No channels are on air right now. Check back soon.";
+      if (!groups.includes(activeGroup)) activeGroup = "";
+      $("tv-sub").textContent = heroText();
       renderChips();
+      renderGroups();
       renderGrid();
       openFromHash();
     } catch (error) {
       $("tv-count").textContent = "";
+      $("tv-more").hidden = true;
       $("tv-grid").innerHTML = '<div class="tv-empty"><h3>Channels could not be loaded</h3><p>' +
         esc(error.name === "AbortError" ? "The request timed out." : error.message) + '</p><button class="tv-btn" type="button" id="tv-retry">Try again</button></div>';
     }
   }
-
   // Site-wide settings from the admin panel: notice, name and analytics.
   function safeLink(value) {
     const url = String(value || "").trim();
@@ -548,12 +713,28 @@
       renderGrid();
       return;
     }
+    if (event.target.closest("#tv-clear")) {
+      clearFilters();
+      return;
+    }
     if (event.target.closest("#tv-retry")) loadChannels();
   });
   $("tv-search").addEventListener("input", (event) => {
     query = event.target.value;
     renderGrid();
   });
+  $("tv-group").addEventListener("change", (event) => {
+    activeGroup = groups.includes(event.target.value) ? event.target.value : "";
+    event.target.classList.toggle("active", Boolean(activeGroup));
+    renderGrid();
+  });
+  $("tv-more-btn").addEventListener("click", renderMore);
+  if (typeof IntersectionObserver === "function") {
+    moreObserver = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting) && rendered < visible.length) renderMore();
+    }, { rootMargin: "800px 0px" });
+    moreObserver.observe($("tv-more"));
+  }
   $("tv-prev").addEventListener("click", () => step(-1));
   $("tv-next").addEventListener("click", () => step(1));
   $("tv-reload").addEventListener("click", () => { if (current) mountFrame(current); });

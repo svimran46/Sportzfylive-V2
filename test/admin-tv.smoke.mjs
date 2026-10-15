@@ -3,6 +3,8 @@
 // M3U), seeding, playlist sync, health checks, import, playback redirects,
 // live-window expiry and cleanup, featured/active flags, manual stream
 // playback, password rotation, the fetch log and the storage report.
+// The stream proxy itself (http streams, HLS rewriting, tokens, logos) is
+// covered by test/stream-proxy.smoke.mjs.
 // Drives the real worker.js against a mocked KV and fetch.
 
 import assert from "node:assert/strict";
@@ -108,10 +110,11 @@ const admin = (path, method = "GET", body) =>
 
 // ---------------------------------------------------------------------------
 // Fixtures: the channels.json format (a JavaScript snippet wrapping a JSON
-// list, with &amp; chains in logos) and an M3U playlist.
+// list, with &amp; chains in logos) served from the default playlist URL
+// (any supported format works there), and an M3U playlist.
 // ---------------------------------------------------------------------------
 
-const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
+const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u";
 const channelsJs = (list) => "const channels = " + JSON.stringify(list, null, 2) + ";\n";
 const UPSTREAM = [
   { name: "ESPN", logo: "https://img.example/espn.png?a=1&amp;amp;b=2", genre: "Sports", url: "https://tv.example/espn", sandbox: true },
@@ -132,20 +135,24 @@ routes[PLAYLIST_URL] = reply(200, channelsJs(UPSTREAM));
   assert.equal(res.status, 200);
   assert.match(res.headers["Cache-Control"], /max-age=60/);
   const data = await res.json();
-  assert.deepEqual(data.channels.map(c => c.name), ["ESPN", "Willow Cricket", "Sky Sports Premier League", "Cartoon Network"]);
-  assert.deepEqual(data.channels.map(c => c.category), ["Sports", "Cricket", "Football", "Kids"]);
+  assert.deepEqual(data.channels.map(c => c.name), ["ESPN", "Willow Cricket", "Sky Sports Premier League", "Cartoon Network", "Plain HTTP"]);
+  assert.deepEqual(data.channels.map(c => c.category), ["Sports", "Cricket", "Football", "Kids", "Sports"],
+    "unmatched names fall back to the default category (Sports)");
   assert.equal(data.channels[0].logo, "https://img.example/espn.png?a=1&b=2", "&amp; chains decoded");
-  assert.equal(data.channels[3].logo, "", "non-https logos dropped");
+  assert.match(data.channels[3].logo, /^\/api\/tv\/logo\/cartoon-network\?v=[0-9a-z]+$/, "http logos go through the logo proxy");
+  assert.equal(data.channels[4].logo, "");
   assert.equal(data.channels[0].kind, "embed");
-  assert.deepEqual(data.channels.map(c => c.sandbox), [true, true, false, false],
+  assert.deepEqual(data.channels.map(c => c.sandbox), [true, true, false, false, false],
     "only \"sandbox\": true (or \"true\") sandboxes a channel, as in the Android app");
   assert.ok(!JSON.stringify(data).includes("tv.example"), "public channel list never carries stream URLs");
+  assert.ok(!JSON.stringify(data).includes("insecure.example"), "public channel list never carries http logo hosts");
   assert.deepEqual(data.categories, ["Sports", "Football", "Cricket", "Kids"]);
+  assert.deepEqual(data.groups, [], "channels.json entries carry no group");
   const stored = JSON.parse(kv.store.get("tv_channels"));
   assert.equal(stored.lastSync.trigger, "seed");
-  assert.equal(stored.lastSync.skipped, 3, "duplicate, http and nameless entries skipped");
+  assert.equal(stored.lastSync.skipped, 2, "duplicate and nameless entries skipped (http streams are kept)");
 }
-ok("first /api/tv/channels read seeds from channels.json, public list has no URLs");
+ok("first /api/tv/channels read seeds from the playlist, public list has no URLs");
 
 {
   const res = await call("/api/play/tv/espn");
@@ -155,8 +162,15 @@ ok("first /api/tv/channels read seeds from channels.json, public list has no URL
   const missing = await call("/api/play/tv/nope");
   assert.equal(missing.status, 404);
   assert.equal(missing.headers["Content-Security-Policy"], "sandbox");
+
+  // http streams are never handed to the browser: the Worker proxies them
+  // (the upstream is unreachable here, so the proxy answers 502).
+  const plain = await call("/api/play/tv/plain-http");
+  assert.equal(plain.status, 502);
+  assert.equal(plain.headers.Location, undefined, "an http stream is never redirected to");
+  assert.equal(plain.headers["Content-Security-Policy"], "sandbox");
 }
-ok("/api/play/tv/:id redirects to the stream; unknown ids get a sandboxed 404");
+ok("/api/play/tv/:id redirects https streams, proxies http ones; unknown ids get a sandboxed 404");
 
 // Admin edits: manual channel, duplicate URL, bad URL, category lock, order.
 {
@@ -172,9 +186,35 @@ ok("/api/play/tv/:id redirects to the stream; unknown ids get a sandboxed 404");
 
   const dup = await admin("/api/admin/tv/channels", "POST", { name: "Copy", url: "https://cdn.example/bein/index.m3u8" });
   assert.equal(dup.status, 409);
-  const bad = await admin("/api/admin/tv/channels", "POST", { name: "Bad", url: "http://insecure.example/live" });
+  const bad = await admin("/api/admin/tv/channels", "POST", { name: "Bad", url: "ftp://insecure.example/live" });
   assert.equal(bad.status, 400);
-  assert.match((await bad.json()).error, /https/);
+  assert.match((await bad.json()).error, /http or https/);
+  const badLogo = await admin("/api/admin/tv/channels", "POST", { name: "Bad logo", url: "https://cdn.example/x.m3u8", logo: "javascript:alert(1)" });
+  assert.equal(badLogo.status, 400);
+
+  // http streams and logos are accepted (and played through the Worker); a
+  // Kodi `|User-Agent=` suffix becomes request headers.
+  const http = await admin("/api/admin/tv/channels", "POST", {
+    name: "Rai Sport HD", group: "Italy", logo: "http://203.0.113.5/logos/rai.png",
+    url: "http://iptv.example:8080/live/user/pass/1001.ts|User-Agent=VLC%2F3.0&Referer=https://ref.example/", proxy: "false"
+  });
+  assert.equal(http.status, 201);
+  const httpChannel = (await http.json()).channel;
+  assert.equal(httpChannel.id, "italy-rai-sport-hd", "ids include the group");
+  assert.equal(httpChannel.url, "http://iptv.example:8080/live/user/pass/1001.ts", "pipe headers stripped from the URL");
+  assert.deepEqual(httpChannel.headers, { userAgent: "VLC/3.0", referer: "https://ref.example/" });
+  assert.equal(httpChannel.kind, "ts");
+  assert.equal(httpChannel.proxied, true);
+  assert.equal(httpChannel.proxy, false);
+  assert.equal(httpChannel.category, "Sports");
+  assert.match(httpChannel.logoSrc, /^\/api\/tv\/logo\/italy-rai-sport-hd\?v=/);
+  const proxied = await admin("/api/admin/tv/channels/italy-rai-sport-hd", "PUT", { proxy: true, group: "Italia" });
+  const proxiedChannel = (await proxied.json()).channel;
+  assert.equal(proxiedChannel.proxy, true);
+  assert.equal(proxiedChannel.group, "Italia");
+  assert.equal(proxiedChannel.id, "italy-rai-sport-hd", "edits keep the id");
+  assert.deepEqual(proxiedChannel.headers, { userAgent: "VLC/3.0", referer: "https://ref.example/" }, "headers survive edits");
+  assert.equal((await admin("/api/admin/tv/channels/italy-rai-sport-hd", "DELETE")).status, 200);
 
   const edited = await admin("/api/admin/tv/channels/espn", "PUT", { category: "News", sort: 1, active: false });
   assert.equal(edited.status, 200);
@@ -202,7 +242,7 @@ ok("admin channel CRUD validates https URLs, rejects duplicates, locks categorie
   assert.equal(res.status, 200);
   const result = await res.json();
   assert.equal(result.added, 1);
-  assert.equal(result.removed, 2, "Sky Sports PL and Cartoon Network dropped upstream");
+  assert.equal(result.removed, 3, "Sky Sports PL, Cartoon Network and Plain HTTP dropped upstream");
 
   const list = (await (await admin("/api/admin/tv/channels")).json()).channels;
   const byId = Object.fromEntries(list.map(c => [c.id, c]));
@@ -223,12 +263,14 @@ ok("playlist sync refreshes synced channels and keeps manual ones and admin choi
   routes["https://check.example/c"] = reply(404, "");
   routes["https://check.example/d"] = reply(522, "");
   routes["https://check.example/e"] = new TypeError("dns failure");
+  routes["http://check.example/f"] = reply(200, "");
   const res = await admin("/api/admin/tv/check", "POST", {
-    urls: ["https://check.example/a", "https://check.example/b", "https://check.example/c", "https://check.example/d", "https://check.example/e", "http://check.example/f"]
+    urls: ["https://check.example/a", "https://check.example/b", "https://check.example/c", "https://check.example/d", "https://check.example/e", "http://check.example/f", "ftp://check.example/g"]
   });
   const results = (await res.json()).results;
-  assert.deepEqual(results.map(r => r.ok), [true, true, false, false, false, false]);
+  assert.deepEqual(results.map(r => r.ok), [true, true, false, false, false, true, false], "http streams can be checked too");
   assert.equal(results[4].error, "unreachable");
+  assert.equal(results[6].error, "not an http(s) URL");
 
   const tooMany = await admin("/api/admin/tv/check", "POST", { urls: Array.from({ length: 26 }, (_, i) => "https://x.example/" + i) });
   assert.equal(tooMany.status, 400, "batches are capped to stay inside the subrequest limit");
@@ -252,12 +294,20 @@ ok("stream health check classifies live and dead streams");
   assert.equal(parsed.total, 3);
   assert.equal(parsed.entries[0].name, "Channel, With Comma");
   assert.equal(parsed.entries[0].category, "Football");
+  assert.equal(parsed.entries[0].group, "Football");
+  assert.deepEqual(parsed.entries[0].headers, { userAgent: "Mozilla" }, "#EXTVLCOPT user agent is kept");
   assert.equal(parsed.entries[0].logo, "https://img.example/a.png");
   assert.equal(parsed.entries[1].exists, true, "already-known stream URLs are flagged");
+  assert.equal(parsed.entries[2].category, "Sports", "no group or name match: the default category");
 
   const imported = await (await admin("/api/admin/tv/import", "POST", { channels: parsed.entries })).json();
   assert.equal(imported.added, 2);
   assert.equal(imported.skipped, 1);
+  const catalog = (await (await admin("/api/admin/tv/channels")).json()).channels;
+  const withComma = catalog.find(c => c.id === "football-channel-with-comma");
+  assert.ok(withComma, "imported ids include the group");
+  assert.deepEqual(withComma.headers, { userAgent: "Mozilla" });
+  assert.equal(withComma.proxied, true, "channels with request headers play through the Worker");
 
   const notJson = await admin("/api/admin/tv/parse", "POST", { url: "https://lists.example/sports.m3u-bad" });
   assert.equal(notJson.status, 400, "an unreachable playlist is a clean 400");
@@ -284,6 +334,18 @@ console.log("# settings");
 {
   const data = await (await admin("/api/admin/settings")).json();
   assert.equal(data.settings.tvSource.url, PLAYLIST_URL);
+  assert.equal(data.settings.tvSource.defaultCategory, "Sports");
+  assert.ok(data.tvCategories.includes("Motorsport") && data.tvCategories.includes("Horse Racing"));
+
+  const badCategory = await admin("/api/admin/settings/tvSource", "PUT", { defaultCategory: "Quidditch" });
+  assert.equal(badCategory.status, 400);
+  const legacy = await (await admin("/api/admin/settings/tvSource", "PUT", {
+    url: "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json", defaultCategory: "entertainment"
+  })).json();
+  assert.equal(legacy.settings.tvSource.url, PLAYLIST_URL, "the retired channels.json source maps to the default");
+  assert.equal(legacy.settings.tvSource.defaultCategory, "Entertainment");
+  assert.equal(legacy.tvSync, undefined, "same source: no resync");
+  await admin("/api/admin/settings/tvSource", "PUT", { defaultCategory: "Sports" });
   assert.equal(data.settings.liveWindows.defaultHours, 3);
   assert.equal(data.security.passwordSource, "env");
   assert.ok(data.sportCategories.some(c => c.key === "FIGHT" && c.label === "UFC & MMA"));
@@ -402,7 +464,8 @@ let oldId;
     streams: [
       { id: "s1", name: "Stream 1", language: "English", quality: "HD", url: "https://tv.example/ufc", sandbox: true },
       { id: "s2", name: "Stream 2", language: "English", quality: "SD", url: "https://cdn.example/ufc.m3u8" },
-      { id: "s3", name: "Notes only", language: "English", quality: "SD" }
+      { id: "s3", name: "Notes only", language: "English", quality: "SD" },
+      { id: "s4", name: "Stream 4", language: "English", quality: "HD", url: "http://iptv.example:8080/live/user/pass/1001.ts" }
     ]
   });
   assert.equal(created.status, 201);
@@ -413,7 +476,7 @@ let oldId;
   const expires = Date.parse(match.expiresAt) - Date.parse(match.startTime);
   assert.equal(expires, 5.5 * HOUR, "UFC & MMA window applied");
 
-  const badStream = await admin("/api/admin/matches", "POST", { title: "X", streams: [{ name: "Bad", url: "http://x.example" }] });
+  const badStream = await admin("/api/admin/matches", "POST", { title: "X", streams: [{ name: "Bad", url: "javascript:alert(1)" }] });
   assert.equal(badStream.status, 400);
 
   const old = await (await admin("/api/admin/matches", "POST", {
@@ -427,7 +490,7 @@ let oldId;
   assert.equal(fight.status, "live", "auto status is live inside the window");
   assert.equal(fight.poster, "https://img.example/banner.jpg", "featured image replaces the feed poster");
   assert.equal(fight.featured, true);
-  assert.deepEqual(fight.manual.streams.map(s => [s.id, s.kind, s.sandbox]), [["s1", "embed", true], ["s2", "hls", false]]);
+  assert.deepEqual(fight.manual.streams.map(s => [s.id, s.kind, s.sandbox]), [["s1", "embed", true], ["s2", "hls", false], ["s4", "ts", false]]);
   assert.ok(!JSON.stringify(list).includes("tv.example"), "manual stream URLs stay private");
   assert.ok(!list.some(m => m.id === oldId), "matches past their live window are hidden publicly");
 
@@ -435,6 +498,9 @@ let oldId;
   assert.equal(play.status, 302);
   assert.equal(play.headers.Location, "https://tv.example/ufc");
   assert.equal((await call("/api/play/stream/" + encodeURIComponent(fightId) + "/s3")).status, 404);
+  const proxiedStream = await call("/api/play/stream/" + encodeURIComponent(fightId) + "/s4");
+  assert.equal(proxiedStream.status, 502, "http match streams play through the Worker (upstream unreachable here)");
+  assert.equal(proxiedStream.headers.Location, undefined);
 
   const content = await (await call("/api/site-content")).json();
   assert.equal(content.featuredMatches[0].id, fightId);
