@@ -1,6 +1,5 @@
 package com.sportzfy.live.core.player
 
-import com.sportzfy.live.core.network.StreamedEndpoints
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.PlayerMode
 
@@ -17,10 +16,12 @@ data class PlayerConfig(
      */
     val blockedResourceHosts: Set<String> = emptySet(),
     /**
-     * Referer sent when the page is loaded directly; null sends none. Matches
-     * send streamed.pk's, as its own embed iframe does; Live TV sends none.
+     * Referer sent when the page is loaded directly; null (the default) sends
+     * none, as a browser tab and the website's `no-referrer` iframe do. Some
+     * embeds (embed.st's `admin` streams) stay black when they are loaded as
+     * the top-level page with streamed.pk as the referer.
      */
-    val referer: String? = StreamedEndpoints.REFERER,
+    val referer: String? = null,
     /** Plain-http streams and pages may play. Cleartext is allowed app-wide; this is the switch. */
     val allowHttpStreams: Boolean = true,
     /** DASH and progressive (MPEG-TS, MP4…) streams play in Media3. HLS and web pages always do. */
