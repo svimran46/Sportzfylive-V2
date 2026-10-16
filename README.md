@@ -19,6 +19,20 @@ A modern, responsive web application for streaming live sports matches and 24/7 
 - 📱 **Responsive Design**: Fully responsive grid layout for mobile, tablet, and desktop
 - 🎨 **Modern UI**: Dark theme with smooth animations and transitions
 
+## Live TV playback checks
+
+The Worker probes every active Live TV channel on the 10-minute cron, 100 per run (oldest check first, so a new catalog is fully probed within a few hours). A probe reads real media, not just the HTTP status:
+
+- **HLS:** the playlist must list a segment, and that segment must be MPEG-TS (sync bytes) or fMP4 with at least 16 KB of data. Master playlists are followed one level.
+- **MPEG-TS / FLV / progressive:** at least 16 KB of data with valid container bytes; an HTML page fails.
+- **DASH:** the manifest must be a valid MPD. Segments are not fetched, so DASH is verified less strictly than HLS.
+- **Web-page embeds:** never listed, because they can't be verified without a browser.
+- Probes time out after 10 seconds, and that limit covers the body read too.
+
+Hysteresis: a channel is listed after 2 good probes in a row and dropped after 3 bad ones in a row. A changed stream URL starts over. Results are one KV record (`tv_health`), written once per run, and `GET /api/admin/tv/health` returns them. The public channel list, the site's Live TV page and `/api/tv/playlist.m3u` (which the app reads) show only listed channels.
+
+Probes run from Cloudflare's network, not the viewer's, so a channel that is blocked only for some countries can be listed here and still fail for a viewer there. A channel that needs custom request headers is probed with them, but left out of the app playlist because the app can't send them.
+
 ## Architecture
 
 ```

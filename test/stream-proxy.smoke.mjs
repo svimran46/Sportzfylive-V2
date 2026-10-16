@@ -188,6 +188,12 @@ console.log("# sports.m3u catalog");
 
 let catalog;
 {
+  // The first read seeds the catalog; nothing is listed until the probe verifies it.
+  const unverified = await call(env, "/api/tv/channels");
+  assert.deepEqual(JSON.parse(await unverified.text()).channels, [], "unprobed channels are not listed");
+  // Stand in for the cron probe: every synced channel verified on its current URL.
+  const seeded = JSON.parse(env.SPORTZFY_DB.store.get("tv_channels")).channels;
+  env.SPORTZFY_DB.store.set("tv_health", JSON.stringify({ channels: Object.fromEntries(seeded.map(c => [c.id, { url: c.url, working: true }])) }));
   const res = await call(env, "/api/tv/channels");
   assert.equal(res.status, 200);
   const text = await res.text();
@@ -642,6 +648,10 @@ ok("logo proxy serves http logos as images and rejects non-images, SVG and overs
   try {
     const cacheEnv = makeEnv();
     upstream[PLAYLIST_URL] = () => respond(SPORTS_M3U);
+    await call(cacheEnv, "/api/tv/channels"); // seeds the catalog
+    // Stand in for the cron probe: the catalog verified on its current URLs.
+    const seeded = JSON.parse(cacheEnv.SPORTZFY_DB.store.get("tv_channels")).channels;
+    cacheEnv.SPORTZFY_DB.store.set("tv_health", JSON.stringify({ channels: Object.fromEntries(seeded.map(c => [c.id, { url: c.url, working: true }])) }));
     const logoPath = (await (await call(cacheEnv, "/api/tv/channels")).json()).channels.find(c => c.id === "france-eurosport-2-hd").logo;
     upstream["http://203.0.113.10/logos/es2.png"] = () => respond(new Uint8Array([0xff, 0xd8, 0xff, 0]), { headers: { "Content-Type": "image/jpeg" } });
     const first = await call(cacheEnv, logoPath);
@@ -751,6 +761,9 @@ ok("tvSource.defaultCategory is the fallback for playlist and manual channels");
   const saved = await (await admin("/api/admin/settings/tvSource", "PUT", { url: OTHER })).json();
   assert.equal(saved.tvSync.ok, true);
   assert.equal(saved.tvSync.trigger, "settings");
+  // Stand in for the cron probe: the new catalog verified on its current URLs.
+  const current = JSON.parse(env.SPORTZFY_DB.store.get("tv_channels")).channels;
+  env.SPORTZFY_DB.store.set("tv_health", JSON.stringify({ channels: Object.fromEntries(current.map(c => [c.id, { url: c.url, working: true }])) }));
   const list = (await (await call(env, "/api/tv/channels")).json()).channels;
   assert.deepEqual(list.map(c => c.id), ["brazil-sportv", "mystery"], "only the new playlist's channels, plus manual ones");
 

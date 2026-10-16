@@ -128,8 +128,17 @@ const UPSTREAM = [
 
 console.log("# Live TV catalog");
 
-// First public read seeds the catalog from the default playlist.
+// First public read seeds the catalog from the default playlist. Nothing is
+// listed until the strict probe has verified it.
 routes[PLAYLIST_URL] = reply(200, channelsJs(UPSTREAM));
+{
+  const res = await call("/api/tv/channels");
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).channels, [], "unprobed channels are not listed");
+  // Stand in for the cron probe: every synced channel verified on its current URL.
+  const seeded = JSON.parse(kv.store.get("tv_channels")).channels;
+  kv.store.set("tv_health", JSON.stringify({ channels: Object.fromEntries(seeded.map(c => [c.id, { url: c.url, working: true }])) }));
+}
 {
   const res = await call("/api/tv/channels");
   assert.equal(res.status, 200);
@@ -223,6 +232,9 @@ ok("/api/play/tv/:id redirects https streams, proxies http ones; unknown ids get
   assert.equal(espn.categoryLocked, true);
   assert.equal(espn.sort, 1);
 
+  // Stand in for the cron probe again: the current catalog verified on its current URLs.
+  const current = JSON.parse(kv.store.get("tv_channels")).channels;
+  kv.store.set("tv_health", JSON.stringify({ channels: Object.fromEntries(current.map(c => [c.id, { url: c.url, working: true }])) }));
   const publicList = await (await call("/api/tv/channels")).json();
   assert.ok(!publicList.channels.some(c => c.id === "espn"), "inactive channels are hidden publicly");
   assert.equal((await call("/api/play/tv/espn")).status, 404, "inactive channels do not play");

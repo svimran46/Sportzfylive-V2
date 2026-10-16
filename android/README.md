@@ -138,7 +138,7 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
 
 ## Live TV
 
-- **Channel list:** loaded from [`channels.json`](https://github.com/svimran46/playlist.m3u/blob/main/channels.json) in the playlist repo. You can point the app at another file with `channelsUrl` in the remote config.
+- **Channel list:** the Worker's verified playlist, `/api/tv/playlist.m3u`. It lists only channels whose streams the Worker's strict probe has played (see the root README, *Live TV playback checks*). The URL comes from the remote config (`channelsUrl`) and falls back to the same playlist when that isn't available. An admin can point the app at another file with `channelsUrl`.
   - The file can be the JavaScript snippet it is today (`const channels = [...];`), a plain JSON array, or an **M3U playlist** (`#EXTM3U` with `#EXTINF` entries, as IPTV providers publish; the title, `tvg-logo` and `group-title`/`#EXTGRP` are read).
   - Each JSON entry needs a `name` and an http(s) `url`. `logo` is optional. `type` (`hls`, `dash`, `ts`, `mp4`, `embed`) says how to play a URL whose extension doesn't, such as an IPTV feed at `http://host:8080/user/pass/123`.
   - Entries without a name or an http(s) stream are skipped, and so are repeated streams. Logo URLs have their repeated `&amp;` escaping undone. Logos may be http or https (the picon servers behind `sports.m3u` have no TLS); anything else shows the channel's initials.

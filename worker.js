@@ -31,6 +31,16 @@ const TV_AUTO_SYNC_EVERY_MS = 60 * 60 * 1000;     // cron re-pulls the playlist 
 const TV_AUTO_RETRY_MS = 30 * 60 * 1000;          // ...and waits this long after a failed pull
 const TV_CHECK_TIMEOUT_MS = 8000;                 // per-URL health check timeout
 const TV_CHECK_BATCH = 25;                        // URLs per health-check request (subrequest budget)
+// Strict playability probe (see runTvProbe). Only channels that delivered
+// real media on consecutive probes are listed on the site and in the app.
+const TV_HEALTH_KEY = "tv_health";                // per-channel probe results, one KV write per run
+const TV_PROBE_BATCH = 100;                       // channels probed per cron run (every 10 minutes)
+const TV_PROBE_CONCURRENCY = 8;
+const TV_PROBE_TIMEOUT_MS = 10000;                // covers the whole request, body included
+const TV_PROBE_PASSES_TO_LIST = 2;                // consecutive good probes before a channel is listed
+const TV_PROBE_FAILS_TO_DROP = 3;                 // consecutive bad probes before a listed channel is dropped
+const TV_PROBE_MIN_BYTES = 16 * 1024;
+const TV_APP_PLAYLIST_URL = "https://sportzfylive.svimranmy.workers.dev/api/tv/playlist.m3u";
 const TV_STATE_MEMO_MS = 30 * 1000;               // public routes reuse the parsed catalog this long per isolate
 const MAX_PLAYLIST_ENTRIES = 5000;
 const MAX_PLAYLIST_BYTES = 5 * 1024 * 1024;
@@ -514,7 +524,7 @@ function appConfigPayload(settings) {
     updateUrl: app.updateUrl,
     maintenance: { enabled: app.maintenanceEnabled, message: app.maintenanceMessage },
     // Blank means the site's own list, so installed apps switch without an update.
-    channelsUrl: app.channelsUrl || DEFAULT_TV_SOURCE_URL
+    channelsUrl: app.channelsUrl || TV_APP_PLAYLIST_URL
   };
   // Left out, the app uses the default Worker; "" switches the fallback off.
   if (!app.streamProxyEnabled) payload.streamProxyUrl = "";
@@ -2144,6 +2154,231 @@ async function checkStreamUrls(urls, concurrency) {
   return results;
 }
 
+// Strict playability probe. Unlike checkStreamUrl (reachability only), this
+// reads real media: an HLS playlist plus its first segment, the start of an
+// MPEG-TS or progressive stream, or a DASH manifest. Web pages (embeds) can't
+// be verified without a browser, so they are never listed.
+class ProbeError extends Error {}
+
+// Reads up to `limit` bytes and drops the rest of the body.
+async function readHead(response, limit) {
+  const reader = response.body?.getReader?.();
+  if (!reader) return new Uint8Array(await response.arrayBuffer()).subarray(0, limit);
+  const chunks = [];
+  let total = 0;
+  try {
+    while (total < limit) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  const bytes = new Uint8Array(Math.min(total, limit));
+  let offset = 0;
+  for (const chunk of chunks) {
+    if (offset >= bytes.length) break;
+    const part = chunk.subarray(0, bytes.length - offset);
+    bytes.set(part, offset);
+    offset += part.length;
+  }
+  return bytes;
+}
+
+// One GET with a timer that covers the body read too (fetchWithTimeout stops
+// its timer once headers arrive, and a stalled live stream would hang the cron).
+async function fetchStreamHead(url, headers, limit) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TV_PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "User-Agent": CHROME_UA, "Accept": "*/*", ...headers }
+    });
+    if (!response.ok) {
+      discardBody(response);
+      throw new ProbeError("HTTP " + response.status);
+    }
+    const bytes = await readHead(response, limit);
+    return { bytes, type: (response.headers.get("content-type") || "").toLowerCase(), finalUrl: response.url || url };
+  } catch (error) {
+    if (error?.name === "AbortError") throw new ProbeError("timeout");
+    if (error instanceof ProbeError) throw error;
+    throw new ProbeError("unreachable");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// MPEG-TS packets start with 0x47 every 188 bytes; checking a run of them
+// rules out error pages and other binary junk.
+function hasTsSync(bytes) {
+  const packets = Math.floor(bytes.length / 188);
+  if (packets < 4) return false;
+  for (let i = 0; i < Math.min(packets, 16); i++) {
+    if (bytes[i * 188] !== 0x47) return false;
+  }
+  return true;
+}
+
+async function verifyHls(url, headers, depth = 0) {
+  const manifest = await fetchStreamHead(url, headers, 256 * 1024);
+  const text = new TextDecoder().decode(manifest.bytes);
+  if (!text.includes("#EXTM3U")) throw new ProbeError("not an HLS playlist");
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (text.includes("#EXT-X-STREAM-INF")) {
+    if (depth > 0) throw new ProbeError("nested HLS variants");
+    const variant = lines.find(line => !line.startsWith("#"));
+    if (!variant) throw new ProbeError("HLS master has no variant");
+    return verifyHls(new URL(variant, manifest.finalUrl).href, headers, depth + 1);
+  }
+  const segment = lines.find(line => !line.startsWith("#"));
+  if (!segment) throw new ProbeError("HLS playlist has no segments");
+  const segmentUrl = new URL(segment, manifest.finalUrl).href;
+  const media = await fetchStreamHead(segmentUrl, headers, 64 * 1024);
+  if (media.type.includes("text/html")) throw new ProbeError("segment is a web page");
+  if (media.bytes.length < TV_PROBE_MIN_BYTES) throw new ProbeError("segment too short (" + media.bytes.length + " bytes)");
+  const fragmented = /\.(m4s|mp4|m4v|m4a|cmfv|cmfa)(\?|$)/i.test(segment);
+  if (!fragmented && !hasTsSync(media.bytes)) throw new ProbeError("segment is not MPEG-TS");
+}
+
+async function verifyProgressive(url, headers, kind) {
+  const head = await fetchStreamHead(url, headers, 64 * 1024);
+  if (head.type.includes("text/html")) throw new ProbeError("web page, not a stream");
+  if (head.bytes.length < TV_PROBE_MIN_BYTES) throw new ProbeError("stream ended after " + head.bytes.length + " bytes");
+  if (kind === "ts" && !hasTsSync(head.bytes)) throw new ProbeError("not MPEG-TS data");
+  if (kind === "flv" && String.fromCharCode(...head.bytes.subarray(0, 3)) !== "FLV") throw new ProbeError("not FLV data");
+}
+
+async function verifyDash(url, headers) {
+  const manifest = await fetchStreamHead(url, headers, 256 * 1024);
+  const text = new TextDecoder().decode(manifest.bytes);
+  if (!text.includes("<MPD")) throw new ProbeError("not a DASH manifest");
+}
+
+// Stored stream headers (userAgent / referer / origin) as the HTTP headers
+// the upstream expects, the same mapping the stream proxy uses.
+function probeHeaders(stored) {
+  const headers = {};
+  if (stored?.userAgent) headers["User-Agent"] = String(stored.userAgent);
+  if (stored?.referer) headers["Referer"] = String(stored.referer);
+  if (stored?.origin) headers["Origin"] = String(stored.origin);
+  return headers;
+}
+
+// Returns { ok, reason, ms, kind }. Never throws.
+export async function probeChannel(channel) {
+  const started = Date.now();
+  const kind = streamKind(channel.url);
+  const url = safeStreamUrl(channel.url);
+  const headers = probeHeaders(channel.headers);
+  try {
+    if (!url) throw new ProbeError("not an http(s) URL");
+    if (kind === "embed") throw new ProbeError("web page: playback can't be verified");
+    if (kind === "hls") await verifyHls(url, headers);
+    else if (kind === "dash") await verifyDash(url, headers);
+    else await verifyProgressive(url, headers, kind);
+    return { ok: true, reason: "", ms: Date.now() - started, kind };
+  } catch (error) {
+    const reason = error instanceof ProbeError ? error.message : "unreachable";
+    return { ok: false, reason, ms: Date.now() - started, kind };
+  }
+}
+
+async function readTvHealth(env) {
+  let raw = null;
+  try {
+    raw = await env.SPORTZFY_DB.get(TV_HEALTH_KEY, "json");
+  } catch (_) {}
+  return raw && typeof raw === "object" && raw.channels && typeof raw.channels === "object" ? raw : { channels: {} };
+}
+
+// The channels that may be shown: active, and the latest probe of this exact
+// stream URL marked them working.
+export function listedChannels(channels, health) {
+  return channels.filter(channel => {
+    if (channel.active === false) return false;
+    const entry = health.channels[String(channel.id)];
+    return Boolean(entry && entry.working === true && entry.url === channel.url);
+  });
+}
+
+// Cron (every 10 minutes): probes the oldest-checked active channels, a batch
+// per run, and records the result. Unchecked channels go first, so a new
+// catalog is fully probed in about TV_PROBE_BATCH-sized steps.
+export async function runTvProbe(env) {
+  const state = await readTvState(env);
+  const active = (state?.channels || []).filter(channel => channel.active !== false);
+  const health = await readTvHealth(env);
+  const now = new Date().toISOString();
+  const activeIds = new Set(active.map(channel => String(channel.id)));
+  for (const id of Object.keys(health.channels)) {
+    if (!activeIds.has(id)) delete health.channels[id];
+  }
+
+  const lastChecked = ({ channel }) => {
+    const entry = health.channels[String(channel.id)];
+    return entry && entry.url === channel.url && entry.checkedAt ? Date.parse(entry.checkedAt) || 0 : 0;
+  };
+  const batch = active.map(channel => ({ channel })).sort((a, b) => lastChecked(a) - lastChecked(b)).slice(0, TV_PROBE_BATCH);
+
+  const results = new Array(batch.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(TV_PROBE_CONCURRENCY, batch.length) }, async () => {
+    while (next < batch.length) {
+      const index = next++;
+      results[index] = await probeChannel(batch[index].channel);
+    }
+  }));
+
+  batch.forEach(({ channel }, index) => {
+    const id = String(channel.id);
+    const previous = health.channels[id]?.url === channel.url ? health.channels[id] : null;
+    const result = results[index];
+    const passes = result.ok ? (previous?.passes || 0) + 1 : 0;
+    const fails = result.ok ? 0 : (previous?.fails || 0) + 1;
+    // Hysteresis: a listed channel stays listed through a single bad probe.
+    const working = result.ok
+      ? previous?.working === true || passes >= TV_PROBE_PASSES_TO_LIST
+      : previous?.working === true && fails < TV_PROBE_FAILS_TO_DROP;
+    health.channels[id] = {
+      url: channel.url,
+      working,
+      passes,
+      fails,
+      ok: result.ok,
+      reason: result.reason,
+      kind: result.kind,
+      ms: result.ms,
+      checkedAt: now
+    };
+  });
+  health.updatedAt = now;
+  await env.SPORTZFY_DB.put(TV_HEALTH_KEY, JSON.stringify(health));
+  const listed = listedChannels(active, health).length;
+  return { checked: batch.length, listed, active: active.length };
+}
+
+// M3U of the listed channels for the app. Channels that need custom request
+// headers are left out: the app can't send them.
+function tvPlaylistM3u(channels) {
+  const clean = (value) => String(value ?? "").replace(/[\r\n",]+/g, " ").replace(/\s+/g, " ").trim();
+  const lines = ["#EXTM3U"];
+  for (const channel of channels) {
+    if (channel.headers && Object.keys(channel.headers).length) continue;
+    const url = safeStreamUrl(channel.url);
+    if (!url) continue;
+    const name = clean(channel.name);
+    const logo = safeStreamUrl(channel.logo);
+    lines.push('#EXTINF:-1 tvg-name="' + name + '" tvg-logo="' + logo + '" group-title="' + clean(channel.group) + '",' + name);
+    lines.push(url);
+  }
+  return lines.join("\n") + "\n";
+}
+
 // FNV-1a: a short, stable cache-buster for logo URLs.
 function shortHash(value) {
   const text = String(value ?? "");
@@ -2916,6 +3151,14 @@ async function storageReport(env) {
  * Route handlers
  */
 async function handlePublicTv(request, env, url, ctx) {
+  if (request.method === "GET" && url.pathname === "/api/tv/playlist.m3u") {
+    const state = await readTvStateCached(env);
+    const listed = orderedChannels(listedChannels(state?.channels || [], await readTvHealth(env)));
+    return new Response(tvPlaylistM3u(listed), {
+      headers: { "Content-Type": "audio/x-mpegurl; charset=utf-8", "Cache-Control": "public, max-age=300" }
+    });
+  }
+
   if (request.method === "GET" && url.pathname === "/api/tv/channels") {
     let state = await readTvStateCached(env);
     if (!state) {
@@ -2927,7 +3170,7 @@ async function handlePublicTv(request, env, url, ctx) {
         state = emptyTvState();
       }
     }
-    const channels = orderedChannels(state.channels.filter(channel => channel.active !== false)).map(publicChannel);
+    const channels = orderedChannels(listedChannels(state.channels, await readTvHealth(env))).map(publicChannel);
     const present = new Set(channels.map(channel => channel.category));
     return cachedJson({
       channels,
@@ -3070,6 +3313,18 @@ async function handleAdminTv(request, env, url) {
       entries: entries.map(entry => ({ ...entry, exists: known.has(entry.url) })),
       skipped,
       total: entries.length
+    });
+  }
+
+  if (path === "/api/admin/tv/health" && method === "GET") {
+    const state = await readTvState(env);
+    const health = await readTvHealth(env);
+    const active = (state?.channels || []).filter(channel => channel.active !== false);
+    return adminJson({
+      updatedAt: health.updatedAt || null,
+      active: active.length,
+      listed: listedChannels(active, health).length,
+      channels: health.channels
     });
   }
 
@@ -3614,6 +3869,13 @@ export default {
       if (tv) console.log("Live TV playlist synced:", JSON.stringify(tv.lastSync));
     } catch (error) {
       console.error("Live TV auto-sync failed:", String(error?.message || error));
+    }
+
+    try {
+      const probe = await runTvProbe(env);
+      console.log("Live TV probe:", JSON.stringify(probe));
+    } catch (error) {
+      console.error("Live TV probe failed:", String(error?.message || error));
     }
   },
 
