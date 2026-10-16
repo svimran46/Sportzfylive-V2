@@ -10,73 +10,550 @@ html,body{margin:0;height:100%;background:#000;color:#cbd5e1;font-family:Inter,s
 video{display:block;width:100%;height:100%;background:#000}
 .msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:15px;line-height:1.5;background:#05060a}
 .msg.show{display:flex}
+.spinner{position:absolute;top:50%;left:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;display:none;pointer-events:none;animation:spin .8s linear infinite}
+.spinner.show{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+.unmute{position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:8px;padding:9px 14px;border:0;border-radius:999px;background:rgba(15,23,42,.88);color:#fff;font-family:inherit;font-size:14px;font-weight:600;line-height:1;cursor:pointer}
+.unmute[hidden]{display:none}
+.unmute:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.unmute svg{width:18px;height:18px;fill:currentColor}
 </style>
 </head>
 <body>
 <video id="video" controls autoplay playsinline></video>
-<div class="msg" id="msg" role="status"></div>
+<div class="spinner" id="spinner" role="status" aria-label="Loading stream"></div>
+<button type="button" class="unmute" id="unmute" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4-2.7-2.7z"/></svg>Tap to unmute</button>
+<div class="msg" id="msg" role="alert"></div>
 <script>
-// HLS player for .m3u8 streams on the Live TV page and the match watch view.
-// It only plays the Worker's own /api/play redirects, so it cannot be pointed
-// at arbitrary streams from another site.
+// Universal player for the Live TV page and the match watch view: HLS
+// (native or hls.js), raw MPEG-TS / FLV (mpegts.js), DASH (dash.js) and plain
+// video/audio files. It only plays the Worker's own /api/play paths, so it
+// cannot be pointed at arbitrary streams from another site. Engine libraries
+// load lazily (only the one a stream needs) from pinned CDN copies.
 (function () {
   "use strict";
-  var HLS_SOURCES = [
-    "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.17/hls.min.js",
-    "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"
-  ];
+  var LIBS = {
+    hls: {
+      global: "Hls",
+      urls: [
+        "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.17/hls.min.js",
+        "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"
+      ]
+    },
+    mpegts: {
+      global: "mpegts",
+      urls: [
+        "https://cdn.jsdelivr.net/npm/mpegts.js@1.8.0/dist/mpegts.js",
+        "https://unpkg.com/mpegts.js@1.8.0/dist/mpegts.js"
+      ]
+    },
+    dash: {
+      global: "dashjs",
+      urls: [
+        "https://cdn.jsdelivr.net/npm/dashjs@4.7.4/dist/dash.all.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/dashjs/4.7.4/dash.all.min.js"
+      ]
+    }
+  };
+  var TYPES = ["hls", "dash", "ts", "flv", "video", "audio", "auto"];
+  var HLS_MIME = "application/vnd.apple.mpegurl";
+  var MAX_RETRIES = 5;      // reconnects before giving up (backoff 1s, 2s, 4s, 8s, 16s)
+  var STABLE_MS = 20000;    // this long playing without a hiccup resets the retry budget
+  var STALL_MS = 20000;     // a live stream stuck buffering this long is reconnected
+  var PROBE_MS = 8000;      // "auto": how long native playback gets to prove itself
+  var TEXT = {
+    unavailable: "This stream is not available.",
+    load: "The stream could not be loaded. Try again later or pick another stream.",
+    offline: "The stream could not be played. It may be offline, or in a format this browser can't play.",
+    library: "The player could not be loaded. Check your connection and try again.",
+    browser: "This browser can't play this stream. Try another browser or device.",
+    codec: "This stream uses a video or audio format this browser can't play. Try another browser or pick another stream."
+  };
+
   var video = document.getElementById("video");
   var msg = document.getElementById("msg");
-  var src = new URLSearchParams(location.search).get("src") || "";
+  var spinner = document.getElementById("spinner");
+  var unmute = document.getElementById("unmute");
+  var params = new URLSearchParams(location.search);
+  var src = params.get("src") || "";
+  // No type means HLS (the only kind the player used to handle); anything
+  // unrecognised gets the "try everything" path.
+  var type = String(params.get("type") || "hls").trim().toLowerCase();
+  if (TYPES.indexOf(type) === -1) type = "auto";
 
+  var libs = {};            // library name -> { done, value, waiting }
+  var active = null;        // current engine: { destroy, recover?, onVideoError?, onStable? }
+  var session = 0;          // bumped on every teardown; stale async callbacks compare against it
+  var started = false;      // the current engine has reached "playing"
+  var failed = false;       // an unrecoverable error is on screen
+  var stopped = false;      // the page was hidden (pagehide)
+  var retries = 0;
+  var retryTimer = 0;
+  var stableTimer = 0;
+  var stallTimer = 0;
+
+  function busy(on) {
+    if (on && (failed || stopped)) return;
+    spinner.classList[on ? "add" : "remove"]("show");
+  }
   function fail(text) {
+    if (failed || stopped) return;
+    failed = true;
+    teardown();
+    busy(false);
+    unmute.hidden = true;
     msg.textContent = text;
     msg.classList.add("show");
   }
-  function start() {
-    var played = video.play();
-    if (played && typeof played.catch === "function") played.catch(function () {});
+  function teardown() {
+    session += 1;
+    clearTimeout(retryTimer);
+    clearTimeout(stableTimer);
+    clearTimeout(stallTimer);
+    retryTimer = 0;
+    retries = 0;
+    started = false;
+    var engine = active;
+    active = null;
+    if (engine) {
+      try { engine.destroy(); } catch (e) {}
+    }
   }
-
-  if (!/^\/api\/play\/(tv\/[^/?#]+|stream\/[^/?#]+\/[^/?#]+)$/.test(src)) {
-    fail("This stream is not available.");
-    return;
+  // Run `next` as a fresh engine on the next tick, after the current one is
+  // torn down (never destroy a library from inside its own event callback
+  // and then start another one in the same stack).
+  function switchTo(next) {
+    teardown();
+    var token = session;
+    setTimeout(function () {
+      if (token === session && !failed && !stopped) next();
+    }, 0);
   }
-  var url = new URL(src, location.origin).href;
-
-  // Safari and iOS play HLS natively.
-  if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = url;
-    video.addEventListener("error", function () { fail("The stream could not be loaded. Try again later or pick another stream."); });
-    start();
-    return;
-  }
-
-  function loadLibrary(index) {
-    if (index >= HLS_SOURCES.length) {
-      fail("The player could not be loaded. Check your connection and try again.");
+  // Exponential-backoff reconnect shared by every engine. One pending retry
+  // at a time; after MAX_RETRIES the viewer gets `finalText`.
+  function scheduleRetry(run, finalText) {
+    if (retryTimer || failed || stopped) return;
+    if (retries >= MAX_RETRIES) {
+      fail(finalText);
       return;
     }
-    var script = document.createElement("script");
-    script.src = HLS_SOURCES[index];
-    script.crossOrigin = "anonymous";
-    script.onload = function () {
-      if (!window.Hls || !window.Hls.isSupported()) {
-        fail("This browser can't play this stream.");
+    var token = session;
+    var delay = 1000 * Math.pow(2, retries);
+    retries += 1;
+    clearTimeout(stableTimer);
+    clearTimeout(stallTimer);
+    busy(true);
+    retryTimer = setTimeout(function () {
+      retryTimer = 0;
+      if (token === session && !failed && !stopped) run();
+    }, delay);
+  }
+  function armStall() {
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(function () {
+      // A paused video is not stalled (the viewer paused, or autoplay was refused).
+      if (!video.paused && active && active.recover) active.recover();
+    }, STALL_MS);
+  }
+
+  // Autoplay: browsers refuse unmuted autoplay without a user gesture, so
+  // fall back to muted playback and offer a one-tap unmute.
+  function start() {
+    armStall();
+    var played;
+    try { played = video.play(); } catch (e) { return; }
+    if (played && typeof played.then === "function") {
+      played.then(null, function (err) {
+        if (err && err.name === "NotAllowedError") blocked();
+      });
+    }
+  }
+  function blocked() {
+    if (failed || stopped) return;
+    if (video.muted) {
+      // Even muted playback was refused: leave it to the controls / unmute button.
+      busy(false);
+      return;
+    }
+    video.muted = true;
+    unmute.hidden = false;
+    start();
+  }
+  unmute.addEventListener("click", function () {
+    video.muted = false;
+    if (!video.volume) video.volume = 1;
+    unmute.hidden = true;
+    try { video.focus(); } catch (e) {}
+    start();
+  });
+
+  video.addEventListener("waiting", onBuffering);
+  video.addEventListener("stalled", onBuffering);
+  function onBuffering() {
+    clearTimeout(stableTimer);
+    busy(true);
+    armStall();
+  }
+  video.addEventListener("playing", onPlaying);
+  function onPlaying() {
+    started = true;
+    busy(false);
+    clearTimeout(stallTimer);
+    clearTimeout(stableTimer);
+    stableTimer = setTimeout(function () {
+      retries = 0;
+      if (active && active.onStable) active.onStable();
+    }, STABLE_MS);
+  }
+  // "stalled" can fire while frames keep coming (the download merely went
+  // idle) and then no "playing" follows, so real progress counts as playing.
+  var lastTime = -1;
+  video.addEventListener("timeupdate", function () {
+    if (video.currentTime === lastTime) return;
+    lastTime = video.currentTime;
+    if (retryTimer || video.paused || video.readyState < 3) return;
+    if (spinner.classList.contains("show")) onPlaying();
+  });
+  video.addEventListener("pause", function () {
+    if (retryTimer) return;
+    clearTimeout(stallTimer);
+    busy(false);
+  });
+  video.addEventListener("volumechange", function () {
+    if (!video.muted && video.volume > 0) unmute.hidden = true;
+  });
+  video.addEventListener("error", function () {
+    if (active && active.onVideoError) active.onVideoError(video.error ? video.error.code : 0);
+  });
+
+  // Load a library once, trying each CDN in order. Concurrent and later
+  // callers share the same result; a failed load reports null.
+  function loadLibrary(name, callback) {
+    var spec = LIBS[name];
+    var state = libs[name];
+    if (!state) {
+      state = libs[name] = { done: false, value: null, waiting: [] };
+      if (window[spec.global]) finish(window[spec.global]);
+      else attempt(0);
+    }
+    if (state.done) callback(state.value);
+    else state.waiting.push(callback);
+
+    function attempt(index) {
+      if (index >= spec.urls.length) {
+        finish(null);
         return;
       }
-      var hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
-      hls.on(window.Hls.Events.ERROR, function (_, data) {
-        if (data && data.fatal) fail("The stream could not be loaded. Try again later or pick another stream.");
+      var script = document.createElement("script");
+      script.src = spec.urls[index];
+      script.crossOrigin = "anonymous";
+      script.async = true;
+      script.onload = function () {
+        if (window[spec.global]) {
+          finish(window[spec.global]);
+          return;
+        }
+        drop(script);
+        attempt(index + 1);
+      };
+      script.onerror = function () {
+        drop(script);
+        attempt(index + 1);
+      };
+      document.head.appendChild(script);
+    }
+    function finish(value) {
+      state.done = true;
+      state.value = value;
+      var waiting = state.waiting;
+      state.waiting = [];
+      for (var i = 0; i < waiting.length; i++) waiting[i](value);
+    }
+  }
+  function drop(node) {
+    if (node.parentNode) node.parentNode.removeChild(node);
+  }
+
+  function canNativeHls() {
+    return !!video.canPlayType(HLS_MIME);
+  }
+  function hasMse() {
+    return !!(window.MediaSource || window.ManagedMediaSource || window.WebKitMediaSource);
+  }
+
+  // Native <video src>. Live streams (HLS) retry every error with backoff:
+  // Safari reports an unreachable playlist as "format not supported". Files
+  // only retry network errors (code 2).
+  function playNative(url, live) {
+    function load() {
+      video.src = url;
+      video.load();
+      start();
+    }
+    function retry() {
+      scheduleRetry(load, TEXT.load);
+    }
+    active = {
+      destroy: releaseVideo,
+      recover: live ? retry : null,
+      onVideoError: function (code) {
+        if (live || code === 2) retry();
+        else fail(code === 3 ? TEXT.codec : TEXT.offline);
+      }
+    };
+    busy(true);
+    load();
+  }
+  function releaseVideo() {
+    video.removeAttribute("src");
+    video.load();
+  }
+
+  // "auto": does the browser play it by itself? Success is canplay (or
+  // metadata) within PROBE_MS; an error or the timeout moves on to `next`.
+  function probeNative(url, next) {
+    var token = session;
+    var timer = setTimeout(function () {
+      if (token === session) switchTo(next);
+    }, PROBE_MS);
+    function ready() {
+      if (token !== session || !active || active.settled) return;
+      clearTimeout(timer);
+      active.settled = true;
+      // From here on it behaves like a live native stream.
+      active.recover = active.retry;
+      active.onVideoError = active.retry;
+    }
+    active = {
+      settled: false,
+      retry: function () {
+        scheduleRetry(function () {
+          video.src = url;
+          video.load();
+          start();
+        }, TEXT.load);
+      },
+      destroy: function () {
+        clearTimeout(timer);
+        video.removeEventListener("canplay", ready);
+        video.removeEventListener("loadedmetadata", ready);
+        releaseVideo();
+      },
+      recover: null,
+      onVideoError: function () {
+        if (token === session) switchTo(next);
+      }
+    };
+    video.addEventListener("canplay", ready);
+    video.addEventListener("loadedmetadata", ready);
+    busy(true);
+    video.src = url;
+    start();
+  }
+
+  // hls.js for browsers without native HLS. lowLatencyMode is off: IPTV
+  // relays serve classic HLS, and LL mode makes hls.js hug the live edge and
+  // request partial segments / blocking reloads that such servers (and the
+  // Worker proxy) don't offer, which turns upstream jitter into stalls.
+  function playHlsJs(url, fallback) {
+    var token = session;
+    busy(true);
+    loadLibrary("hls", function (Hls) {
+      if (token !== session) return;
+      if (!Hls) return fallback ? switchTo(fallback) : fail(TEXT.library);
+      if (!Hls.isSupported()) return fallback ? switchTo(fallback) : fail(TEXT.browser);
+      var mediaRecoveries = 0;
+      var hls = new Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 30 });
+      active = {
+        destroy: function () { hls.destroy(); },
+        onStable: function () { mediaRecoveries = 0; }
+      };
+      hls.on(Hls.Events.ERROR, function (event, data) {
+        if (token !== session || !data || !data.fatal) return;
+        if (fallback && !started) return switchTo(fallback);
+        var details = String(data.details || "");
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          // Codec errors never heal; anything else gets two recovery attempts
+          // (the second also swaps the audio codec, as hls.js recommends).
+          if (/codec/i.test(details) || mediaRecoveries >= 2) return fail(TEXT.codec);
+          mediaRecoveries += 1;
+          if (mediaRecoveries === 2 && hls.swapAudioCodec) hls.swapAudioCodec();
+          hls.recoverMediaError();
+          return;
+        }
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          scheduleRetry(function () {
+            // startLoad() resumes segment loading but cannot re-fetch a
+            // playlist that never loaded; reload the source for those.
+            if (/^manifest/i.test(details)) hls.loadSource(url);
+            else hls.startLoad();
+          }, TEXT.load);
+          return;
+        }
+        fail(TEXT.load);
       });
-      hls.on(window.Hls.Events.MANIFEST_PARSED, start);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        if (token === session) start();
+      });
       hls.loadSource(url);
       hls.attachMedia(video);
-    };
-    script.onerror = function () { loadLibrary(index + 1); };
-    document.head.appendChild(script);
+    });
   }
-  loadLibrary(0);
+
+  // mpegts.js for continuous MPEG-TS / FLV over HTTP (Xtream "live" URLs).
+  // Network errors reconnect with backoff (fresh player each time); codec
+  // and format errors mean the stream itself is unplayable here, so they
+  // get at most one reconnect before a clear message.
+  function playMpegts(url, kind, fallback) {
+    var token = session;
+    busy(true);
+    loadLibrary("mpegts", function (mpegts) {
+      if (token !== session) return;
+      if (!mpegts) return fallback ? switchTo(fallback) : fail(TEXT.library);
+      var features = typeof mpegts.getFeatureList === "function" ? mpegts.getFeatureList() : null;
+      var supported = (features && features.mseLivePlayback) ||
+        (typeof mpegts.isSupported === "function" && mpegts.isSupported());
+      if (!supported) {
+        if (canNativeHls()) return switchTo(function () { playNative(url + "?format=hls", true); });
+        return fallback ? switchTo(fallback) : fail(TEXT.browser);
+      }
+      var details = mpegts.ErrorDetails || {};
+      var unplayable = [
+        details.MEDIA_CODEC_UNSUPPORTED || "CodecUnsupported",
+        details.MEDIA_FORMAT_UNSUPPORTED || "FormatUnsupported"
+      ];
+      var player = null;
+      var mediaFailures = 0;
+
+      function create() {
+        destroyPlayer();
+        var current = player = mpegts.createPlayer({
+          type: kind === "flv" ? "flv" : "mpegts",
+          isLive: true,
+          url: url
+        }, {
+          enableWorker: true,
+          lazyLoad: false,                 // never pause the download of a live stream
+          liveBufferLatencyChasing: true,  // jump back to the live edge after hiccups
+          liveBufferLatencyMaxLatency: 8,  // generous: IPTV upstreams are bursty
+          liveBufferLatencyMinRemain: 3,
+          autoCleanupSourceBuffer: true,   // long sessions must not grow the buffer forever
+          seekType: "range"                // the library default
+        });
+        current.on(mpegts.Events.ERROR, function (errorType, detail) {
+          if (token !== session || current !== player) return;
+          if (fallback && !started) return switchTo(fallback);
+          if (errorType === (mpegts.ErrorTypes && mpegts.ErrorTypes.MEDIA_ERROR)) mediaFailure(unplayable.indexOf(detail) !== -1);
+          else reconnect();
+        });
+        // A live stream never "completes": the upstream closed the connection.
+        current.on(mpegts.Events.LOADING_COMPLETE || "loading_complete", function () {
+          if (token === session && current === player) reconnect();
+        });
+        current.attachMediaElement(video);
+        current.load();
+        start();
+      }
+      function destroyPlayer() {
+        if (!player) return;
+        var old = player;
+        player = null;
+        try { old.destroy(); } catch (e) {}
+      }
+      function reconnect() {
+        if (fallback && !started) return switchTo(fallback);
+        destroyPlayer();
+        scheduleRetry(create, TEXT.load);
+      }
+      function mediaFailure(fatal) {
+        if (!player) return;
+        mediaFailures += 1;
+        if (fatal || mediaFailures > 1) fail(TEXT.codec);
+        else reconnect();
+      }
+      active = {
+        destroy: destroyPlayer,
+        recover: function () { if (player) reconnect(); },
+        onStable: function () { mediaFailures = 0; },
+        onVideoError: function (code) {
+          if (fallback && !started) return switchTo(fallback);
+          // MSE decode failures surface on the <video> element, not via mpegts.js.
+          if (code === 3 || code === 4) mediaFailure(false);
+          else if (player) reconnect();
+        }
+      };
+      create();
+    });
+  }
+
+  function playDash(url) {
+    var token = session;
+    busy(true);
+    loadLibrary("dash", function (dashjs) {
+      if (token !== session) return;
+      if (!dashjs || typeof dashjs.MediaPlayer !== "function") return fail(TEXT.library);
+      if (typeof dashjs.supportsMediaSource === "function" && !dashjs.supportsMediaSource()) return fail(TEXT.browser);
+      var events = dashjs.MediaPlayer.events || {};
+      var player = dashjs.MediaPlayer().create();
+      active = {
+        destroy: function () { player.reset(); }
+      };
+      player.on(events.ERROR || "error", function (event) {
+        if (token !== session) return;
+        var error = event && event.error;
+        var text = String((error && (error.message || error)) || "");
+        fail(/codec|not supported|unsupported/i.test(text) ? TEXT.codec : TEXT.load);
+      });
+      player.on(events.PLAYBACK_NOT_ALLOWED || "playbackNotAllowed", function () {
+        if (token === session) blocked();
+      });
+      player.initialize(video, url, true);
+    });
+  }
+
+  function begin() {
+    var url = new URL(src, location.origin).href;
+    if (type === "hls") {
+      if (canNativeHls()) playNative(url, true);
+      else playHlsJs(url, null);
+    } else if (type === "ts" || type === "flv") {
+      // iPhones without any MediaSource can't run mpegts.js, but they play
+      // the Worker's HLS rendition of the same channel natively.
+      if (!hasMse() && canNativeHls()) playNative(url + "?format=hls", true);
+      else playMpegts(url, type, null);
+    } else if (type === "dash") {
+      playDash(url);
+    } else if (type === "video" || type === "audio") {
+      playNative(url, false);
+    } else {
+      probeNative(url, function () {
+        playHlsJs(url, function () {
+          playMpegts(url, "ts", function () { fail(TEXT.offline); });
+        });
+      });
+    }
+  }
+
+  // Free the decoder and the upstream connection when the page goes away
+  // (Xtream accounts allow few concurrent connections); resume if the page
+  // comes back from the back/forward cache.
+  window.addEventListener("pagehide", function () {
+    stopped = true;
+    teardown();
+    busy(false);
+  });
+  window.addEventListener("pageshow", function (event) {
+    if (!event || !event.persisted || !stopped || failed) return;
+    stopped = false;
+    begin();
+  });
+
+  if (!/^\/api\/play\/(tv\/[^/?#]+|stream\/[^/?#]+\/[^/?#]+)$/.test(src)) {
+    fail(TEXT.unavailable);
+    return;
+  }
+  begin();
 })();
 </script>
 </body>

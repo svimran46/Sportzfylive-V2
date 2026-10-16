@@ -13,8 +13,15 @@ const SITE = API;
 const SESSION_KEY = "sportzfy_admin_session";
 const MATCH_PAGE_SIZE = 50;
 const CHECK_BATCH = 25;
+const TV_PAGE_SIZE = 100;
+const CATALOG_LIMIT = 200;
 const LANGUAGES = ["English", "Spanish", "French", "German", "Italian", "Portuguese", "Arabic", "Hindi", "Bengali", "Urdu", "Polish", "Turkish", "Dutch", "Russian", "Multi-language", "Other"];
 const QUALITIES = ["HD", "SD", "FHD", "4K"];
+// The Worker's TV categories, used until /api/admin/settings provides its list.
+const TV_CATEGORIES = ["Sports", "Football", "Cricket", "Motorsport", "Fight", "Tennis", "Golf", "Basketball", "Horse Racing", "Entertainment", "Kids", "News", "Movies"];
+const STREAM_URL_HINT = "http or https — an HLS (.m3u8), DASH (.mpd), MPEG-TS (.ts), FLV, MP4/WebM, audio stream, or an embed page. http streams play through the Worker.";
+// Client-side pre-check only (scheme + host); the Worker validates the rest.
+const STREAM_URL_RE = /^https?:\/\/[^\s/?#|]+/i;
 const NOTICE_SWATCHES = ["#7f1d1d", "#111827", "#166534", "#1d4ed8", "#6d28d9", "#c2410c"];
 
 const state = {
@@ -26,7 +33,7 @@ const state = {
   renderId: 0,
   matchFilter: { q: "", date: "", chip: "all", page: 1 },
   matchSelection: new Set(),
-  tvFilter: { q: "", chip: "all", category: "" },
+  tvFilter: { q: "", chip: "all", category: "", group: "", page: 1 },
   tvSelection: new Set(),
   currentMatch: null,
   streamModal: null,
@@ -942,7 +949,7 @@ async function openStreamModal(index = -1) {
         languages.map(l => "<option" + (l === stream.language ? " selected" : "") + ">" + esc(l) + "</option>").join("") + "</select></div>" +
         '<div class="field"><label for="s-quality">Quality</label><select id="s-quality" name="quality" class="select">' +
         QUALITIES.map(q => "<option" + (q === stream.quality ? " selected" : "") + ">" + q + "</option>").join("") + "</select></div></div>" +
-      '<div class="field"><label for="s-url">URL</label><input id="s-url" name="url" class="input mono" inputmode="url" placeholder="https://…" value="' + esc(stream.url || "") + '"><div class="hint">https only — an embed page or an .m3u8 manifest.</div></div>' +
+      '<div class="field"><label for="s-url">URL</label><input id="s-url" name="url" class="input mono" inputmode="url" placeholder="https://… or http://…" value="' + esc(stream.url || "") + '"><div class="hint">' + esc(STREAM_URL_HINT) + "</div></div>" +
       '<label class="check"><input type="checkbox" name="sandbox"' + (stream.sandbox ? " checked" : "") + '><span>Run in a sandbox <small>— blocks pop-ups and redirects; some pages show a black frame inside one. Set from the channel when you pick one above.</small></span></label>' +
       '<input type="hidden" name="channelId" value="' + esc(stream.channelId || "") + '">' +
     "</div>" +
@@ -960,13 +967,18 @@ function renderCatalog() {
   const modal = state.streamModal;
   const list = $("#catalogList");
   if (!modal || !list) return;
-  const query = modal.query.toLowerCase();
-  const channels = (state.tv?.channels || []).filter(c => !query || c.name.toLowerCase().includes(query));
-  $("#catalogCount").textContent = plural(channels.length, "channel") + " available" + (modal.bulk ? " · " + modal.picked.size + " picked" : "");
-  list.innerHTML = channels.length
-    ? channels.map(c => '<button type="button" class="catalog-item' + (modal.picked.has(c.id) ? " picked" : "") + '" data-action="catalog-pick" data-id="' + esc(c.id) + '" role="option">' +
+  const query = modal.query.trim().toLowerCase();
+  const channels = (state.tv?.channels || []).filter(c => !query || channelMatches(c, query));
+  // Playlists run to thousands of channels: list the first few hundred and
+  // let the search narrow the rest down.
+  const shown = channels.slice(0, CATALOG_LIMIT);
+  $("#catalogCount").textContent = plural(channels.length, "channel") + " available" +
+    (channels.length > shown.length ? " · first " + shown.length + " listed, search to narrow" : "") +
+    (modal.bulk ? " · " + modal.picked.size + " picked" : "");
+  list.innerHTML = shown.length
+    ? shown.map(c => '<button type="button" class="catalog-item' + (modal.picked.has(c.id) ? " picked" : "") + '" data-action="catalog-pick" data-id="' + esc(c.id) + '" role="option">' +
         (modal.bulk ? '<input type="checkbox" tabindex="-1" aria-hidden="true"' + (modal.picked.has(c.id) ? " checked" : "") + ">" : "") +
-        "<span>" + esc(c.name) + "</span>" + (c.active === false ? '<span class="faint">inactive</span>' : '<span class="faint">' + esc(c.category || "") + "</span>") + "</button>").join("")
+        "<span>" + esc(c.name) + "</span>" + (c.active === false ? '<span class="faint">inactive</span>' : '<span class="faint">' + esc([c.group, c.category].filter(Boolean).join(" · ")) + "</span>") + "</button>").join("")
     : '<div class="pad muted">No channels match.</div>';
   $("#bulkToggle").textContent = modal.bulk ? "Single pick" : "Bulk add";
   $("#streamFoot").innerHTML = modal.bulk
@@ -996,7 +1008,7 @@ function pickCatalogChannel(id) {
 async function saveStreamFromModal(form) {
   const modal = state.streamModal;
   const url = form.elements.url.value.trim();
-  if (url && !/^https:\/\//i.test(url)) return toast("Stream URL must start with https://", "error");
+  if (url && !STREAM_URL_RE.test(url)) return toast("Stream URL must start with http:// or https://", "error");
   const streams = manualStreams(state.currentMatch).slice();
   const current = modal.index >= 0 ? streams[modal.index] : null;
   const item = {
@@ -1038,13 +1050,75 @@ async function bulkAddStreams(button) {
 /* ------------------------------------------------------------------ */
 
 const TV_CHIPS = [["all", "all"], ["active", "active"], ["inactive", "inactive"], ["manual", "manual"], ["synced", "synced"]];
+const KIND_LABELS = { hls: "HLS", ts: "MPEG-TS", dash: "DASH", flv: "FLV", video: "Video", audio: "Audio", embed: "Embed" };
+
+// Mirrors the Worker's streamKind(): how a stream URL plays. Only a fallback —
+// /api/admin/tv/channels sends each channel's kind.
+const STREAM_EXTENSIONS = {
+  m3u8: "hls", m3u: "hls", mpd: "dash", ts: "ts", mts: "ts", m2ts: "ts", flv: "flv",
+  mp4: "video", m4v: "video", webm: "video", mov: "video", mkv: "video", ogv: "video",
+  mp3: "audio", aac: "audio", m4a: "audio", ogg: "audio", oga: "audio", opus: "audio", flac: "audio", wav: "audio"
+};
+const STREAM_QUERY_KINDS = { m3u8: "hls", hls: "hls", ts: "ts", mpegts: "ts", mpd: "dash", dash: "dash", flv: "flv", mp4: "video" };
+function streamKind(value) {
+  let url;
+  try { url = new URL(String(value ?? "").split("|")[0].trim()); } catch (_) { return "embed"; }
+  const extension = ((url.pathname.match(/\.([a-z0-9]+)$/i) || [])[1] || "").toLowerCase();
+  if (Object.hasOwn(STREAM_EXTENSIONS, extension)) return STREAM_EXTENSIONS[extension];
+  if (/\/live\/[^/]+\/[^/]+\/\d+$/.test(url.pathname)) return "ts";
+  for (const key of ["type", "format", "output", "extension"]) {
+    const kind = String(url.searchParams.get(key) ?? "").trim().toLowerCase();
+    if (Object.hasOwn(STREAM_QUERY_KINDS, kind)) return STREAM_QUERY_KINDS[kind];
+  }
+  return "embed";
+}
+const channelKind = (c) => (Object.hasOwn(KIND_LABELS, c?.kind) ? c.kind : streamKind(c?.url));
+
+// Request headers the Worker sends upstream (from the playlist).
+const HEADER_LABELS = [["userAgent", "User-Agent"], ["referer", "Referer"], ["origin", "Origin"]];
+const channelHeaders = (c) => HEADER_LABELS
+  .map(([key, label]) => [label, typeof c?.headers?.[key] === "string" ? c.headers[key].trim() : ""])
+  .filter(([, value]) => value);
+
+// Same rule as the Worker's needsProxy(): plain-http streams, admin-forced
+// proxying, request headers and raw MPEG-TS/FLV play through the Worker.
+function channelProxied(c) {
+  if (c?.proxied === true) return true;
+  const kind = channelKind(c);
+  return /^http:/i.test(String(c?.url || "")) || c?.proxy === true || channelHeaders(c).length > 0 || kind === "ts" || kind === "flv";
+}
+
+// The logo the admin page can show: the Worker's logoSrc (https as-is, http
+// relayed through /api/tv/logo/:id), else the stored logo when it is https.
+// http logos never load directly — this page is https (mixed content).
+function channelLogo(c) {
+  const src = String(c?.logoSrc || "");
+  if (src.startsWith("/") && !src.startsWith("//")) return API + src;
+  if (/^https:\/\//i.test(src)) return src;
+  const logo = String(c?.logo || "");
+  return /^https:\/\//i.test(logo) ? logo : "";
+}
+
+// Distinct non-empty groups (countries etc.), in catalog order.
+function channelGroups(channels) {
+  const seen = new Set();
+  for (const c of channels || []) {
+    const group = String(c.group || "").trim();
+    if (group) seen.add(group);
+  }
+  return [...seen];
+}
+
+const channelMatches = (c, query) =>
+  String(c.name || "").toLowerCase().includes(query) || String(c.group || "").toLowerCase().includes(query);
 
 function filteredChannels() {
-  const { q, chip, category } = state.tvFilter;
+  const { q, chip, category, group } = state.tvFilter;
   const query = q.trim().toLowerCase();
   return (state.tv?.channels || []).filter(c => {
-    if (query && !c.name.toLowerCase().includes(query)) return false;
+    if (query && !channelMatches(c, query)) return false;
     if (category && c.category !== category) return false;
+    if (group && String(c.group || "").trim() !== group) return false;
     if (chip === "active") return c.active !== false;
     if (chip === "inactive") return c.active === false;
     if (chip === "manual") return c.origin !== "synced";
@@ -1066,6 +1140,10 @@ async function renderChannels() {
   if (stale(renderId)) return;
   state.tvSelection.clear();
   const f = state.tvFilter;
+  const groups = channelGroups(tv.channels);
+  // A group that a sync removed would filter everything out invisibly.
+  if (f.group && !groups.includes(f.group)) f.group = "";
+  f.page = 1;
   setView(
     '<div class="head"><h1>Live TV</h1><p>Manage the channels shown on the public <a class="green" href="' + esc(SITE + "/live-tv") + '" target="_blank" rel="noopener">Live TV page</a> · <span id="tvCount"></span></p>' +
     '<p class="hint" style="font-size:15px;margin-top:8px">' + lastSyncLine(tv) + "</p>" +
@@ -1076,9 +1154,14 @@ async function renderChannels() {
       '<a class="btn primary" href="#/tv/new">+ Add Channel</a>' +
     "</div></div>" +
     '<div class="filters">' +
-      '<div class="search-wrap">' + icon("search") + '<input class="input" type="search" placeholder="Search channels…" aria-label="Search channels" data-filter="tv-q" value="' + esc(f.q) + '"></div>' +
+      '<div class="search-wrap">' + icon("search") + '<input class="input" type="search" placeholder="Search channels or countries…" aria-label="Search channels" data-filter="tv-q" value="' + esc(f.q) + '"></div>' +
       '<div class="filter-row"><select class="select" aria-label="Category" data-filter="tv-category"><option value="">All categories</option>' +
-        (tv.categories || []).map(c => '<option value="' + esc(c) + '"' + (f.category === c ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select></div>" +
+        (tv.categories || []).map(c => '<option value="' + esc(c) + '"' + (f.category === c ? " selected" : "") + ">" + esc(c) + "</option>").join("") + "</select>" +
+        (groups.length
+          ? '<select class="select" aria-label="Group" data-filter="tv-group"><option value="">All groups (' + groups.length + ")</option>" +
+            groups.map(g => '<option value="' + esc(g) + '"' + (f.group === g ? " selected" : "") + ">" + esc(g) + "</option>").join("") + "</select>"
+          : "") +
+      "</div>" +
       '<div class="chips" role="group" aria-label="Channel filters">' +
         TV_CHIPS.map(([key, label]) => '<button type="button" class="chip' + (f.chip === key ? " active" : "") + '" data-action="tv-chip" data-chip="' + key + '" aria-pressed="' + (f.chip === key) + '">' + label + "</button>").join("") +
       "</div></div>" +
@@ -1087,9 +1170,26 @@ async function renderChannels() {
   renderChannelTable();
 }
 
+function channelRowMeta(c) {
+  const kind = channelKind(c);
+  return [
+    c.group ? String(c.group) : "",
+    c.category || "",
+    c.origin === "synced" ? "synced" : "manual",
+    KIND_LABELS[kind],
+    channelProxied(c) ? "via Worker" : "",
+    c.sandbox ? "sandboxed" : "",
+    Number.isFinite(c.sort) ? "order " + c.sort : ""
+  ].filter(Boolean).map(esc).join(" · ");
+}
+
 function renderChannelTable() {
   const all = state.tv?.channels || [];
   const list = filteredChannels();
+  const pages = Math.max(1, Math.ceil(list.length / TV_PAGE_SIZE));
+  state.tvFilter.page = Math.min(Math.max(1, state.tvFilter.page || 1), pages);
+  const page = state.tvFilter.page;
+  const items = list.slice((page - 1) * TV_PAGE_SIZE, page * TV_PAGE_SIZE);
   $("#tvCount").textContent = plural(all.length, "channel") + (list.length !== all.length ? " · " + list.length + " shown" : "");
   const count = state.tvSelection.size;
   $("#tvBulk").innerHTML = count
@@ -1103,23 +1203,33 @@ function renderChannelTable() {
     $("#tvTable").innerHTML = emptyState(all.length ? "No channels found" : "No channels yet", all.length ? "Try a different search or filter." : "Sync the playlist, import one from a URL, or add a channel by hand.");
     return;
   }
+  // The header checkbox covers every channel the filters match, on all pages.
   const allSelected = list.every(c => state.tvSelection.has(c.id));
   $("#tvTable").innerHTML = '<section class="panel"><div class="table-wrap"><table><thead><tr>' +
-    '<th class="cb"><input type="checkbox" aria-label="Select all shown" data-action="tv-select-all"' + (allSelected ? " checked" : "") + "></th>" +
+    '<th class="cb"><input type="checkbox" aria-label="' + esc("Select all " + plural(list.length, "matching channel")) + '" title="Select all ' + list.length + ' matching" data-action="tv-select-all"' + (allSelected ? " checked" : "") + "></th>" +
     '<th>Channel</th><th>Status</th><th style="text-align:right">Actions</th></tr></thead><tbody>' +
-    list.map(c => "<tr>" +
+    items.map(c => {
+      const initials = esc(String(c.name || "").slice(0, 2).toUpperCase());
+      const logo = channelLogo(c);
+      return "<tr>" +
       '<td class="cb"><input type="checkbox" aria-label="Select ' + esc(c.name) + '" data-action="tv-select" data-id="' + esc(c.id) + '"' + (state.tvSelection.has(c.id) ? " checked" : "") + "></td>" +
-      '<td><div class="logo-cell"><span class="logo-box">' + (c.logo ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-initials="' + esc(c.name.slice(0, 2).toUpperCase()) + '" onerror="this.replaceWith(document.createTextNode(this.dataset.initials))">' : esc(c.name.slice(0, 2).toUpperCase())) + "</span>" +
+      '<td><div class="logo-cell"><span class="logo-box">' + (logo ? '<img src="' + esc(logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-initials="' + initials + '" onerror="this.replaceWith(document.createTextNode(this.dataset.initials))">' : initials) + "</span>" +
         '<span><a class="row-title" href="#/tv/' + encodeURIComponent(c.id) + '">' + esc(c.name) + "</a>" +
-        '<div class="row-meta">' + esc(c.category || "") + " · " + (c.origin === "synced" ? "synced" : "manual") + (c.kind === "hls" ? " · HLS" : "") + (c.sandbox ? " · sandboxed" : "") + (Number.isFinite(c.sort) ? " · order " + c.sort : "") + "</div></span></div></td>" +
+        '<div class="row-meta">' + channelRowMeta(c) + "</div></span></div></td>" +
       '<td><button type="button" class="pill' + (c.active === false ? " grey" : "") + '" data-action="tv-toggle-active" data-id="' + esc(c.id) + '" title="Click to ' + (c.active === false ? "activate" : "deactivate") + '">' + (c.active === false ? "Inactive" : "Active") + "</button></td>" +
       '<td><div class="row-actions">' +
         '<button type="button" class="text-btn" data-action="tv-test" data-id="' + esc(c.id) + '">Test</button>' +
         '<a class="text-btn" href="' + esc(SITE + "/live-tv#ch=" + encodeURIComponent(c.id)) + '" target="_blank" rel="noopener">Preview</a>' +
         '<a class="text-btn green" href="#/tv/' + encodeURIComponent(c.id) + '">Edit</a>' +
         '<button type="button" class="text-btn red" data-action="tv-delete" data-id="' + esc(c.id) + '">Delete</button>' +
-      "</div></td></tr>").join("") +
-    "</tbody></table></div></section>";
+      "</div></td></tr>";
+    }).join("") +
+    "</tbody></table></div>" +
+    (pages > 1
+      ? '<div class="pager"><button class="btn sm" type="button" data-action="tv-page" data-page="' + (page - 1) + '"' + (page <= 1 ? " disabled" : "") + '>Previous</button><span>Page ' + page + " of " + pages +
+        '</span><button class="btn sm" type="button" data-action="tv-page" data-page="' + (page + 1) + '"' + (page >= pages ? " disabled" : "") + ">Next</button></div>"
+      : "") +
+    "</section>";
 }
 
 async function updateChannel(id, body, message) {
@@ -1208,10 +1318,11 @@ function openImportModal() {
   state.importRun = null;
   openModal(
     '<form data-submit="tv-import" novalidate><div class="modal-head"><h3>Import from URL</h3><button class="icon-btn" type="button" data-action="modal-close" aria-label="Close">' + icon("x") + "</button></div>" +
-    '<div class="modal-body"><p>Paste an M3U or JSON playlist URL. Each stream is tested before import — only working channels are added.</p>' +
+    '<div class="modal-body"><p>Paste an https link to an M3U or JSON playlist. Its streams may be http or https, in any format the player supports.</p>' +
       '<label class="sr-only" for="importUrl">Playlist URL</label><input id="importUrl" name="url" class="input mono" inputmode="url" placeholder="https://example.com/playlist.m3u or .json" required>' +
+      '<label class="check" style="margin-top:18px"><input type="checkbox" name="test" checked><span>Test each stream before adding <small>— only working channels are offered. Testing opens one connection per stream, and Xtream accounts often allow only one or two at a time, so untick this for large IPTV playlists.</small></span></label>' +
       '<div id="importStatus" class="import-progress" role="status"></div></div>' +
-    '<div class="modal-foot" id="importFoot"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Import &amp; validate</button></div></form>'
+    '<div class="modal-foot" id="importFoot"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Import</button></div></form>'
   );
   setTimeout(() => $("#importUrl")?.focus(), 30);
 }
@@ -1219,17 +1330,36 @@ function openImportModal() {
 async function runImport(form) {
   const url = form.elements.url.value.trim();
   if (!/^https:\/\//i.test(url)) return toast("Paste an https playlist URL", "error");
+  const test = form.elements.test.checked;
   const run = { cancelled: false };
   state.importRun = run;
   const status = $("#importStatus");
   const foot = $("#importFoot");
+  const retry = () => {
+    foot.innerHTML = '<button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Try again</button>';
+  };
   foot.innerHTML = '<button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="button" disabled>Working…</button>';
   try {
     status.innerHTML = '<div class="muted">Downloading and reading the playlist…</div>';
     const parsed = await send("/api/admin/tv/parse", "POST", { url });
     if (run.cancelled) return;
-    const fresh = parsed.entries.filter(e => !e.exists);
-    const known = parsed.entries.length - fresh.length;
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+    const fresh = entries.filter(e => !e.exists);
+    const known = entries.length - fresh.length;
+    const skipped = parsed?.skipped ? " · " + parsed.skipped + " unusable entries skipped" : "";
+    run.all = fresh;
+
+    if (!test) {
+      // No stream checks: offer every new channel straight away.
+      run.working = fresh;
+      status.innerHTML = "<div><b class=\"green\">" + plural(fresh.length, "new channel") + "</b> · " + known + " already in the catalog" + esc(skipped) + "</div>" +
+        (fresh.length ? '<div class="hint">Streams were not tested — use Test on the Live TV page to check one.</div>' : "");
+      if (!fresh.length) return retry();
+      foot.innerHTML = '<button class="btn" type="button" data-action="modal-close">Cancel</button>' +
+        '<button class="btn primary" type="button" data-action="tv-import-add" data-mode="all">Add ' + plural(fresh.length, "channel") + "</button>";
+      return;
+    }
+
     const results = [];
     for (let i = 0; i < fresh.length; i += CHECK_BATCH) {
       if (run.cancelled) return;
@@ -1237,22 +1367,23 @@ async function runImport(form) {
       status.innerHTML = '<div class="muted">Testing streams: ' + done + " of " + fresh.length + '…</div><div class="progress"><span style="width:' + Math.round((done / fresh.length) * 100) + '%"></span></div>';
       const batch = fresh.slice(i, i + CHECK_BATCH);
       const r = await send("/api/admin/tv/check", "POST", { urls: batch.map(e => e.url) });
-      results.push(...r.results);
+      // Keep results aligned with entries even if a batch answers short.
+      batch.forEach((_, j) => results.push(r?.results?.[j]));
     }
     if (run.cancelled) return;
     run.working = fresh.filter((_, i) => results[i]?.ok);
-    run.all = fresh;
     const failed = fresh.map((e, i) => ({ e, r: results[i] })).filter(item => !item.r?.ok);
     status.innerHTML = '<div class="progress"><span style="width:100%"></span></div>' +
-      "<div><b class=\"green\">" + plural(run.working.length, "working channel") + "</b> · " + failed.length + " failed · " + known + " already in the catalog" +
-      (parsed.skipped ? " · " + parsed.skipped + " unusable entries skipped" : "") + "</div>" +
+      "<div><b class=\"green\">" + plural(run.working.length, "working channel") + "</b> · " + failed.length + " failed · " + known + " already in the catalog" + esc(skipped) + "</div>" +
       (failed.length ? '<div class="result-list">' + failed.slice(0, 200).map(({ e, r }) => esc(e.name) + " — " + esc(r?.error || "failed")).join("<br>") + "</div>" : "");
+    if (!fresh.length) return retry();
     foot.innerHTML = '<button class="btn" type="button" data-action="modal-close">Cancel</button>' +
-      (failed.length ? '<button class="btn" type="button" data-action="tv-import-add" data-mode="all"' + (fresh.length ? "" : " disabled") + ">Add all " + fresh.length + "</button>" : "") +
+      (failed.length ? '<button class="btn" type="button" data-action="tv-import-add" data-mode="all">Add all ' + fresh.length + "</button>" : "") +
       '<button class="btn primary" type="button" data-action="tv-import-add" data-mode="working"' + (run.working.length ? "" : " disabled") + ">Add " + plural(run.working.length, "channel") + "</button>";
   } catch (error) {
+    if (run.cancelled) return;
     status.innerHTML = '<div class="error-box">' + esc(error.message) + "</div>";
-    foot.innerHTML = '<button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Try again</button>';
+    retry();
   }
 }
 
@@ -1286,22 +1417,40 @@ async function renderChannelForm(id) {
   }
   const c = channel || { active: true };
   const synced = c.origin === "synced";
+  const logoSrc = channel ? channelLogo(c) : "";
+  const headers = channelHeaders(c);
+  const groups = channelGroups(tv.channels);
+  const kind = channel ? channelKind(c) : "";
   setView(
     pageHead(channel ? "Edit TV Channel" : "Add TV Channel",
       channel
-        ? (synced ? "Synced from the playlist — its name, logo and stream URL refresh on every sync; status, order and a category you pick here are kept." : "Manual channel — it survives playlist syncs.")
+        ? (synced ? "Synced from the playlist — its name, group, logo and stream URL refresh on every sync; status, order and a category you pick here are kept." : "Manual channel — it survives playlist syncs.")
         : "Add a channel manually — manual channels survive playlist syncs.") +
     '<a class="back-link" href="#/tv">← All channels</a>' +
     '<form class="card" data-submit="channel-save" data-id="' + esc(channel ? c.id : "") + '" novalidate>' +
       '<div class="field"><label for="c-name">Channel name <span class="req">*</span></label><input id="c-name" name="name" class="input" required maxlength="120" placeholder="BeIN Sports FIFA" value="' + esc(c.name || "") + '"></div>' +
-      '<div class="field"><label for="c-logo">Logo URL</label><div class="with-thumb"><input id="c-logo" name="logo" class="input" placeholder="https://…" value="' + esc(c.logo || "") + '" data-input="thumb" data-thumb="logoThumb">' +
-        '<img id="logoThumb" class="thumb logo' + (c.logo ? "" : " hidden") + '" alt="" src="' + esc(c.logo || "") + '" referrerpolicy="no-referrer" onerror="this.classList.add(\'hidden\')"></div></div>' +
-      '<div class="field"><label for="c-url">Stream URL <span class="req">*</span></label><input id="c-url" name="url" class="input mono" required inputmode="url" placeholder="https://example.com/stream/index.m3u8" value="' + esc(c.url || "") + '"><div class="hint">Must be HTTPS — m3u8 manifest or embed page URL.</div></div>' +
-      '<div class="grid-2"><div class="field"><label for="c-category">Category</label><select id="c-category" name="category" class="select"><option value="">Auto (from channel name)</option>' +
+      '<div class="field"><label for="c-group">Group</label><input id="c-group" name="group" class="input" maxlength="60" list="groupList" placeholder="Country or section, e.g. Italy" value="' + esc(c.group || "") + '">' +
+        '<datalist id="groupList">' + groups.map(g => '<option value="' + esc(g) + '"></option>').join("") + "</datalist>" +
+        '<div class="hint">Shown as the country/group filter on the Live TV page. Leave blank for none.</div></div>' +
+      // The thumb shows the Worker-relayed logo while the field still holds
+      // the saved value; a newly typed http logo cannot preview on this https page.
+      '<div class="field"><label for="c-logo">Logo URL</label><div class="with-thumb"><input id="c-logo" name="logo" class="input" placeholder="https://…" value="' + esc(c.logo || "") + '" data-input="thumb" data-thumb="logoThumb"' +
+        (logoSrc ? ' data-saved-value="' + esc(c.logo || "") + '" data-saved-src="' + esc(logoSrc) + '"' : "") + ">" +
+        '<img id="logoThumb" class="thumb logo' + (logoSrc ? "" : " hidden") + '" alt="" src="' + esc(logoSrc) + '" referrerpolicy="no-referrer" onerror="this.classList.add(\'hidden\')"></div>' +
+        '<div class="hint">https or http. http logos are relayed by the Worker once saved, so they do not preview here before that.</div></div>' +
+      '<div class="field"><label for="c-url">Stream URL <span class="req">*</span></label><input id="c-url" name="url" class="input mono" required inputmode="url" placeholder="https://example.com/stream/index.m3u8" value="' + esc(c.url || "") + '"><div class="hint">' + esc(STREAM_URL_HINT) +
+        (kind ? " Saved as: <b>" + esc(KIND_LABELS[kind]) + "</b>" + (channelProxied(c) ? " · plays through the Worker" : "") + "." : "") + "</div></div>" +
+      (headers.length
+        ? '<div class="field"><span class="label">Request headers</span><div class="mini-box">' +
+            headers.map(([label, value]) => '<div class="label">' + esc(label) + '</div><div class="mono" style="overflow-wrap:anywhere;margin-bottom:8px">' + esc(value) + "</div>").join("") +
+          '</div><div class="hint">Read-only. Set by the playlist (<code>#EXTVLCOPT</code> lines or a <code>URL|User-Agent=…</code> suffix); the Worker sends them when it fetches the stream.</div></div>'
+        : "") +
+      '<div class="grid-2"><div class="field"><label for="c-category">Category</label><select id="c-category" name="category" class="select"><option value="">Auto (from group and name)</option>' +
         (tv.categories || []).map(cat => '<option value="' + esc(cat) + '"' + (c.categoryLocked && c.category === cat ? " selected" : "") + ">" + esc(cat) + "</option>").join("") + "</select>" +
         (channel && !c.categoryLocked ? '<div class="hint">Currently ' + esc(c.category) + ".</div>" : "") + "</div>" +
         '<div class="field"><label for="c-sort">Sort order</label><input id="c-sort" name="sort" type="number" class="input" placeholder="Auto" value="' + esc(Number.isFinite(c.sort) ? c.sort : "") + '"><div class="hint">Lower numbers show first. Auto keeps playlist order.</div></div></div>' +
-      '<label class="check"><input type="checkbox" name="sandbox"' + (c.sandbox ? " checked" : "") + "><span>Run in a sandbox <small>— blocks the page's pop-ups and redirects. Some channels show a black frame inside one, so leave it off unless a channel misbehaves." +
+      '<label class="check"><input type="checkbox" name="proxy"' + (c.proxy === true ? " checked" : "") + "><span>Play through the Worker <small>— relay the stream through this site even when it is https. Use it for streams that refuse other websites (CORS) or need the headers above. http, MPEG-TS and FLV streams always play through the Worker.</small></span></label>" +
+      '<label class="check"><input type="checkbox" name="sandbox"' + (c.sandbox ? " checked" : "") + "><span>Run in a sandbox <small>— blocks the page's pop-ups and redirects (embed pages only). Some channels show a black frame inside one, so leave it off unless a channel misbehaves." +
         (synced ? " Synced channels follow <code>\"sandbox\": true</code> in the playlist on every sync." : "") + "</small></span></label>" +
       '<label class="check"><input type="checkbox" name="active"' + (c.active !== false ? " checked" : "") + "><span>Active on Live TV</span></label>" +
       '<div class="form-actions"><button class="btn primary" type="submit">' + (channel ? "Save changes" : "Create Channel") + "</button>" +
@@ -1318,8 +1467,12 @@ async function saveChannel(form) {
   const id = form.dataset.id;
   const v = (name) => form.elements[name].value.trim();
   if (!v("name")) return void ($("#formStatus").textContent = "Channel name is required.");
-  if (!/^https:\/\//i.test(v("url"))) return void ($("#formStatus").textContent = "Stream URL must start with https://");
-  const body = { name: v("name"), logo: v("logo"), url: v("url"), category: v("category"), sort: v("sort"), sandbox: form.elements.sandbox.checked, active: form.elements.active.checked };
+  if (!STREAM_URL_RE.test(v("url"))) return void ($("#formStatus").textContent = "Stream URL must start with http:// or https://");
+  if (v("logo") && !/^https?:\/\//i.test(v("logo"))) return void ($("#formStatus").textContent = "Logo URL must start with http:// or https://");
+  const body = {
+    name: v("name"), group: v("group").slice(0, 60), logo: v("logo"), url: v("url"), category: v("category"), sort: v("sort"),
+    proxy: form.elements.proxy.checked, sandbox: form.elements.sandbox.checked, active: form.elements.active.checked
+  };
   const button = form.querySelector("button[type=submit]");
   await busy(button, "Saving…", async () => {
     try {
@@ -1398,6 +1551,8 @@ async function renderSettings(section) {
   const s = data.settings;
   const lw = s.liveWindows;
   const n = s.notice;
+  const tvCategories = Array.isArray(data.tvCategories) && data.tvCategories.length ? data.tvCategories.map(String) : TV_CATEGORIES;
+  const tvDefault = tvCategories.includes(s.tvSource.defaultCategory) ? s.tvSource.defaultCategory : (tvCategories.includes("Sports") ? "Sports" : tvCategories[0]);
 
   const typeRow = (t = { name: "", keywords: [], hours: "" }) =>
     '<div class="type-entry" data-type-row><input class="input" placeholder="Name" aria-label="Match type name" data-type="name" value="' + esc(t.name) + '">' +
@@ -1423,12 +1578,15 @@ async function renderSettings(section) {
         '<div class="inline-field" style="margin-top:18px"><label for="i-budget">Streams resolved per fetch</label><input id="i-budget" name="resolveBudget" type="number" min="1" max="20" class="input" value="' + esc(s.ingest.resolveBudget) + '"></div>' +
         '<p class="hint" style="margin:-6px 0 22px">1–20. Higher resolves faster but uses more of the Worker\'s per-request subrequest budget (50 on the free plan).</p>' +
         saveRow("Save ingest settings", "ingest") + "</form>") +
-    card("tvSource", "home", "TV source", "The playlist the Live TV sync imports from (M3U or JSON, like channels.json), its fetch budget, and health-check concurrency. All editable here — no redeploy.",
+    card("tvSource", "home", "TV source", "The playlist the Live TV sync imports from — by default the sports.m3u playlist (any M3U or JSON playlist works) — plus its fetch budget, health-check concurrency and the category for channels nothing else places. A sync replaces every synced channel with the playlist's current list; manual channels stay. All editable here — no redeploy.",
       '<form data-submit="settings-tvSource">' +
         '<div class="field"><label for="t-url">Playlist URL (M3U or JSON)</label><input id="t-url" name="url" class="input mono" inputmode="url" value="' + esc(s.tvSource.url) + '"></div>' +
+        '<div class="field"><label for="t-category">Default category</label><select id="t-category" name="defaultCategory" class="select">' +
+          tvCategories.map(cat => '<option value="' + esc(cat) + '"' + (cat === tvDefault ? " selected" : "") + ">" + esc(cat) + "</option>").join("") + "</select>" +
+          '<div class="hint">For channels whose playlist group and name do not point to a category. Applies from the next sync.</div></div>' +
         '<div class="inline-field"><label for="t-timeout">Playlist fetch timeout (s)</label><input id="t-timeout" name="timeoutSec" type="number" min="5" max="300" class="input" value="' + esc(s.tvSource.timeoutSec) + '"></div>' +
         '<div class="inline-field"><label for="t-conc">Health-check concurrency</label><input id="t-conc" name="concurrency" type="number" min="1" max="10" class="input" value="' + esc(s.tvSource.concurrency) + '"></div>' +
-        switchRow("autoSync", "Re-sync automatically", "Pull the playlist every 6 hours so changed stream links reach the Live TV page on their own.", s.tvSource.autoSync) +
+        switchRow("autoSync", "Re-sync automatically", "Pull the playlist every hour (and soon after the URL changes) so new channels and changed stream links reach the Live TV page on their own.", s.tvSource.autoSync) +
         saveRow("Save TV source settings", "tvSource") + "</form>") +
 
     '<div class="group-label">CONTENT</div>' +
@@ -1671,7 +1829,8 @@ async function saveSection(section, body, form) {
 const SETTINGS_SUBMIT = {
   "settings-ingest": (f) => saveSection("ingest", { autoSync: f.elements.autoSync.checked, resolveBudget: f.elements.resolveBudget.value }, f),
   "settings-tvSource": (f) => saveSection("tvSource", {
-    url: f.elements.url.value.trim(), timeoutSec: f.elements.timeoutSec.value, concurrency: f.elements.concurrency.value, autoSync: f.elements.autoSync.checked
+    url: f.elements.url.value.trim(), timeoutSec: f.elements.timeoutSec.value, concurrency: f.elements.concurrency.value, autoSync: f.elements.autoSync.checked,
+    defaultCategory: f.elements.defaultCategory.value
   }, f),
   "settings-liveWindows": (f) => {
     const categories = {};
@@ -1874,6 +2033,7 @@ const ACTIONS = {
 
   "tv-chip": (el) => {
     state.tvFilter.chip = el.dataset.chip;
+    state.tvFilter.page = 1;
     $$('[data-action="tv-chip"]').forEach(c => {
       c.classList.toggle("active", c === el);
       c.setAttribute("aria-pressed", String(c === el));
@@ -1888,6 +2048,11 @@ const ACTIONS = {
   "tv-select-all": (el) => {
     filteredChannels().forEach(c => (el.checked ? state.tvSelection.add(c.id) : state.tvSelection.delete(c.id)));
     renderChannelTable();
+  },
+  "tv-page": (el) => {
+    state.tvFilter.page = Number(el.dataset.page) || 1;
+    renderChannelTable();
+    $("#tvTable").scrollIntoView({ block: "start" });
   },
   "tv-clear-selection": () => {
     state.tvSelection.clear();
@@ -2028,10 +2193,11 @@ document.addEventListener("input", (event) => {
     filterTimer = setTimeout(() => {
       if (filter === "match-q") { state.matchFilter.q = el.value; state.matchFilter.page = 1; renderMatchTable(); }
       if (filter === "match-date") { state.matchFilter.date = el.value; state.matchFilter.page = 1; renderMatchTable(); }
-      if (filter === "tv-q") { state.tvFilter.q = el.value; renderChannelTable(); }
-      if (filter === "tv-category") { state.tvFilter.category = el.value; renderChannelTable(); }
+      if (filter === "tv-q") { state.tvFilter.q = el.value; state.tvFilter.page = 1; renderChannelTable(); }
+      if (filter === "tv-category") { state.tvFilter.category = el.value; state.tvFilter.page = 1; renderChannelTable(); }
+      if (filter === "tv-group") { state.tvFilter.group = el.value; state.tvFilter.page = 1; renderChannelTable(); }
       if (filter === "catalog-q" && state.streamModal) { state.streamModal.query = el.value; renderCatalog(); }
-    }, filter === "match-date" || filter === "tv-category" ? 0 : 150);
+    }, filter === "match-date" || filter === "tv-category" || filter === "tv-group" ? 0 : 150);
   }
   const kind = el.dataset?.input;
   if (kind === "uk-hint") updateUkHint();
@@ -2039,8 +2205,13 @@ document.addEventListener("input", (event) => {
     const thumb = $("#" + el.dataset.thumb);
     if (thumb) {
       const value = el.value.trim();
-      thumb.classList.toggle("hidden", !/^(https:\/\/|\/)/i.test(value));
-      if (/^(https:\/\/|\/)/i.test(value)) thumb.src = value;
+      // A saved channel logo previews through the Worker (data-saved-src);
+      // anything else only when https or same-origin — http would be
+      // blocked as mixed content, so the thumb just stays hidden.
+      const src = el.dataset.savedSrc && value === el.dataset.savedValue ? el.dataset.savedSrc
+        : /^(https:\/\/|\/)/i.test(value) ? value : "";
+      thumb.classList.toggle("hidden", !src);
+      if (src) thumb.src = src;
     }
   }
   if (kind === "notice-preview") updateNoticePreview();
@@ -2052,7 +2223,8 @@ document.addEventListener("input", (event) => {
 });
 document.addEventListener("change", (event) => {
   const el = event.target;
-  if (el.dataset?.filter === "tv-category") { state.tvFilter.category = el.value; renderChannelTable(); }
+  if (el.dataset?.filter === "tv-category") { state.tvFilter.category = el.value; state.tvFilter.page = 1; renderChannelTable(); }
+  if (el.dataset?.filter === "tv-group") { state.tvFilter.group = el.value; state.tvFilter.page = 1; renderChannelTable(); }
   if (el.id === "f-date") updateUkHint();
   if (el.dataset?.input === "notice-preview") updateNoticePreview();
 });

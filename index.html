@@ -2207,17 +2207,23 @@
     // navigation. Scripts and same-origin stay on so the player works; the
     // page is on another origin, so it cannot lift the sandbox.
     const MANUAL_STREAM_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation";
+    // Stream kinds the universal player page can play; "embed" (a web page)
+    // and anything unrecognised load directly in the frame instead.
+    const PLAYER_STREAM_KINDS = ["hls", "dash", "ts", "flv", "video", "audio"];
 
     function collectPlayableStreams(match) {
         const playable = [];
         // Streams the admin attached (often from the Live TV catalog) come
         // first, in the admin's order. The public list carries ids only; the
-        // Worker redirects /api/play/stream/... to the stream itself.
+        // Worker redirects (or proxies) /api/play/stream/... to the stream.
         const manual = match && match.manual && Array.isArray(match.manual.streams) ? match.manual.streams : [];
         for (const stream of manual) {
             if (!stream || !stream.id) continue;
             const path = "/api/play/stream/" + encodeURIComponent(String(match.id || "")) + "/" + encodeURIComponent(String(stream.id));
-            const hls = stream.kind === "hls";
+            // Every non-embed kind (HLS, MPEG-TS, DASH, FLV, plain video or
+            // audio) plays in the first-party player page; HLS is its default
+            // engine, so only the other kinds name their type.
+            const kind = PLAYER_STREAM_KINDS.includes(stream.kind) ? stream.kind : "";
             playable.push({
                 group: { source: String(stream.name || "Stream"), id: String(stream.id) },
                 stream: {
@@ -2226,8 +2232,10 @@
                     hd: /^(HD|FHD|4K)$/i.test(String(stream.quality || "")),
                     source: String(stream.name || "Stream")
                 },
-                url: hls ? PROXY_URL + "/player.html?src=" + encodeURIComponent(path) : PROXY_URL + path,
-                sandbox: !hls && stream.sandbox === true
+                url: kind
+                    ? PROXY_URL + "/player.html?src=" + encodeURIComponent(path) + (kind !== "hls" ? "&type=" + kind : "")
+                    : PROXY_URL + path,
+                sandbox: !kind && stream.sandbox === true
             });
         }
         const groups = (match && match.streamed && Array.isArray(match.streamed.sources))

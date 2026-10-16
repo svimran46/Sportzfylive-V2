@@ -14,7 +14,7 @@ A modern, responsive web application for streaming live sports matches and 24/7 
 - ⚠️ **Error Handling**: Per-source failure isolation — one bad Streamed source never breaks a match list
 - 🎯 **Watch page**: match identity (crests + share) on top, the player, stream chips labelled with language/provider/HD, then a rail of other matches — all rendered from the match list already in memory, so opening a match costs no extra requests
 - 🔗 **Shareable matches**: share buttons emit `#match=<id>` links, and the site opens that match directly on load
-- 📺 **Live TV** (`/live-tv`): 24/7 channels from the [`channels.json`](https://github.com/svimran46/playlist.m3u) playlist (the same list the Android app uses) — category chips, search, a player with previous/next, reload, full screen and share, `#ch=<id>` deep links, and an "Up next" rail on wide screens
+- 📺 **Live TV** (`/live-tv`): the sports channels from [`sports.m3u`](https://github.com/svimran46/channels.m3u/tree/claude/youthful-knuth-czn4sp) (built by `build_sports_m3u.py`) — country filter, sport chips, search, a universal player (HLS, MPEG-TS, DASH, FLV, MP4/WebM, audio, embeds) with previous/next, reload, full screen and share, `#ch=<id>` deep links, and an "Up next" rail on wide screens
 - 🛠️ **Admin panel** (`/admin`): dashboard, match management (filters, bulk actions, featured/active flags, streams picked from the TV catalog), Live TV channel management (playlist sync, import from URL with stream health checks), fetch logs and site settings — no redeploy needed for any of it
 - 📱 **Responsive Design**: Fully responsive grid layout for mobile, tablet, and desktop
 - 🎨 **Modern UI**: Dark theme with smooth animations and transitions
@@ -124,29 +124,44 @@ Cleanup). A match the feed reports live is never removed.
 ### Live TV
 
 `/live-tv` lists the active channels from the Worker's catalog. The catalog is
-seeded from the TV source playlist on first use (default:
-`https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json`),
-re-synced every 6 hours by the cron when *Re-sync automatically* is on, and on
-demand from the admin. A sync replaces the playlist's channels but keeps manual
-channels, and keeps each synced channel's status, sort order and an
-admin-picked category. Categories (Sports, Football, Cricket, Entertainment,
-Kids, News, Movies) come from a channel's `category` field or its name —
-upstream marks every channel `genre: "Sports"`, cartoons included.
+synced from the TV source playlist — by default the latest commit of
+`sports.m3u` on the `claude/youthful-knuth-czn4sp` branch of
+`svimran46/channels.m3u` (2,230 sports channels in 89 country groups). It is
+seeded on first use, re-synced every hour by the cron when *Re-sync
+automatically* is on (and at once when the source URL changes), and on demand
+from the admin. A sync replaces every synced channel, so only the playlist's
+channels stay on the page; channels added by hand in the admin are kept until
+deleted there. Each channel keeps its `group-title` as its group (the country
+filter); categories (Football, Cricket, Motorsport, Fight, Tennis, Golf,
+Basketball, Horse Racing, Sports, …) come from the name, with *Default
+category* (Settings → TV source) as the fallback.
 
-The public channel list never contains stream URLs. The player frames
-`/api/play/tv/:id`, which redirects to the channel. Channels marked
-`"sandbox": true` in the playlist run in a sandboxed iframe (no pop-ups, no
-top-level navigation), others load directly, and `.m3u8` streams play in
-`player.html` with hls.js (native HLS on Safari/iOS). Streams an admin
-attaches to a match play the same way on the match's watch view, ahead of the
-Streamed sources.
+The public channel list never contains stream URLs. Channels play through
+`/api/play/tv/:id`:
+
+- **https HLS/DASH/video/audio/embeds** redirect to the stream, as before.
+- **http streams, raw MPEG-TS/FLV, channels with request headers
+  (`#EXTVLCOPT:http-user-agent`/`http-referrer`, Kodi `|User-Agent=…`) or the
+  admin's *Play through the Worker* flag** are proxied by the Worker: the
+  browser never sees the upstream URL (Xtream URLs carry the account login),
+  there is no mixed content, and HLS playlists are rewritten so every segment
+  goes through `/api/play/tv/:id/s/<token>` (AES-GCM sealed, 12 h, bound to
+  the channel). DASH uses `/b/<token>/…`. `?format=hls` asks for the `.m3u8`
+  sibling of an Xtream `.ts` stream (iPhones without MSE).
+- http logos are served from `/api/tv/logo/:id` (images only, edge-cached).
+
+Tokens are sealed with `STREAM_PROXY_SECRET` when set, else `ADMIN_TOKEN`.
+Note that most Xtream accounts allow only one or two simultaneous
+connections, and each viewer of a proxied channel holds one.
 
 ### Playback
 
-- **HLS Streams (.m3u8)**: Automatically played via hls.js
-- **Iframe Embeds**: Displayed in a regular iframe (no `sandbox` attribute, which embed players refuse to run under)
-- **Search**: Type to filter channels by name
-- **Filter**: Click category buttons to filter by genre
+`player.html` picks an engine from the channel's kind: native HLS or hls.js
+for `.m3u8`, mpegts.js for MPEG-TS and FLV (falling back to the Worker's HLS
+version on iPhones without MSE), dash.js for `.mpd`, and the native player for
+MP4/WebM/audio. Libraries load lazily from pinned CDN versions. Blocked
+autoplay retries muted with a *Tap to unmute* button; network drops reconnect
+with backoff. Embed pages open in an iframe (sandboxed when flagged).
 
 ### Watch page
 
@@ -174,6 +189,9 @@ bun run test     # or: npm test
 #   node test/dom-ux.smoke.mjs    # keyboard access, modal behavior, stream picker selection
 #   node test/ui-polish.smoke.mjs # design-system structure, layout order, a11y semantics
 #   node test/resolver.smoke.mjs  # Streamed sync, per-source failure isolation, API shaping, image proxy
+#   node test/live-tv.smoke.mjs   # Live TV page: filters, batching, kind routing, deep links
+#   node test/player.smoke.mjs    # universal player engine selection, fallbacks, autoplay
+#   node test/stream-proxy.smoke.mjs # Worker stream proxy, sealing, HLS/DASH rewriting, logos
 #   node test/admin-tv.smoke.mjs  # Live TV catalog, playlist parsing/sync/import, play redirects,
 #                                 # settings, live windows + cleanup, password rotation, fetch log
 #   node test/deploy.smoke.mjs    # published copies in sync, no host leftovers, deploy workflow

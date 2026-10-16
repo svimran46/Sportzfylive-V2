@@ -103,7 +103,7 @@ assert.ok(sitemap.includes("<loc>" + CANONICAL + "/live-tv</loc>"), "sitemap lis
 ok("sitemap.xml published for the canonical origin");
 
 // Live TV: linked from the homepage, framed channels are sandboxed, and the
-// HLS player page only plays the Worker's own /api/play redirects.
+// universal player page only plays the Worker's own /api/play paths.
 const liveTv = read("live-tv.html").toString("utf8");
 assert.ok(liveTv.includes('<link rel="canonical" href="' + CANONICAL + '/live-tv">'), "Live TV canonical URL");
 assert.ok(liveTv.includes("/api/tv/channels") && liveTv.includes("/api/play/tv/"), "Live TV reads the catalog and plays through /api/play");
@@ -112,8 +112,30 @@ assert.ok(liveTv.includes('if (channel.sandbox) frame.setAttribute("sandbox", SA
 assert.ok(!/allow-popups|allow-top-navigation/.test(liveTv), "channel frames cannot open pop-ups or navigate the page");
 assert.ok((html.match(/href="\/live-tv"/g) || []).length >= 5, "the homepage links to Live TV from its menus");
 const player = read("player.html").toString("utf8");
-assert.ok(player.includes("/^\\/api\\/play\\/(tv\\/[^/?#]+|stream\\/[^/?#]+\\/[^/?#]+)$/"), "the HLS player only accepts /api/play paths");
-ok("Live TV page and HLS player published and linked");
+assert.ok(player.includes("/^\\/api\\/play\\/(tv\\/[^/?#]+|stream\\/[^/?#]+\\/[^/?#]+)$/"), "the player only accepts /api/play paths");
+ok("Live TV page and player published and linked");
+
+// The player's engines come from pinned CDN copies only: no other hosts, no
+// floating versions, and each library from both of its CDNs.
+const PLAYER_CDN_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com"];
+const PLAYER_LIBS = [
+  "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.17/hls.min.js",
+  "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js",
+  "https://cdn.jsdelivr.net/npm/mpegts.js@1.8.0/dist/mpegts.js",
+  "https://unpkg.com/mpegts.js@1.8.0/dist/mpegts.js",
+  "https://cdn.jsdelivr.net/npm/dashjs@4.7.4/dist/dash.all.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/dashjs/4.7.4/dash.all.min.js"
+];
+const playerUrls = player.match(/\bhttps?:\/\/[^\s"'`<>)]+/g) || [];
+for (const url of playerUrls) {
+  assert.ok(url.startsWith("https://"), "player loads nothing over plain http: " + url);
+  assert.ok(PLAYER_CDN_HOSTS.includes(new URL(url).hostname), "player script host is allowed: " + url);
+  assert.ok(PLAYER_LIBS.includes(url), "player script is an exact pinned version: " + url);
+}
+for (const url of PLAYER_LIBS) assert.ok(playerUrls.includes(url), "player can load " + url);
+assert.ok(!/@latest\b|@\^|@~/.test(player), "no floating library versions in the player");
+assert.ok(!/<script[^>]*\bsrc=/i.test(player), "engine libraries load lazily, not as static <script src> tags");
+ok("player engines load lazily from pinned hls.js 1.5.17 / mpegts.js 1.8.0 / dash.js 4.7.4 CDN copies");
 
 // ---------------------------------------------------------------------------
 // 4. Header rules and the deploy workflow.

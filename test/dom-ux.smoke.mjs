@@ -445,8 +445,8 @@ ok("no references to the removed openManualStream remain");
 
 // ---------------------------------------------------------------------------
 // 4. Streams the admin attached to a match: listed first, played through the
-//    Worker's /api/play redirect (never a raw URL), embeds sandboxed and .m3u8
-//    streams through the HLS player page.
+//    Worker's /api/play route (never a raw URL), embeds sandboxed, and every
+//    other format (.m3u8, MPEG-TS, ...) through the universal player page.
 // ---------------------------------------------------------------------------
 windowStub.__SPORTZFY_MATCHES.set("manual-1", {
   id: "manual-1",
@@ -455,11 +455,13 @@ windowStub.__SPORTZFY_MATCHES.set("manual-1", {
   sources: [],
   streamed: { sourceCount: 0, streamCount: 0, sources: [], streams: [] },
   manual: {
-    streamCount: 2,
+    streamCount: 5,
     streams: [
       { id: "s1", name: "Sky Sports Football", language: "English", quality: "HD", kind: "embed", sandbox: true },
       { id: "s2", name: "Backup", language: "Spanish", quality: "SD", kind: "hls" },
-      { id: "s3", name: "Direct", language: "English", quality: "HD", kind: "embed" }
+      { id: "s3", name: "Direct", language: "English", quality: "HD", kind: "embed" },
+      { id: "s4", name: "Raw feed", language: "English", quality: "HD", kind: "ts", sandbox: true },
+      { id: "s5", name: "Legacy", language: "English", quality: "SD" }
     ]
   }
 });
@@ -470,7 +472,7 @@ windowStub.__SPORTZFY_MATCHES.set("manual-1", {
     selector === ".sfy-match-item" || selector === "[data-match-id]" ? manualCard : null;
   documentStub.dispatch("keydown", { key: "Enter", target: manualCard, preventDefault() {} });
   const manualChips = documentStub.getElementById("stream-picker").children;
-  assert.equal(manualChips.length, 3, "every admin-attached stream renders as a chip");
+  assert.equal(manualChips.length, 5, "every admin-attached stream renders as a chip");
   assert.equal(manualChips[0].dataset.embedUrl, "https://sportzfylive.svimranmy.workers.dev/api/play/stream/manual-1/s1");
   assert.equal(manualChips[0].dataset.sandbox, "1", "streams flagged sandbox are marked for the sandbox");
   assert.ok(!manualChips[2].dataset.sandbox, "unflagged embed streams load directly");
@@ -480,12 +482,23 @@ windowStub.__SPORTZFY_MATCHES.set("manual-1", {
     ".m3u8 streams play through the HLS player page"
   );
   assert.ok(!manualChips[1].dataset.sandbox, "the first-party HLS player page is not sandboxed");
+  assert.equal(
+    manualChips[3].dataset.embedUrl,
+    "https://sportzfylive.svimranmy.workers.dev/player.html?src=" + encodeURIComponent("/api/play/stream/manual-1/s4") + "&type=ts",
+    "raw MPEG-TS streams play through the player page with their type"
+  );
+  assert.ok(!manualChips[3].dataset.sandbox, "the player page is never sandboxed, even for a flagged stream");
+  assert.equal(
+    manualChips[4].dataset.embedUrl,
+    "https://sportzfylive.svimranmy.workers.dev/api/play/stream/manual-1/s5",
+    "streams without a kind load directly (as embeds)"
+  );
   assert.ok(manualChips[0].dataset.streamLabel.includes("Sky Sports Football"), "chip names the channel");
   const frame = documentStub.getElementById("player-container").children[0];
   assert.equal(frame.tagName, "iframe", "the first stream auto-plays");
   assert.equal(frame.getAttribute("sandbox"), "allow-scripts allow-same-origin allow-forms allow-modals allow-presentation");
   context.navigateBack();
 }
-ok("admin-attached streams: listed first, played via /api/play, sandboxed when flagged");
+ok("admin-attached streams: listed first, played via /api/play, sandboxed when flagged, any format via the player page");
 
 console.log("\nAll " + passed + " DOM assertions passed.");

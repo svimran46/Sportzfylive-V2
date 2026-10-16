@@ -291,7 +291,12 @@ ok("no embedUrl persisted in KV");
         category: "FOOTBALL",
         url: "/matches/manual-secret-path",
         liveWindow: 999,
-        streams: [{ id: "s1", name: "Sky Sports", language: "English", league: "", quality: "HD" }]
+        streams: [
+          { id: "s1", name: "Sky Sports", language: "English", league: "", quality: "HD" },
+          // http stream URLs are accepted now (the Worker proxies them) but
+          // must stay just as private as https ones.
+          { id: "s2", name: "IPTV", language: "English", league: "", quality: "HD", url: "http://iptv.example:8080/live/user/pass/1001.ts" }
+        ]
       }
     }),
     env,
@@ -328,7 +333,7 @@ for (const group of publicValencia.streamed.sources) {
 ok("/api/matches/all-today carries resolved streamed summary");
 
 const publicBlob = JSON.stringify(allToday);
-for (const forbidden of ["embedUrl", "liveWindow", "createdAt", "updatedAt", "streamedSummary", "manual-secret-path"]) {
+for (const forbidden of ["embedUrl", "liveWindow", "createdAt", "updatedAt", "streamedSummary", "manual-secret-path", "iptv.example", "user/pass"]) {
   assert.ok(!publicBlob.includes(forbidden), "public response must not contain " + forbidden);
 }
 assert.ok(!("url" in publicValencia));
@@ -338,7 +343,9 @@ assert.deepEqual(Object.keys(manualPublic).sort(), [
   "category", "competition", "description", "externalId", "featured", "id", "manual",
   "popular", "poster", "source", "sources", "startTime", "status", "streamed", "teams", "title"
 ]);
-assert.equal(manualPublic.manual.streamCount, 1);
+assert.equal(manualPublic.manual.streamCount, 2);
+assert.deepEqual(manualPublic.manual.streams.map((stream) => [stream.id, stream.kind]), [["s2", "ts"]],
+  "only playable streams are listed; an Xtream live path plays as MPEG-TS");
 assert.equal(manualPublic.streamed.sourceCount, 0);
 assert.equal(manualPublic.streamed.streamCount, 0);
 ok("whitelist shaping: no admin fields or playback URLs in public responses");
@@ -481,7 +488,7 @@ console.log("# repeat sync");
 
   assert.equal(matchesAfter.length, 4, "manual match survives re-sync");
   const manual = matchesAfter.find((match) => match.id === globalThis.manualMatchId);
-  assert.equal(manual.streams.length, 1, "manual streams preserved");
+  assert.equal(manual.streams.length, 2, "manual streams preserved");
   assert.equal(manual.streams[0].name, "Sky Sports");
 
   const valenciaAfter = matchesAfter.find((match) => match.id === "streamed-101");
