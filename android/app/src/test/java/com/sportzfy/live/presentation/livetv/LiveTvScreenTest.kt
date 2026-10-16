@@ -120,7 +120,6 @@ class LiveTvScreenTest {
     fun countryPickerShowsTheSelectionAndAToZSorts() {
         show()
         compose.onNodeWithText("World").assertExists()
-        compose.onNodeWithText("4 channels").assertExists()
         compose.onNodeWithText("A–Z").performClick()
         settle()
         assertEquals(

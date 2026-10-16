@@ -59,7 +59,7 @@ fun BottomNavBar(
             .background(SportzfyColors.Slate)
             .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
-        HorizontalDivider(color = SportzfyColors.Outline, thickness = 1.dp)
+        HorizontalDivider(color = SportzfyColors.Outline.copy(alpha = 0.6f), thickness = 0.5.dp)
         Row(Modifier.fillMaxWidth()) {
             items.forEach { item ->
                 BottomNavItem(
@@ -80,32 +80,42 @@ private fun BottomNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val color = if (selected) SportzfyColors.Rose else SportzfyColors.TextSecondary
-    Column(
+    Box(
         modifier = modifier
-            .heightIn(min = 60.dp)
+            .height(52.dp)
             .tvFocus(RoundedCornerShape(12.dp), focusedScale = 1f)
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
+        // A thin accent on the bar's top edge marks the current tab.
         Box(
             Modifier
-                .width(28.dp)
-                .height(3.dp)
-                .background(if (selected) SportzfyColors.Rose else Color.Transparent, RoundedCornerShape(50))
+                .align(Alignment.TopCenter)
+                .width(24.dp)
+                .height(2.dp)
+                .background(if (selected) SportzfyColors.Rose else Color.Transparent, RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
         )
-        SportzfyIcon(item.icon, contentDescription = null, tint = color, size = 22.dp)
-        Text(
-            text = item.label,
-            // Pink text uses the lighter text shade for contrast; the icon keeps Rose.
-            color = if (selected) SportzfyColors.RoseText else SportzfyColors.TextSecondary,
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            SportzfyIcon(
+                item.icon,
+                contentDescription = null,
+                tint = if (selected) SportzfyColors.Rose else SportzfyColors.TextMuted,
+                size = 20.dp,
+            )
+            Text(
+                text = item.label,
+                // Pink text uses the lighter text shade for contrast; the icon keeps Rose.
+                color = if (selected) SportzfyColors.RoseText else SportzfyColors.TextMuted,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

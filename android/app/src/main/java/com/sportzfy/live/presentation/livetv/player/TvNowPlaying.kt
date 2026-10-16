@@ -2,7 +2,6 @@ package com.sportzfy.live.presentation.livetv.player
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -22,7 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -59,11 +60,11 @@ fun TvNowPlaying(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            // Same 16dp gutter as the grid, so the edges line up.
-            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(SportzfyColors.SlateRaised)
-            .border(1.dp, SportzfyColors.Outline, RoundedCornerShape(20.dp)),
+            // Edge to edge, like a TV app: the picture is the focus of the page.
+            .background(SportzfyColors.Slate)
+            .drawBehind {
+                drawLine(SportzfyColors.Outline, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1f)
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // No fillMaxWidth: it would force the full width and break the ratio once the cap applies.
@@ -97,7 +98,7 @@ private fun NowPlayingBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -163,7 +164,7 @@ private fun BarButton(
     onClick: () -> Unit,
     tint: androidx.compose.ui.graphics.Color = SportzfyColors.TextSecondary,
 ) {
-    IconButton(onClick = onClick, modifier = Modifier.tvFocus(CircleShape)) {
+    IconButton(onClick = onClick, modifier = Modifier.size(42.dp).tvFocus(CircleShape)) {
         SportzfyIcon(icon, contentDescription = description, tint = tint, size = 22.dp)
     }
 }

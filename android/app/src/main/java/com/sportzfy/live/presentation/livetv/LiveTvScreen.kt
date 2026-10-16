@@ -1,5 +1,12 @@
 package com.sportzfy.live.presentation.livetv
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,8 +82,6 @@ import com.sportzfy.live.presentation.components.ChannelCard
 import com.sportzfy.live.presentation.components.EmptyState
 import com.sportzfy.live.presentation.components.InlineBanner
 import com.sportzfy.live.presentation.components.MatchListSkeleton
-import com.sportzfy.live.presentation.components.SegmentedControl
-import com.sportzfy.live.presentation.components.SportzfyChip
 import com.sportzfy.live.presentation.components.bleedHorizontally
 import com.sportzfy.live.presentation.components.tvFocus
 import com.sportzfy.live.presentation.model.ChannelShelf
@@ -197,48 +202,31 @@ private fun ChannelGrid(
     LazyVerticalGrid(
         // Three columns on phones (100dp fits three from 340dp wide), more on tablets and TVs.
         columns = GridCells.Adaptive(minSize = 100.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         val fullSpan: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
-        item(key = "search", span = fullSpan) {
-            ChannelSearchField(state.query, actions.onQueryChange)
+        // One compact toolbar row: search, country, sort. Then the chips.
+        item(key = "toolbar", span = fullSpan) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChannelSearchField(state.query, actions.onQueryChange, Modifier.weight(1f))
+                if (state.showCountries) CountryButton(state.selectedCountry, onPickCountry)
+                SortToggle(
+                    sort = state.sort,
+                    onToggle = { actions.onSortChange(if (state.sort == ChannelSort.A_Z) ChannelSort.BROWSE else ChannelSort.A_Z) },
+                )
+            }
         }
         state.error?.let { error ->
             item(key = "banner", span = fullSpan) {
                 InlineBanner("${error.userMessage()} Showing the last channels loaded.")
             }
         }
-        item(key = "toolbar", span = fullSpan) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.showCountries) {
-                    CountryButton(state.selectedCountry, onPickCountry, Modifier.weight(1f))
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
-                SegmentedControl(
-                    options = ChannelSort.entries.map { it.label },
-                    selectedIndex = state.sort.ordinal,
-                    onSelect = { actions.onSortChange(ChannelSort.entries[it]) },
-                    modifier = Modifier.width(148.dp),
-                )
-            }
-        }
         if (state.showCategories || state.shelves.isNotEmpty()) {
             item(key = "chips", span = fullSpan) {
                 FilterChips(state, actions)
-            }
-        }
-        if (state.channels.isNotEmpty()) {
-            item(key = "count", span = fullSpan) {
-                Text(
-                    text = if (state.channels.size == 1) "1 channel" else "${state.channels.size} channels",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp),
-                    color = SportzfyColors.TextMuted,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
             }
         }
         if (state.channels.isEmpty()) {
@@ -295,8 +283,8 @@ private fun LiveTvHeader(onOpenMenu: (() -> Unit)?) {
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-            .padding(start = if (onOpenMenu != null) 4.dp else 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-            .height(56.dp),
+            .padding(start = if (onOpenMenu != null) 4.dp else 16.dp, end = 16.dp)
+            .height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onOpenMenu != null) {
@@ -305,18 +293,11 @@ private fun LiveTvHeader(onOpenMenu: (() -> Unit)?) {
             }
             Spacer(Modifier.width(4.dp))
         }
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(SportzfyColors.Rose.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            SportzfyIcon(SportzfyIcons.LiveTv, contentDescription = null, tint = SportzfyColors.Rose, size = 20.dp)
-        }
-        Spacer(Modifier.width(12.dp))
+        SportzfyIcon(SportzfyIcons.LiveTv, contentDescription = null, tint = SportzfyColors.Rose, size = 20.dp)
+        Spacer(Modifier.width(10.dp))
         Text(
             text = "Live TV",
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier
                 .testTag("screen-title")
                 .semantics { heading() },
@@ -324,81 +305,99 @@ private fun LiveTvHeader(onOpenMenu: (() -> Unit)?) {
     }
 }
 
+private val ToolbarHeight = 44.dp
+private val ToolbarShape = RoundedCornerShape(12.dp)
+
+/** Compact search box, the toolbar's height; Material's TextField is 56dp and underlined. */
 @Composable
-private fun ChannelSearchField(query: String, onQueryChange: (String) -> Unit) {
+private fun ChannelSearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val focusManager = LocalFocusManager.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(14.dp)
-    TextField(
-        interactionSource = interaction,
+    BasicTextField(
         value = query,
         onValueChange = onQueryChange,
-        placeholder = { Text("Search channels…") },
-        leadingIcon = { SportzfyIcon(SportzfyIcons.Search, contentDescription = null, size = 22.dp) },
-        trailingIcon = if (query.isNotEmpty()) {
-            {
-                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.tvFocus(CircleShape)) {
-                    SportzfyIcon(SportzfyIcons.Close, contentDescription = "Clear search", size = 22.dp)
-                }
-            }
-        } else {
-            null
-        },
         singleLine = true,
+        interactionSource = interaction,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = SportzfyColors.TextPrimary),
+        cursorBrush = SolidColor(SportzfyColors.Rose),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-        shape = shape,
-        // An outline all round instead of Material's underline.
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = SportzfyColors.SlateRaised,
-            unfocusedContainerColor = SportzfyColors.SlateRaised,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            unfocusedPlaceholderColor = SportzfyColors.TextMuted,
-            focusedPlaceholderColor = SportzfyColors.TextMuted,
-            unfocusedLeadingIconColor = SportzfyColors.TextMuted,
-            cursorColor = SportzfyColors.Rose,
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, if (focused) SportzfyColors.Rose else SportzfyColors.Outline, shape),
+        modifier = modifier
+            .height(ToolbarHeight)
+            .clip(ToolbarShape)
+            .background(SportzfyColors.SlateRaised)
+            .border(1.dp, if (focused) SportzfyColors.Rose else SportzfyColors.Outline, ToolbarShape),
+        decorationBox = { field ->
+            Row(Modifier.fillMaxSize().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                SportzfyIcon(SportzfyIcons.Search, contentDescription = null, tint = SportzfyColors.TextMuted, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (query.isEmpty()) {
+                        Text("Search channels", style = MaterialTheme.typography.bodyMedium, color = SportzfyColors.TextMuted, maxLines = 1)
+                    }
+                    field()
+                }
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp).tvFocus(CircleShape)) {
+                        SportzfyIcon(SportzfyIcons.Close, contentDescription = "Clear search", size = 18.dp)
+                    }
+                }
+            }
+        },
     )
 }
 
-/** "🌐 World  2230  ⌄": opens the country sheet. */
+/** "🌐 World ⌄": opens the country sheet. */
 @Composable
 private fun CountryButton(selected: CountryOption, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(14.dp)
     Row(
         modifier = modifier
-            .heightIn(min = 52.dp)
-            .tvFocus(shape)
-            .clip(shape)
+            .height(ToolbarHeight)
+            .widthIn(max = 132.dp)
+            .tvFocus(ToolbarShape)
+            .clip(ToolbarShape)
             .background(SportzfyColors.SlateRaised)
-            .border(1.dp, SportzfyColors.Outline, shape)
+            .border(1.dp, SportzfyColors.Outline, ToolbarShape)
             .clickable(role = Role.Button, onClickLabel = "Change country", onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SportzfyIcon(SportzfyIcons.Globe, contentDescription = null, tint = SportzfyColors.RoseText, size = 18.dp)
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = selected.label,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        SportzfyIcon(SportzfyIcons.Globe, contentDescription = null, tint = SportzfyColors.RoseText, size = 16.dp)
         Spacer(Modifier.width(6.dp))
         Text(
-            text = selected.count.toString(),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = SportzfyColors.TextMuted,
+            text = selected.label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
-        Spacer(Modifier.width(4.dp))
-        SportzfyIcon(SportzfyIcons.ChevronDown, contentDescription = null, tint = SportzfyColors.TextSecondary, size = 18.dp)
+        Spacer(Modifier.width(2.dp))
+        SportzfyIcon(SportzfyIcons.ChevronDown, contentDescription = null, tint = SportzfyColors.TextMuted, size = 16.dp)
+    }
+}
+
+/** A–Z on (rose) or off (the playlist's own order). */
+@Composable
+private fun SortToggle(sort: ChannelSort, onToggle: () -> Unit) {
+    val on = sort == ChannelSort.A_Z
+    Box(
+        modifier = Modifier
+            .height(ToolbarHeight)
+            .tvFocus(ToolbarShape)
+            .clip(ToolbarShape)
+            .background(if (on) SportzfyColors.RoseFill else SportzfyColors.SlateRaised)
+            .border(1.dp, if (on) SportzfyColors.RoseFill else SportzfyColors.Outline, ToolbarShape)
+            .toggleable(value = on, role = Role.Switch, onValueChange = { onToggle() })
+            .semantics { contentDescription = "Sort A to Z" }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = ChannelSort.A_Z.label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = if (on) SportzfyColors.TextPrimary else SportzfyColors.TextSecondary,
+        )
     }
 }
 
@@ -411,7 +410,7 @@ private fun FilterChips(state: ChannelsUiState, actions: LiveTvActions) {
         modifier = Modifier.bleedHorizontally(16.dp),
     ) {
         items(state.shelves, key = { "shelf-${it.name}" }) { shelf ->
-            SportzfyChip(
+            PillChip(
                 label = shelf.label,
                 selected = state.selectedShelf == shelf,
                 onClick = { actions.onSelectShelf(shelf) },
@@ -423,13 +422,51 @@ private fun FilterChips(state: ChannelsUiState, actions: LiveTvActions) {
         }
         if (state.showCategories) {
             items(state.categories, key = { it.category?.name ?: "all" }) { option ->
-                SportzfyChip(
+                PillChip(
                     label = option.label,
                     selected = state.selectedShelf == null && option.category == state.selectedCategory,
                     onClick = { actions.onSelectCategory(option.category) },
                 )
             }
         }
+    }
+}
+
+/** 34dp pill: slimmer than the app's 48dp filter chip, so the grid starts higher. */
+@Composable
+private fun PillChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    @DrawableRes leadingIcon: Int? = null,
+) {
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier = Modifier
+            .height(34.dp)
+            .tvFocus(shape)
+            .clip(shape)
+            .background(if (selected) SportzfyColors.RoseFill else SportzfyColors.SlateRaised)
+            .border(1.dp, if (selected) SportzfyColors.RoseFill else SportzfyColors.Outline, shape)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leadingIcon != null) {
+            SportzfyIcon(
+                leadingIcon,
+                contentDescription = null,
+                tint = if (selected) SportzfyColors.TextPrimary else SportzfyColors.TextMuted,
+                size = 14.dp,
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
+            color = if (selected) SportzfyColors.TextPrimary else SportzfyColors.TextSecondary,
+            maxLines = 1,
+        )
     }
 }
 

@@ -190,8 +190,7 @@ fun TvPlayerLayer(
 
         val shape = when (placement) {
             Placement.MINI -> RoundedCornerShape(14.dp)
-            Placement.DOCKED -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-            Placement.FULL -> RectangleShape
+            Placement.DOCKED, Placement.FULL -> RectangleShape
         }
         Box(
             modifier = Modifier
@@ -308,7 +307,7 @@ private fun rememberMiniWindow(layerWidthDp: Dp, layerWidth: Float, layerHeight:
     val margin = with(density) { 12.dp.toPx() }
     val top = WindowInsets.statusBars.getTop(density) + margin
     // Clear of the bottom tab bar and the system navigation bar.
-    val bottomReserve = with(density) { 88.dp.toPx() } + WindowInsets.navigationBars.getBottom(density)
+    val bottomReserve = with(density) { 68.dp.toPx() } + WindowInsets.navigationBars.getBottom(density)
     val previous = remember { Holder<MiniWindow?>(null) }
     return remember(width, margin, top, bottomReserve, layerWidth, layerHeight) {
         MiniWindow(Size(width, width * 9f / 16f), margin, top, bottomReserve, layerWidth, layerHeight)
