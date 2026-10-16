@@ -114,7 +114,7 @@ const admin = (path, method = "GET", body) =>
 // (any supported format works there), and an M3U playlist.
 // ---------------------------------------------------------------------------
 
-const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u";
+const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/public/sports.m3u";
 const channelsJs = (list) => "const channels = " + JSON.stringify(list, null, 2) + ";\n";
 const UPSTREAM = [
   { name: "ESPN", logo: "https://img.example/espn.png?a=1&amp;amp;b=2", genre: "Sports", url: "https://tv.example/espn", sandbox: true },

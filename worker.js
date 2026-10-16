@@ -21,11 +21,12 @@ const TV_CHANNELS_KEY = "tv_channels";           // Live TV catalog (channels + 
 const PLAY_INDEX_KEY = "play_index";             // matchId -> streamId -> playback URL, for /api/play redirects
 const ADMIN_CREDENTIAL_KEY = "admin_credential"; // salted hash of a password set from the admin panel
 
-// The Live TV catalog is the sports.m3u playlist (Xtream Codes live streams,
-// grouped by country). Settings that still point at the old channels.json
-// list are moved over to it, so every deployment ends up with the same list.
-const DEFAULT_TV_SOURCE_URL = "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u";
-const LEGACY_TV_SOURCE_URLS = ["https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"];
+// The Live TV catalog is public/sports.m3u from this repo (Xtream Codes live
+// streams grouped by country), read from GitHub so a commit to the file
+// reaches the site on the next sync. The Android app gets the same URL as its
+// channel list. Settings that still point at an older list are moved over.
+const DEFAULT_TV_SOURCE_URL = "https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/public/sports.m3u";
+const LEGACY_TV_SOURCE_URLS = ["https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json", "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u"];
 const TV_AUTO_SYNC_EVERY_MS = 60 * 60 * 1000;     // cron re-pulls the playlist this often
 const TV_AUTO_RETRY_MS = 30 * 60 * 1000;          // ...and waits this long after a failed pull
 const TV_CHECK_TIMEOUT_MS = 8000;                 // per-URL health check timeout
@@ -512,7 +513,8 @@ function appConfigPayload(settings) {
     minVersionCode: app.minVersionCode,
     updateUrl: app.updateUrl,
     maintenance: { enabled: app.maintenanceEnabled, message: app.maintenanceMessage },
-    channelsUrl: app.channelsUrl
+    // Blank means the site's own list, so installed apps switch without an update.
+    channelsUrl: app.channelsUrl || DEFAULT_TV_SOURCE_URL
   };
   // Left out, the app uses the default Worker; "" switches the fallback off.
   if (!app.streamProxyEnabled) payload.streamProxyUrl = "";
