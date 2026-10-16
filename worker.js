@@ -2362,6 +2362,35 @@ export async function runTvProbe(env) {
   return { checked: batch.length, listed, active: active.length };
 }
 
+// What the admin page shows for one channel's stream check:
+//   working    listed for viewers (2 good probes in a row, not yet 3 bad)
+//   verifying  last probe good, waiting for the second before listing
+//   failed     last probe bad and not listed; `reason` says why
+//   unchecked  never probed on its current URL (inactive channels stay here)
+export function channelCheck(channel, health) {
+  const entry = health?.channels?.[String(channel.id)];
+  if (channel.active === false || !entry || entry.url !== channel.url) return { state: "unchecked" };
+  const state = entry.working === true ? "working" : entry.ok ? "verifying" : "failed";
+  return {
+    state,
+    ok: entry.ok === true,
+    reason: entry.ok ? "" : String(entry.reason || ""),
+    checkedAt: entry.checkedAt || null,
+    passes: entry.passes || 0,
+    fails: entry.fails || 0
+  };
+}
+
+// Counts per check state across active channels, for the admin summary line.
+export function checkSummary(channels, health) {
+  const counts = { working: 0, verifying: 0, failed: 0, unchecked: 0 };
+  for (const channel of channels) {
+    if (channel.active === false) continue;
+    counts[channelCheck(channel, health).state]++;
+  }
+  return { ...counts, updatedAt: health?.updatedAt || null, batch: TV_PROBE_BATCH };
+}
+
 // M3U of the listed channels for the app. Channels that need custom request
 // headers are left out: the app can't send them.
 function tvPlaylistM3u(channels) {
@@ -3205,9 +3234,11 @@ async function handleAdminTv(request, env, url) {
   const method = request.method;
 
   if (path === "/api/admin/tv/channels" && method === "GET") {
-    const state = await readTvState(env) || emptyTvState();
+    const [stored, health] = await Promise.all([readTvState(env), readTvHealth(env)]);
+    const state = stored || emptyTvState();
     return adminJson({
-      channels: orderedChannels(state.channels).map(adminChannel),
+      channels: orderedChannels(state.channels).map(channel => ({ ...adminChannel(channel), check: channelCheck(channel, health) })),
+      checks: checkSummary(state.channels, health),
       categories: TV_CATEGORIES,
       syncedAt: state.syncedAt || null,
       source: state.source || "",

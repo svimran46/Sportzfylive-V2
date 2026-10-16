@@ -1049,7 +1049,17 @@ async function bulkAddStreams(button) {
 /* Live TV channels                                                    */
 /* ------------------------------------------------------------------ */
 
-const TV_CHIPS = [["all", "all"], ["active", "active"], ["inactive", "inactive"], ["manual", "manual"], ["synced", "synced"]];
+const TV_CHIPS = [["all", "all"], ["active", "active"], ["inactive", "inactive"], ["manual", "manual"], ["synced", "synced"],
+  ["working", "working"], ["failed", "failed"], ["pending", "pending check"]];
+
+// Stream check states from the Worker's probe (see channelCheck in worker.js).
+const CHECK_PILLS = {
+  working: ["", "Working", "Passed the stream check: shown on the site and in the app"],
+  verifying: ["amber", "Verifying", "One good check; listed after the next one passes"],
+  failed: ["red", "Failed", "Failed the stream check: hidden from viewers"],
+  unchecked: ["grey", "Not checked", "Not checked yet on its current stream URL"]
+};
+const checkState = (c) => c.check?.state || "unchecked";
 const KIND_LABELS = { hls: "HLS", ts: "MPEG-TS", dash: "DASH", flv: "FLV", video: "Video", audio: "Audio", embed: "Embed" };
 
 // Mirrors the Worker's streamKind(): how a stream URL plays. Only a fallback —
@@ -1123,6 +1133,9 @@ function filteredChannels() {
     if (chip === "inactive") return c.active === false;
     if (chip === "manual") return c.origin !== "synced";
     if (chip === "synced") return c.origin === "synced";
+    if (chip === "working") return checkState(c) === "working";
+    if (chip === "failed") return checkState(c) === "failed";
+    if (chip === "pending") return c.active !== false && (checkState(c) === "unchecked" || checkState(c) === "verifying");
     return true;
   });
 }
@@ -1132,6 +1145,21 @@ function lastSyncLine(tv) {
   if (!s) return "Playlist never synced.";
   if (!s.ok) return '<span class="red">Last playlist sync failed ' + esc(ago(s.at)) + ": " + esc(s.error || "") + "</span>";
   return "Playlist synced " + esc(ago(s.at)) + " · " + s.added + " added · " + s.updated + " updated · " + s.removed + " removed";
+}
+
+// "Stream checks: 312 working · 40 verifying · 1480 failed · 398 not checked · last run 4 min ago"
+function checkLine(tv) {
+  const c = tv.checks;
+  if (!c) return "";
+  const parts = [
+    '<span class="green">' + c.working + " working</span> (shown to viewers)",
+    c.verifying ? '<span class="amber">' + c.verifying + " verifying</span>" : "",
+    c.failed ? '<span class="red">' + c.failed + " failed</span>" : "",
+    c.unchecked ? c.unchecked + " not checked yet" : "",
+    c.updatedAt ? "last run " + esc(ago(c.updatedAt)) : "no check has run yet",
+  ].filter(Boolean);
+  return '<p class="hint" style="font-size:15px;margin-top:4px">Stream checks: ' + parts.join(" · ") +
+    " · " + c.batch + " channels every 10 minutes</p>";
 }
 
 async function renderChannels() {
@@ -1146,7 +1174,7 @@ async function renderChannels() {
   f.page = 1;
   setView(
     '<div class="head"><h1>Live TV</h1><p>Manage the channels shown on the public <a class="green" href="' + esc(SITE + "/live-tv") + '" target="_blank" rel="noopener">Live TV page</a> · <span id="tvCount"></span></p>' +
-    '<p class="hint" style="font-size:15px;margin-top:8px">' + lastSyncLine(tv) + "</p>" +
+    '<p class="hint" style="font-size:15px;margin-top:8px">' + lastSyncLine(tv) + "</p>" + checkLine(tv) +
     '<div class="head-actions">' +
       '<button class="btn danger" type="button" data-action="tv-delete-all">Delete All</button>' +
       '<button class="btn" type="button" data-action="tv-import-open">' + icon("download") + "Import from URL</button>" +
@@ -1168,6 +1196,13 @@ async function renderChannels() {
     '<div id="tvBulk"></div><div id="tvTable"></div>'
   );
   renderChannelTable();
+}
+
+function checkPill(c) {
+  if (c.active === false) return "";
+  const [tone, label, hint] = CHECK_PILLS[checkState(c)];
+  const when = c.check?.checkedAt ? " · checked " + ago(c.check.checkedAt) : "";
+  return '<span class="pill' + (tone ? " " + tone : "") + '" title="' + esc(hint + when) + '">' + label + "</span>";
 }
 
 function channelRowMeta(c) {
@@ -1216,7 +1251,11 @@ function renderChannelTable() {
       '<td><div class="logo-cell"><span class="logo-box">' + (logo ? '<img src="' + esc(logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-initials="' + initials + '" onerror="this.replaceWith(document.createTextNode(this.dataset.initials))">' : initials) + "</span>" +
         '<span><a class="row-title" href="#/tv/' + encodeURIComponent(c.id) + '">' + esc(c.name) + "</a>" +
         '<div class="row-meta">' + channelRowMeta(c) + "</div></span></div></td>" +
-      '<td><button type="button" class="pill' + (c.active === false ? " grey" : "") + '" data-action="tv-toggle-active" data-id="' + esc(c.id) + '" title="Click to ' + (c.active === false ? "activate" : "deactivate") + '">' + (c.active === false ? "Inactive" : "Active") + "</button></td>" +
+      '<td><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+        '<button type="button" class="pill' + (c.active === false ? " grey" : "") + '" data-action="tv-toggle-active" data-id="' + esc(c.id) + '" title="Click to ' + (c.active === false ? "activate" : "deactivate") + '">' + (c.active === false ? "Inactive" : "Active") + "</button>" +
+        checkPill(c) + "</div>" +
+        (checkState(c) === "failed" && c.check.reason ? '<div class="row-meta"><span class="red">' + esc(c.check.reason) + "</span></div>" : "") +
+      "</td>" +
       '<td><div class="row-actions">' +
         '<button type="button" class="text-btn" data-action="tv-test" data-id="' + esc(c.id) + '">Test</button>' +
         '<a class="text-btn" href="' + esc(SITE + "/live-tv#ch=" + encodeURIComponent(c.id)) + '" target="_blank" rel="noopener">Preview</a>' +
