@@ -2,6 +2,8 @@ package com.sportzfy.live.presentation.livetv.player
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +28,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sportzfy.live.core.player.PlaybackSource
 import com.sportzfy.live.core.theme.SportzfyColors
@@ -56,9 +59,11 @@ fun TvNowPlaying(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            // Same 16dp gutter as the grid, so the edges line up.
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(SportzfyColors.SlateRaised),
+            .background(SportzfyColors.SlateRaised)
+            .border(1.dp, SportzfyColors.Outline, RoundedCornerShape(20.dp)),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // No fillMaxWidth: it would force the full width and break the ratio once the cap applies.
@@ -92,35 +97,29 @@ private fun NowPlayingBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PulsingDot(size = 10.dp)
-        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
+            Text(
+                text = channel.name,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = channel.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = "  ·  LIVE",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = SportzfyColors.TextSecondary,
-                    maxLines = 1,
-                )
-            }
-            channelSubtitle(channel)?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = SportzfyColors.TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                LivePill()
+                channelSubtitle(channel)?.let {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SportzfyColors.TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         BarButton(
@@ -133,8 +132,27 @@ private fun NowPlayingBar(
             // Escape hatch for a channel page that won't play inside the app.
             BarButton(SportzfyIcons.ExternalLink, "Open in browser", { runCatching { uriHandler.openUri(channel.streamUrl) } })
         }
-        BarButton(SportzfyIcons.PictureInPicture, "Mini player", onMinimize)
-        BarButton(SportzfyIcons.Fullscreen, "Full screen", onFullscreen)
+        BarButton(SportzfyIcons.PictureInPicture, "Mini player", onMinimize, tint = SportzfyColors.TextPrimary)
+        BarButton(SportzfyIcons.Fullscreen, "Full screen", onFullscreen, tint = SportzfyColors.TextPrimary)
+    }
+}
+
+/** Solid rose "● LIVE" tag. */
+@Composable
+internal fun LivePill(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .background(SportzfyColors.RoseFill, RoundedCornerShape(50))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PulsingDot(size = 5.dp, color = androidx.compose.ui.graphics.Color.White)
+        Spacer(Modifier.width(5.dp))
+        Text(
+            text = "LIVE",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
+            color = androidx.compose.ui.graphics.Color.White,
+        )
     }
 }
 

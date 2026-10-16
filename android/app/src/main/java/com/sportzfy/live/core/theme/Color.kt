@@ -29,6 +29,9 @@ object SportzfyColors {
     /** Accent-coloured text on dark surfaces: 5.2:1 or better on every dark token. */
     val RoseText = Color(0xFFFF4D73)
 
+    /** Light plate under channel logos: station logos are drawn for light backgrounds. */
+    val LogoPlate = Color(0xFFEEF2F7)
+
     /** Starred channels. */
     val Gold = Color(0xFFFACC15)
 

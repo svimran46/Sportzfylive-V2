@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,9 +43,10 @@ import com.sportzfy.live.core.theme.SportzfyIcons
 import com.sportzfy.live.domain.model.Channel
 
 /**
- * One Live TV channel tile: round logo, name, sport badge and a star. The
- * channel playing now is outlined and marked LIVE; the directory doesn't
- * say whether the others are on air, so they carry no badge.
+ * One Live TV channel tile, sized for a three-column grid: logo plate,
+ * name (two lines, so every tile in a row is the same height) and sport.
+ * The channel playing now is outlined and tagged LIVE; the directory
+ * doesn't say whether the others are on air, so they carry no tag.
  */
 @Composable
 fun ChannelCard(
@@ -56,8 +57,8 @@ fun ChannelCard(
     isFavorite: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(20.dp)
-    Box(
+    val shape = RoundedCornerShape(16.dp)
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .tvFocus(shape)
@@ -67,70 +68,78 @@ fun ChannelCard(
                 if (isPlaying) BorderStroke(2.dp, SportzfyColors.Rose) else BorderStroke(1.dp, SportzfyColors.Outline),
                 shape,
             )
-            .clickable(role = Role.Button, onClickLabel = "Play", onClick = onClick),
+            .clickable(role = Role.Button, onClickLabel = "Play", onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.height(12.dp))
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 11f)) {
             ChannelLogo(
                 channel = channel,
-                shape = CircleShape,
-                background = Color.White,
-                modifier = Modifier.size(76.dp),
+                shape = RoundedCornerShape(10.dp),
+                background = SportzfyColors.LogoPlate,
+                modifier = Modifier.fillMaxSize(),
             )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = channel.name,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = SportzfyColors.TextPrimary,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = channel.category.label.uppercase(),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                color = SportzfyColors.RoseText,
-                maxLines = 1,
-                modifier = Modifier
-                    .background(SportzfyColors.Rose.copy(alpha = 0.14f), RoundedCornerShape(50))
-                    .border(1.dp, SportzfyColors.Rose.copy(alpha = 0.35f), RoundedCornerShape(50))
-                    .padding(horizontal = 14.dp, vertical = 4.dp),
-            )
-        }
-
-        if (isPlaying) {
-            Row(
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PulsingDot(size = 7.dp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "LIVE",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                    color = SportzfyColors.RoseText,
-                )
+            if (isPlaying) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(5.dp)
+                        .background(SportzfyColors.RoseFill, RoundedCornerShape(50))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PulsingDot(size = 5.dp, color = Color.White)
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "LIVE",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp),
+                        color = Color.White,
+                    )
+                }
+            }
+            if (onToggleFavorite != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(28.dp)
+                        .tvFocus(CircleShape)
+                        .clip(CircleShape)
+                        .background(SportzfyColors.Charcoal.copy(alpha = 0.55f))
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                            onClick = onToggleFavorite,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    SportzfyIcon(
+                        SportzfyIcons.Star,
+                        contentDescription = if (isFavorite) "Remove ${channel.name} from favorites" else "Add ${channel.name} to favorites",
+                        tint = if (isFavorite) SportzfyColors.Gold else Color.White,
+                        size = 15.dp,
+                    )
+                }
             }
         }
-        if (onToggleFavorite != null) {
-            IconButton(
-                onClick = onToggleFavorite,
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).tvFocus(CircleShape),
-            ) {
-                SportzfyIcon(
-                    SportzfyIcons.Star,
-                    contentDescription = if (isFavorite) "Remove ${channel.name} from favorites" else "Add ${channel.name} to favorites",
-                    tint = if (isFavorite) SportzfyColors.Gold else SportzfyColors.TextMuted,
-                    size = 20.dp,
-                )
-            }
-        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = channel.name,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold, lineHeight = 16.sp),
+            color = SportzfyColors.TextPrimary,
+            textAlign = TextAlign.Center,
+            minLines = 2,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = channel.category.label.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+            color = if (isPlaying) SportzfyColors.RoseText else SportzfyColors.TextMuted,
+            maxLines = 1,
+        )
     }
 }
 
@@ -158,7 +167,7 @@ fun ChannelLogo(
                 // Fit inside the circle: station logos are wide and must not be cropped.
                 contentScale = ContentScale.Fit,
                 onError = { failed = true },
-                modifier = Modifier.fillMaxSize().padding(12.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
             )
         } else {
             Text(

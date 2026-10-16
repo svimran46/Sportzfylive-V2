@@ -3,6 +3,8 @@ package com.sportzfy.live.presentation.livetv
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -192,10 +195,11 @@ private fun ChannelGrid(
     onPickCountry: () -> Unit,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 156.dp),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        // Three columns on phones (100dp fits three from 340dp wide), more on tablets and TVs.
+        columns = GridCells.Adaptive(minSize = 100.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         val fullSpan: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
@@ -208,7 +212,7 @@ private fun ChannelGrid(
             }
         }
         item(key = "toolbar", span = fullSpan) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (state.showCountries) {
                     CountryButton(state.selectedCountry, onPickCountry, Modifier.weight(1f))
                 } else {
@@ -218,13 +222,23 @@ private fun ChannelGrid(
                     options = ChannelSort.entries.map { it.label },
                     selectedIndex = state.sort.ordinal,
                     onSelect = { actions.onSortChange(ChannelSort.entries[it]) },
-                    modifier = Modifier.width(170.dp),
+                    modifier = Modifier.width(148.dp),
                 )
             }
         }
         if (state.showCategories || state.shelves.isNotEmpty()) {
             item(key = "chips", span = fullSpan) {
                 FilterChips(state, actions)
+            }
+        }
+        if (state.channels.isNotEmpty()) {
+            item(key = "count", span = fullSpan) {
+                Text(
+                    text = if (state.channels.size == 1) "1 channel" else "${state.channels.size} channels",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp),
+                    color = SportzfyColors.TextMuted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
         if (state.channels.isEmpty()) {
@@ -313,7 +327,11 @@ private fun LiveTvHeader(onOpenMenu: (() -> Unit)?) {
 @Composable
 private fun ChannelSearchField(query: String, onQueryChange: (String) -> Unit) {
     val focusManager = LocalFocusManager.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(14.dp)
     TextField(
+        interactionSource = interaction,
         value = query,
         onValueChange = onQueryChange,
         placeholder = { Text("Search channels…") },
@@ -330,19 +348,25 @@ private fun ChannelSearchField(query: String, onQueryChange: (String) -> Unit) {
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-        shape = RoundedCornerShape(16.dp),
+        shape = shape,
+        // An outline all round instead of Material's underline.
         colors = TextFieldDefaults.colors(
             focusedContainerColor = SportzfyColors.SlateRaised,
             unfocusedContainerColor = SportzfyColors.SlateRaised,
-            focusedIndicatorColor = SportzfyColors.Rose,
-            unfocusedIndicatorColor = SportzfyColors.Outline,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            unfocusedPlaceholderColor = SportzfyColors.TextMuted,
+            focusedPlaceholderColor = SportzfyColors.TextMuted,
+            unfocusedLeadingIconColor = SportzfyColors.TextMuted,
             cursorColor = SportzfyColors.Rose,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, if (focused) SportzfyColors.Rose else SportzfyColors.Outline, shape),
     )
 }
 
-/** "COUNTRY  World · 2230  ⌄": opens the country sheet. */
+/** "🌐 World  2230  ⌄": opens the country sheet. */
 @Composable
 private fun CountryButton(selected: CountryOption, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(14.dp)
@@ -354,23 +378,26 @@ private fun CountryButton(selected: CountryOption, onClick: () -> Unit, modifier
             .background(SportzfyColors.SlateRaised)
             .border(1.dp, SportzfyColors.Outline, shape)
             .clickable(role = Role.Button, onClickLabel = "Change country", onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        SportzfyIcon(SportzfyIcons.Globe, contentDescription = null, tint = SportzfyColors.RoseText, size = 18.dp)
+        Spacer(Modifier.width(8.dp))
         Text(
-            text = "COUNTRY",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 2.sp),
-            color = SportzfyColors.TextMuted,
-            maxLines = 1,
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = "${selected.label} · ${selected.count}",
+            text = selected.label,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = selected.count.toString(),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = SportzfyColors.TextMuted,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(4.dp))
         SportzfyIcon(SportzfyIcons.ChevronDown, contentDescription = null, tint = SportzfyColors.TextSecondary, size = 18.dp)
     }
 }
@@ -450,7 +477,7 @@ private fun CountrySheet(state: ChannelsUiState, onSelect: (String?) -> Unit, on
                             .heightIn(min = 52.dp)
                             .tvFocus(shape, focusedScale = 1f)
                             .clip(shape)
-                            .background(if (selected) SportzfyColors.SelectedSurface else androidx.compose.ui.graphics.Color.Transparent)
+                            .background(if (selected) SportzfyColors.SelectedSurface else Color.Transparent)
                             .clickable(role = Role.Button) { onSelect(option.name) }
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
