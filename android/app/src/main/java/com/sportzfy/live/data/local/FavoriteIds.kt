@@ -1,8 +1,8 @@
 package com.sportzfy.live.data.local
 
 /**
- * Saved match ids, newest first. Match ids only live for a day upstream,
- * so the list is capped instead of growing forever.
+ * Saved ids (matches, starred and recent channels), newest first. Match ids
+ * only live for a day upstream, so the lists are capped instead of growing forever.
  */
 object FavoriteIds {
     const val MAX_SAVED = 200
@@ -10,6 +10,10 @@ object FavoriteIds {
 
     fun toggle(ids: List<String>, id: String, max: Int = MAX_SAVED): List<String> =
         if (id in ids) ids - id else (listOf(id) + ids).take(max)
+
+    /** Puts [id] first, removing an older copy, so the list reads most recent first. */
+    fun bump(ids: List<String>, id: String, max: Int = MAX_SAVED): List<String> =
+        (listOf(id) + (ids - id)).take(max)
 
     fun encode(ids: List<String>): String = ids.joinToString(SEPARATOR)
 

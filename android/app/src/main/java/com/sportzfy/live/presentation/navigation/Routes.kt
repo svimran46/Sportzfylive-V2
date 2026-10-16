@@ -18,10 +18,6 @@ data object AllMatchesRoute
 @Serializable
 data class WatchRoute(val matchId: String)
 
-/** Full-screen player for one Live TV channel. */
-@Serializable
-data class ChannelRoute(val channelId: String)
-
 @Serializable
 data object SettingsRoute
 

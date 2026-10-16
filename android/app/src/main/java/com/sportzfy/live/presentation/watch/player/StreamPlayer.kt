@@ -29,6 +29,7 @@ import com.sportzfy.live.presentation.components.tvFocus
  * the player WebView for web pages (the `embed.st` players, channel
  * sites). [format] (a channel's `type`) overrides the guess from the URL's
  * extension. Fills [modifier]; the caller decides the aspect ratio.
+ * [textureSurface]: see [MediaPlayerView].
  */
 @Composable
 fun StreamPlayer(
@@ -37,6 +38,7 @@ fun StreamPlayer(
     state: StreamPlayerState = rememberStreamPlayerState(),
     config: PlayerConfig = PlayerConfig(),
     format: StreamFormat? = null,
+    textureSurface: Boolean = false,
 ) {
     val source = remember(url, format, config.allowHttpStreams, config.extendedFormats) {
         url?.let { PlaybackSource.from(it, format, config.allowHttpStreams, config.extendedFormats) }
@@ -48,7 +50,7 @@ fun StreamPlayer(
 
     Box(modifier = modifier.background(Color.Black)) {
         when (source) {
-            is PlaybackSource.Media -> MediaPlayerView(source.url, source.format, state, Modifier.fillMaxSize())
+            is PlaybackSource.Media -> MediaPlayerView(source.url, source.format, state, Modifier.fillMaxSize(), textureSurface)
             is PlaybackSource.Embed -> EmbedPlayerView(source.url, state, Modifier.fillMaxSize(), config)
             null -> PlayerMessage(
                 text = if (url == null) "Pick a stream to start watching" else unplayableMessage(url, format, config),

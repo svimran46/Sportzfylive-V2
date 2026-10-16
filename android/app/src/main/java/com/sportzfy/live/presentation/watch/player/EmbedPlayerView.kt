@@ -59,8 +59,9 @@ internal fun EmbedPlayerView(
     var generation by remember { mutableIntStateOf(0) }
     val holder = remember { WebViewHolder() }
 
-    val fullscreen = remember(context) {
-        context.findActivity()?.let { activity -> FullscreenHost(activity) { state.isFullscreen = it } }
+    val activity = remember(context) { context.findActivity() }
+    val fullscreen = remember(activity) {
+        activity?.let { host -> FullscreenHost(host) { state.isFullscreen = it } }
     }
 
     val listener = remember(state, fullscreen) {
@@ -106,10 +107,13 @@ internal fun EmbedPlayerView(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    holder.webView?.onPause()
+                    // Picture-in-picture pauses the activity but keeps it on
+                    // screen: the stream plays on until the window is closed (ON_STOP).
+                    if (activity?.isInPictureInPictureMode != true) holder.webView?.onPause()
                     // Keep the stream's renewed session cookies across process death.
                     CookieManager.getInstance().flush()
                 }
+                Lifecycle.Event.ON_STOP -> holder.webView?.onPause()
                 Lifecycle.Event.ON_RESUME -> holder.webView?.onResume()
                 else -> Unit
             }

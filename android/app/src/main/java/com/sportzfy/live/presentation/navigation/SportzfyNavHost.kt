@@ -4,12 +4,15 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -32,8 +35,11 @@ import com.sportzfy.live.presentation.about.AboutScreen
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
 import com.sportzfy.live.presentation.catalog.MatchCatalogScreen
 import com.sportzfy.live.presentation.components.BottomNavBar
-import com.sportzfy.live.presentation.livetv.ChannelPlayerScreen
 import com.sportzfy.live.presentation.livetv.LiveTvScreen
+import com.sportzfy.live.presentation.livetv.player.TvNowPlaying
+import com.sportzfy.live.presentation.livetv.player.TvPlayerLayer
+import com.sportzfy.live.presentation.livetv.player.TvPlayerViewModel
+import com.sportzfy.live.presentation.livetv.player.rememberTvDockAnchor
 import com.sportzfy.live.presentation.model.AppSection
 import com.sportzfy.live.presentation.model.DayScope
 import com.sportzfy.live.presentation.model.DrawerItem
@@ -49,7 +55,9 @@ private const val TAB_FADE_MILLIS = 180
 
 /**
  * App shell. The four tabs show the bottom bar and the drawer's menu button;
- * the match and channel players, Settings and About are full-screen.
+ * the match player, Settings and About are full-screen. The Live TV player
+ * is drawn above every screen ([TvPlayerLayer]): docked on the Live TV tab,
+ * a floating mini player everywhere else.
  * Back from any tab returns to Today, and back from Today leaves the app.
  */
 @Composable
@@ -59,6 +67,9 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
         // Created outside the NavHost, so it is Activity-scoped and shared by the
         // tabs: search and filters carry across Today, Tomorrow and All Matches.
         val catalogViewModel: CatalogViewModel = koinViewModel()
+        // Activity-scoped too: a channel keeps playing while the user changes tab.
+        val tvPlayer: TvPlayerViewModel = koinViewModel()
+        val tvDock = rememberTvDockAnchor()
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
@@ -81,64 +92,83 @@ fun SportzfyNavHost(modifier: Modifier = Modifier) {
             val openMatch: (String) -> Unit = { id -> navController.ifSettled { navigate(WatchRoute(id)) } }
             val back: () -> Unit = { navController.ifSettled { popBackStack() } }
 
-            NavHost(
-                navController = navController,
-                startDestination = TodayRoute,
-                enterTransition = { fadeIn(tween(TAB_FADE_MILLIS)) },
-                exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
-            ) {
-                composable<TodayRoute> {
-                    MatchCatalogScreen(
-                        DayScope.TODAY,
-                        openMatch,
-                        viewModel = catalogViewModel,
-                        bottomBar = { bottomBar(MainTab.TODAY) },
-                        onBrowseTomorrow = { navController.navigateToTab(MainTab.TOMORROW) },
-                        onOpenMenu = openDrawer,
-                    )
+            Box(Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = navController,
+                    startDestination = TodayRoute,
+                    enterTransition = { fadeIn(tween(TAB_FADE_MILLIS)) },
+                    exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
+                ) {
+                    composable<TodayRoute> {
+                        MatchCatalogScreen(
+                            DayScope.TODAY,
+                            openMatch,
+                            viewModel = catalogViewModel,
+                            bottomBar = { bottomBar(MainTab.TODAY) },
+                            onBrowseTomorrow = { navController.navigateToTab(MainTab.TOMORROW) },
+                            onOpenMenu = openDrawer,
+                        )
+                    }
+                    composable<TomorrowRoute> {
+                        MatchCatalogScreen(
+                            DayScope.TOMORROW,
+                            openMatch,
+                            viewModel = catalogViewModel,
+                            bottomBar = { bottomBar(MainTab.TOMORROW) },
+                            onOpenMenu = openDrawer,
+                        )
+                    }
+                    composable<LiveTvRoute> {
+                        val tv by tvPlayer.state.collectAsStateWithLifecycle()
+                        LiveTvScreen(
+                            onPlayChannel = tvPlayer::play,
+                            playingChannelId = tv.channel?.id,
+                            nowPlaying = { TvNowPlaying(tvPlayer, tvDock) },
+                            bottomBar = { bottomBar(MainTab.LIVE_TV) },
+                            onOpenMenu = openDrawer,
+                        )
+                    }
+                    composable<AllMatchesRoute> {
+                        MatchCatalogScreen(
+                            DayScope.ALL,
+                            openMatch,
+                            viewModel = catalogViewModel,
+                            bottomBar = { bottomBar(MainTab.ALL_MATCHES) },
+                            onOpenMenu = openDrawer,
+                        )
+                    }
+                    composable<WatchRoute> {
+                        WatchStudioScreen(onBack = back)
+                    }
+                    composable<SettingsRoute> {
+                        SettingsScreen(onBack = back, versionName = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE)
+                    }
+                    composable<AboutRoute> {
+                        AboutScreen(onBack = back, versionName = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE)
+                    }
                 }
-                composable<TomorrowRoute> {
-                    MatchCatalogScreen(
-                        DayScope.TOMORROW,
-                        openMatch,
-                        viewModel = catalogViewModel,
-                        bottomBar = { bottomBar(MainTab.TOMORROW) },
-                        onOpenMenu = openDrawer,
-                    )
-                }
-                composable<LiveTvRoute> {
-                    LiveTvScreen(
-                        onOpenChannel = { id -> navController.ifSettled { navigate(ChannelRoute(id)) } },
-                        bottomBar = { bottomBar(MainTab.LIVE_TV) },
-                        onOpenMenu = openDrawer,
-                    )
-                }
-                composable<AllMatchesRoute> {
-                    MatchCatalogScreen(
-                        DayScope.ALL,
-                        openMatch,
-                        viewModel = catalogViewModel,
-                        bottomBar = { bottomBar(MainTab.ALL_MATCHES) },
-                        onOpenMenu = openDrawer,
-                    )
-                }
-                composable<WatchRoute> {
-                    WatchStudioScreen(onBack = back)
-                }
-                composable<ChannelRoute> {
-                    ChannelPlayerScreen(onBack = back)
-                }
-                composable<SettingsRoute> {
-                    SettingsScreen(onBack = back, versionName = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE)
-                }
-                composable<AboutRoute> {
-                    AboutScreen(onBack = back, versionName = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE)
-                }
+                // After the NavHost: drawn on top, and its full-screen Back wins.
+                TvPlayerLayer(
+                    viewModel = tvPlayer,
+                    anchor = tvDock,
+                    onOpenLiveTv = { navController.navigateToTab(MainTab.LIVE_TV) },
+                )
             }
+            StopTvForMatches(navController, tvPlayer)
             // Registered after the NavHost so it wins over its back handling:
             // Back closes an open drawer before it changes screen.
             BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
         }
+    }
+}
+
+/** A match stream and a TV channel never play together: opening a match stops the channel. */
+@Composable
+private fun StopTvForMatches(navController: NavController, tvPlayer: TvPlayerViewModel) {
+    val entry by navController.currentBackStackEntryAsState()
+    val watching = entry?.destination?.hasRoute<WatchRoute>() == true
+    LaunchedEffect(watching) {
+        if (watching) tvPlayer.close()
     }
 }
 

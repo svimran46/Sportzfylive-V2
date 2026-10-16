@@ -11,6 +11,11 @@ data class Channel(
     val streamUrl: String,
     /** Set by `"type"` in the channel list; null lets the URL's extension decide. */
     val streamFormat: StreamFormat? = null,
+    /**
+     * Country or region the playlist files the channel under (an M3U
+     * `group-title` such as "Italy", or a JSON `country`); null when it gives none.
+     */
+    val country: String? = null,
 ) {
     /** Host serving the stream, shown as the channel's source. */
     val sourceHost: String

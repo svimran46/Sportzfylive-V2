@@ -27,10 +27,12 @@ import com.sportzfy.live.domain.model.ChannelCategory
 import com.sportzfy.live.presentation.catalog.CatalogViewModel
 import com.sportzfy.live.domain.repository.SettingsRepository
 import com.sportzfy.live.presentation.livetv.LiveTvViewModel
+import com.sportzfy.live.presentation.livetv.player.TvPlayerViewModel
 import com.sportzfy.live.presentation.settings.SettingsViewModel
 import com.sportzfy.live.presentation.model.testChannel
 import com.sportzfy.live.presentation.model.testMatch
 import com.sportzfy.live.testing.FakeAppConfigRepository
+import com.sportzfy.live.testing.FakeChannelLibraryRepository
 import com.sportzfy.live.testing.FakeChannelRepository
 import com.sportzfy.live.testing.FakeClock
 import com.sportzfy.live.testing.FakeFavoritesRepository
@@ -87,7 +89,13 @@ class MainNavigationTest {
                     }
                     single<SettingsRepository> { FakeSettingsRepository() }
                     viewModel { SettingsViewModel(get(), FakeFavoritesRepository()) }
-                    viewModel { LiveTvViewModel(FakeChannelRepository(listOf(testChannel("Willow Cricket", ChannelCategory.CRICKET)))) }
+                    viewModel {
+                        LiveTvViewModel(
+                            FakeChannelRepository(listOf(testChannel("Willow Cricket", ChannelCategory.CRICKET))),
+                            FakeChannelLibraryRepository(),
+                        )
+                    }
+                    viewModel { TvPlayerViewModel(FakeChannelRepository(), FakeChannelLibraryRepository()) }
                 }
             )
         }

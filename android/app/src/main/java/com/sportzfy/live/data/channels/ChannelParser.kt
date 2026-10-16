@@ -23,6 +23,7 @@ internal data class ChannelDto(
     val url: String? = null,
     val category: String? = null,
     val type: JsonElement? = null,
+    val country: String? = null,
 )
 
 private fun JsonElement?.text(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -34,6 +35,7 @@ private class RawChannel(
     val url: String?,
     val category: String?,
     val format: StreamFormat? = null,
+    val country: String? = null,
 )
 
 /**
@@ -41,7 +43,8 @@ private class RawChannel(
  * (`const channels = [...];`), so the outermost JSON array is cut out of it
  * first; a plain JSON array works too. An M3U playlist (`#EXTM3U` with
  * `#EXTINF` entries, as IPTV providers publish) is read as well: the title,
- * `tvg-logo` and `group-title` (or `#EXTGRP`) of each entry.
+ * `tvg-logo` and `group-title` (or `#EXTGRP`) of each entry. The group is
+ * read as the channel's country as well, which is how `sports.m3u` files them.
  *
  * Entries without a name or an http(s) stream URL are skipped, as are repeated
  * stream URLs. `genre` is "Sports" for every channel upstream (cartoons
@@ -78,6 +81,7 @@ object ChannelParser {
                 url = dto.url,
                 category = dto.category,
                 format = StreamFormat.fromHint(dto.type.text()),
+                country = dto.country,
             )
         }
     }
@@ -107,11 +111,14 @@ object ChannelParser {
                     val attributes = M3U_ATTRIBUTE.findAll(if (comma >= 0) current.substring(0, comma) else current)
                         .associate { it.groupValues[1].lowercase() to it.groupValues[2] }
                     val title = if (comma >= 0) current.substring(comma + 1) else null
+                    val groupTitle = attributes["group-title"]?.takeIf { it.isNotBlank() } ?: group
                     entries += RawChannel(
                         name = title?.takeIf { it.isNotBlank() } ?: attributes["tvg-name"],
                         logo = attributes["tvg-logo"],
                         url = line,
-                        category = attributes["group-title"]?.takeIf { it.isNotBlank() } ?: group,
+                        category = groupTitle,
+                        // sports.m3u files every channel under its country.
+                        country = groupTitle,
                     )
                     info = null
                     group = null
@@ -147,10 +154,11 @@ object ChannelParser {
             Channel(
                 id = if (count == 1) base else "$base-$count",
                 name = name,
-                logoUrl = entry.logo?.let(::decodeEntities)?.trim()?.takeIf { isHttps(it) },
+                logoUrl = entry.logo?.let(::decodeEntities)?.trim()?.takeIf { isHttpUrl(it) },
                 category = categoryOf(entry.category, name),
                 streamUrl = url,
                 streamFormat = entry.format,
+                country = entry.country?.let(::decodeEntities)?.trim()?.takeIf { it.isNotEmpty() },
             )
         }
     }
@@ -185,7 +193,10 @@ object ChannelParser {
     private fun isHttps(url: String): Boolean =
         url.startsWith("https://", ignoreCase = true) && url.length > "https://".length && url.none(Char::isWhitespace)
 
-    /** Streams may be plain http (IPTV feeds often are); whether they play is the player's call. */
+    /**
+     * Streams may be plain http (IPTV feeds often are); whether they play is the player's call.
+     * Logos may be too: the IPTV picon servers behind `sports.m3u` have no TLS.
+     */
     private fun isHttpUrl(url: String): Boolean =
         isHttps(url) || (url.startsWith("http://", ignoreCase = true) && url.length > "http://".length && url.none(Char::isWhitespace))
 

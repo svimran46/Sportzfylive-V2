@@ -25,6 +25,11 @@ enum class PlayerError {
     WEBVIEW_UNAVAILABLE,
 }
 
+/** Pauses and resumes the current Media3 stream. */
+internal fun interface PlaybackTransport {
+    fun setPaused(paused: Boolean)
+}
+
 /** Observable player status, hoisted so the watch screen can react to it. */
 @Stable
 class StreamPlayerState {
@@ -41,6 +46,28 @@ class StreamPlayerState {
     var isFullscreen by mutableStateOf(false)
         internal set
 
+    /** Paused by the user. Only Media3 streams can pause; see [canPause]. */
+    var isPaused by mutableStateOf(false)
+        internal set
+
+    /** Applied to Media3 streams; a web page keeps its own volume. */
+    var isMuted by mutableStateOf(false)
+        private set
+
+    /** Set while a Media3 stream is on screen; web pages have their own controls. */
+    internal var transport by mutableStateOf<PlaybackTransport?>(null)
+
+    val canPause: Boolean
+        get() = transport != null
+
+    fun togglePause() {
+        transport?.setPaused(!isPaused)
+    }
+
+    fun toggleMute() {
+        isMuted = !isMuted
+    }
+
     /** Bumped to force the current stream to reload. */
     internal var reloadToken by mutableIntStateOf(0)
         private set
@@ -52,6 +79,7 @@ class StreamPlayerState {
 
     internal fun onSourceChanged() {
         isLoading = true
+        isPaused = false
         error = null
         blockedCount = 0
     }

@@ -102,7 +102,9 @@ class ChannelParserTest {
             listOf("http://iptv.example:8080/live/u/p/1.ts", "https://cdn.example/willow/index.m3u8", "https://cdn.example/bbc/manifest.mpd"),
             channels.map { it.streamUrl },
         )
-        assertEquals(listOf("https://img.example/sky.png", null, null), channels.map { it.logoUrl })
+        assertEquals(listOf("https://img.example/sky.png", "http://img.example/w.png", null), channels.map { it.logoUrl })
+        // The group doubles as the country: sports.m3u files every channel under one.
+        assertEquals(listOf("UK Football", "Cricket", "News, World"), channels.map { it.country })
         assertEquals(
             listOf(ChannelCategory.FOOTBALL, ChannelCategory.CRICKET, ChannelCategory.OTHERS),
             channels.map { it.category },
@@ -116,9 +118,17 @@ class ChannelParserTest {
     }
 
     @Test
-    fun `non-https logos are dropped, not loaded`() {
-        val channel = parse("[${entry("ESPN", "https://tv.example/espn", "http://img.example/espn.png")}]")!!.single()
-        assertNull(channel.logoUrl)
+    fun `plain http logos are kept, anything else is dropped`() {
+        val http = parse("[${entry("ESPN", "https://tv.example/espn", "http://img.example/espn.png")}]")!!.single()
+        assertEquals("http://img.example/espn.png", http.logoUrl)
+        val other = parse("[${entry("ESPN", "https://tv.example/espn", "ftp://img.example/espn.png")}]")!!.single()
+        assertNull(other.logoUrl)
+    }
+
+    @Test
+    fun `JSON entries may name a country`() {
+        val raw = """[{"name":"Rai Sport","url":"https://tv.example/rai","country":"Italy"},{"name":"ESPN","url":"https://tv.example/espn"}]"""
+        assertEquals(listOf("Italy", null), parse(raw)!!.map { it.country })
     }
 
     @Test

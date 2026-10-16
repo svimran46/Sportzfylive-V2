@@ -45,6 +45,18 @@ object SportzfyIcons {
     @DrawableRes val Clock = LucideR.drawable.lucide_ic_clock
     @DrawableRes val Language = LucideR.drawable.lucide_ic_languages
     @DrawableRes val Delete = LucideR.drawable.lucide_ic_trash_2
+    @DrawableRes val Star = LucideR.drawable.lucide_ic_star
+    @DrawableRes val Pause = LucideR.drawable.lucide_ic_pause
+    @DrawableRes val Previous = LucideR.drawable.lucide_ic_skip_back
+    @DrawableRes val Next = LucideR.drawable.lucide_ic_skip_forward
+    @DrawableRes val VolumeOn = LucideR.drawable.lucide_ic_volume_2
+    @DrawableRes val VolumeOff = LucideR.drawable.lucide_ic_volume_x
+    @DrawableRes val Fullscreen = LucideR.drawable.lucide_ic_maximize
+    @DrawableRes val ExitFullscreen = LucideR.drawable.lucide_ic_minimize
+    @DrawableRes val PictureInPicture = LucideR.drawable.lucide_ic_picture_in_picture_2
+    @DrawableRes val Expand = LucideR.drawable.lucide_ic_maximize_2
+    @DrawableRes val ChevronDown = LucideR.drawable.lucide_ic_chevron_down
+    @DrawableRes val Globe = LucideR.drawable.lucide_ic_globe
 }
 
 @Composable

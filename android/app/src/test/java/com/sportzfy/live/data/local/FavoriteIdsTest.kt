@@ -18,6 +18,12 @@ class FavoriteIdsTest {
     }
 
     @Test
+    fun `bump moves an id to the front without duplicating it`() {
+        assertEquals(listOf("b", "a", "c"), FavoriteIds.bump(listOf("a", "b", "c"), "b"))
+        assertEquals(listOf("d", "a", "b"), FavoriteIds.bump(listOf("a", "b", "c"), "d", max = 3))
+    }
+
+    @Test
     fun `encode and decode round-trip`() {
         val ids = listOf("streamed-1", "match two", "x/y")
         assertEquals(ids, FavoriteIds.decode(FavoriteIds.encode(ids)))

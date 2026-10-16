@@ -141,21 +141,29 @@ A fixed bottom bar has four destinations: **Today** (the start screen), **Tomorr
 - **Channel list:** loaded from [`channels.json`](https://github.com/svimran46/playlist.m3u/blob/main/channels.json) in the playlist repo. You can point the app at another file with `channelsUrl` in the remote config.
   - The file can be the JavaScript snippet it is today (`const channels = [...];`), a plain JSON array, or an **M3U playlist** (`#EXTM3U` with `#EXTINF` entries, as IPTV providers publish; the title, `tvg-logo` and `group-title`/`#EXTGRP` are read).
   - Each JSON entry needs a `name` and an http(s) `url`. `logo` is optional. `type` (`hls`, `dash`, `ts`, `mp4`, `embed`) says how to play a URL whose extension doesn't, such as an IPTV feed at `http://host:8080/user/pass/123`.
-  - Entries without a name or an http(s) stream are skipped, and so are repeated streams. Logo URLs have their repeated `&amp;` escaping undone, and non-https logos show the channel's initials instead.
+  - Entries without a name or an http(s) stream are skipped, and so are repeated streams. Logo URLs have their repeated `&amp;` escaping undone. Logos may be http or https (the picon servers behind `sports.m3u` have no TLS); anything else shows the channel's initials.
   - The list is kept for 30 minutes. If a reload fails, the last good list stays on screen with a banner.
 - **Groups:** **Football**, **Cricket** and **Others**. Every entry upstream has `"genre": "Sports"`, cartoon channels included, so genre can't be used to group them. Instead:
   - An entry's optional `category` field (`football`, `cricket` or `others`) decides its group.
   - Otherwise the name decides, then the category text (an M3U `group-title` like "UK Football"). "Cricket" or "Willow" means Cricket. "Football", "Fussball", "LaLiga", "Bundesliga", "Premier League" and similar mean Football. Everything else is Others.
   - A chip only appears for a group that has channels.
-- **Search:** matches every word you type against the channel's name and group.
-- **No LIVE badges:** the directory doesn't say whether a channel is on air, so the app doesn't claim it.
+- **Country:** an M3U `group-title` (or a JSON `country`) is the channel's country; `sports.m3u` files every channel under one. The **Country** button opens a sheet with World (every channel) and each country A–Z with its channel count, plus a filter field. The sport chips count only the chosen country. A list with no countries shows no button.
+- **Browse / A–Z:** Browse keeps the playlist's order; A–Z sorts by name.
+- **Recent and Favorites:** chips ahead of the sports, shown once they hold a channel. Recent is the last 30 channels played, newest first; the star on a tile or on the player saves a channel to Favorites. Both cover every country and sport, and stay on the device (`channel_library` DataStore).
+- **Search:** matches every word you type against the channel's name, group and country.
+- **LIVE marker:** only the channel playing now is outlined and marked LIVE. The directory doesn't say whether the others are on air, so the app doesn't claim it.
+- **Player:** tapping a tile plays it in place, docked above the grid (the grid scrolls, the picture stays), with the channel, country and sport, a star, **Mini player** and **Full screen** under it.
+  - Over a Media3 stream, a tap shows previous / play-pause / next (through the grid the channel was picked from, wrapping round), mute and full screen; they hide after a few seconds of playback. A web page keeps its own controls.
+  - **Full screen:** landscape with the system bars hidden; the title bar, picture-in-picture and exit sit on top. Back leaves full screen.
+  - **Mini player:** a floating window over the whole app. Leaving the Live TV tab (or pressing Mini player) moves the picture into it without restarting the stream. Drag it anywhere (it settles against the nearer side), tap it to go back to Live TV, or close it with ×. It has play-pause and mute for media streams.
+  - **Picture-in-picture:** while a channel plays, Home or Recents moves it into a system PiP window (Android 8+, on devices that support it); full screen also has a button for it.
+  - The one player is drawn above every screen ([`TvPlayerLayer`](app/src/main/java/com/sportzfy/live/presentation/livetv/player/TvPlayerLayer.kt)) and only moves between the docked slot, the mini window and full screen, so switching never rebuffers. Opening a match stops the channel, so two streams never play at once.
 - **Playback:** a media stream (HLS, DASH, MPEG-TS…) plays in Media3, as above. A web page opens like a browser tab.
   - Its page is loaded directly, not inside a frame (many channel pages refuse to run in someone else's frame).
   - It may hand off to its real player on another site.
   - No streamed.pk referrer is sent.
   - Pop-up windows and known ad hosts stay blocked, and fullscreen works as for matches.
-  - The stream host is shown as the channel's source, with an **Open in browser** button as a fallback.
-  - Other channels from the same group sit below the player and switch in place.
+  - A web page channel gets an **Open in browser** button under the player as a fallback.
 
 ## Search, saved matches and Android TV
 

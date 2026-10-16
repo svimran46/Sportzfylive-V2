@@ -3,12 +3,14 @@ package com.sportzfy.live.testing
 import com.sportzfy.live.domain.model.AppConfig
 import com.sportzfy.live.domain.model.Channel
 import com.sportzfy.live.domain.model.ChannelFeed
+import com.sportzfy.live.domain.model.ChannelLibrary
 import com.sportzfy.live.domain.model.Match
 import com.sportzfy.live.domain.model.MatchFeed
 import com.sportzfy.live.domain.model.StreamItem
 import com.sportzfy.live.domain.model.StreamResolution
 import com.sportzfy.live.domain.model.StreamSource
 import com.sportzfy.live.domain.repository.AppConfigRepository
+import com.sportzfy.live.domain.repository.ChannelLibraryRepository
 import com.sportzfy.live.domain.repository.ChannelRepository
 import com.sportzfy.live.domain.repository.FavoritesRepository
 import com.sportzfy.live.domain.repository.MatchRepository
@@ -100,3 +102,20 @@ class FakeChannelRepository(channels: List<Channel> = emptyList()) : ChannelRepo
     override suspend fun getChannel(id: String): Channel? = state.value.channels.firstOrNull { it.id == id }
 }
 
+/** In-memory starred and recent channels. */
+class FakeChannelLibraryRepository(initial: ChannelLibrary = ChannelLibrary.Empty) : ChannelLibraryRepository {
+    private val state = MutableStateFlow(initial)
+    override val library: Flow<ChannelLibrary> = state
+
+    val value: ChannelLibrary
+        get() = state.value
+
+    override suspend fun toggleFavorite(channelId: String) {
+        val ids = state.value.favoriteIds
+        state.value = state.value.copy(favoriteIds = if (channelId in ids) ids - channelId else listOf(channelId) + ids)
+    }
+
+    override suspend fun recordWatched(channelId: String) {
+        state.value = state.value.copy(recentIds = listOf(channelId) + (state.value.recentIds - channelId))
+    }
+}

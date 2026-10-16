@@ -19,6 +19,8 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.compose.PlayerSurface
+import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
+import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import com.sportzfy.live.domain.model.StreamFormat
 import okhttp3.OkHttpClient
 import org.koin.compose.koinInject
@@ -32,6 +34,9 @@ import org.koin.compose.koinInject
  * A live stream that falls behind its window (the device paused or stalled
  * past the oldest segment still listed) jumps back to the live edge on its
  * own instead of showing an error.
+ *
+ * [textureSurface] draws into a TextureView instead of a SurfaceView, so the
+ * video can be clipped, moved and resized with the layout (the floating TV player).
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -40,6 +45,7 @@ internal fun MediaPlayerView(
     format: StreamFormat,
     state: StreamPlayerState,
     modifier: Modifier = Modifier,
+    textureSurface: Boolean = false,
     okHttpClient: OkHttpClient = koinInject(),
 ) {
     val context = LocalContext.current
@@ -69,7 +75,13 @@ internal fun MediaPlayerView(
             }
         }
         player.addListener(playerListener)
+        state.transport = PlaybackTransport { paused ->
+            state.isPaused = paused
+            if (paused) player.pause() else player.play()
+        }
         onDispose {
+            state.transport = null
+            state.isPaused = false
             player.removeListener(playerListener)
             player.release()
         }
@@ -79,7 +91,8 @@ internal fun MediaPlayerView(
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> player.pause()
-                Lifecycle.Event.ON_START -> player.play()
+                // A stream the user paused stays paused when the app comes back.
+                Lifecycle.Event.ON_START -> if (!state.isPaused) player.play()
                 else -> Unit
             }
         }
@@ -98,7 +111,15 @@ internal fun MediaPlayerView(
         player.playWhenReady = true
     }
 
-    PlayerSurface(player = player, modifier = modifier)
+    LaunchedEffect(player, state.isMuted) {
+        player.volume = if (state.isMuted) 0f else 1f
+    }
+
+    PlayerSurface(
+        player = player,
+        modifier = modifier,
+        surfaceType = if (textureSurface) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW,
+    )
 }
 
 /**
