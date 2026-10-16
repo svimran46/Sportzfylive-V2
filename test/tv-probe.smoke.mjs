@@ -9,7 +9,7 @@ const realSetTimeout = globalThis.setTimeout;
 globalThis.setTimeout = (fn, ms, ...rest) => realSetTimeout(fn, Math.min(ms ?? 0, 150), ...rest);
 
 const worker = (await import("../worker.js")).default;
-const { probeChannel, listedChannels, runTvProbe } = await import("../worker.js");
+const { probeChannel, listedChannels, runTvProbe, channelCheck, checkSummary } = await import("../worker.js");
 
 // A transport-stream packet run: 0x47 at the start of every 188-byte packet.
 function tsBytes(packets = 200) {
@@ -140,5 +140,31 @@ assert.match(body, /https:\/\/ok\.example\/live\.m3u8/);
 assert.doesNotMatch(body, /DEAD/, "dead channels are not in the playlist");
 assert.doesNotMatch(body, /WITH-HEADERS/, "channels needing request headers are left out");
 assert.equal(response.headers.get("content-type"), "audio/x-mpegurl; charset=utf-8");
+
+// 6. Admin view: each channel's check state and the counts.
+{
+  const url = "https://ok.example/live.m3u8";
+  const health = { updatedAt: "2026-10-16T12:00:00.000Z", channels: {
+    good: { url, working: true, ok: true, passes: 2 },
+    half: { url, working: false, ok: true, passes: 1 },
+    bad: { url, working: false, ok: false, fails: 1, reason: "HTTP 404" },
+    moved: { url: "https://old.example/x.m3u8", working: true, ok: true },
+    off: { url, working: true, ok: true },
+  } };
+  const list = [
+    channel("good", url), channel("half", url), channel("bad", url),
+    channel("moved", url), channel("never", url), channel("off", url, { active: false }),
+  ];
+  const states = Object.fromEntries(list.map(c => [c.id, channelCheck(c, health).state]));
+  assert.deepEqual(states, {
+    good: "working", half: "verifying", bad: "failed", moved: "unchecked", never: "unchecked", off: "unchecked",
+  }, "states follow the probe; a changed URL or an inactive channel reads as not checked");
+  assert.equal(channelCheck(list[2], health).reason, "HTTP 404");
+  assert.equal(channelCheck(list[0], health).reason, "", "no reason on a passing channel");
+  const summary = checkSummary(list, health);
+  assert.deepEqual({ ...summary, updatedAt: undefined, batch: undefined },
+    { working: 1, verifying: 1, failed: 1, unchecked: 2, updatedAt: undefined, batch: undefined }, "inactive channels aren't counted");
+  assert.equal(summary.updatedAt, "2026-10-16T12:00:00.000Z");
+}
 
 console.log("tv-probe smoke: all checks passed");
