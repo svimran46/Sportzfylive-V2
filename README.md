@@ -255,8 +255,8 @@ npx wrangler secret put ADMIN_TOKEN    # admin panel token (once)
 ```
 
 Wrangler authenticates with `wrangler login`, or with the `CLOUDFLARE_API_TOKEN`
-and `CLOUDFLARE_ACCOUNT_ID` environment variables when you want it
-non-interactive. The site is live at
+environment variable when you want it non-interactive (the account id is
+pinned in `wrangler.jsonc`). The site is live at
 `https://sportzfylive.svimranmy.workers.dev/`.
 
 ### Secrets
@@ -278,18 +278,19 @@ and call the local Worker instead of the deployed one.
 ### Deploy on every push (GitHub Actions)
 
 `.github/workflows/deploy.yml` runs the smoke suites and then `wrangler deploy`
-on each push to `main`. Two repository secrets arm the deploy
+on each push to `main`. One repository secret arms the deploy
 (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | API token created from the **Edit Cloudflare Workers** template |
-| `CLOUDFLARE_ACCOUNT_ID` | Account ID from the Cloudflare dashboard |
 
-While they are unset the workflow still runs the tests and stays green: the
-preflight names which secret is missing and the publish step is skipped, so
-`bun run deploy` is the manual path until the secrets are added. No workflow
-change is needed when they appear — the next push deploys automatically.
+The account id is not secret and is pinned as `account_id` in `wrangler.jsonc`.
+
+While the secret is unset the workflow still runs the tests and stays green: the
+preflight names the missing secret and the publish step is skipped, so
+`bun run deploy` is the manual path until it is added. No workflow change is
+needed when it appears — the next push deploys automatically.
 
 ### First-time setup on a fresh Cloudflare account
 

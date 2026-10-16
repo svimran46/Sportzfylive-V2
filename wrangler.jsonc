@@ -14,6 +14,8 @@
   // plan remove it — scheduled() then runs the same sync inline every 10 minutes.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sportzfylive",
+  // Not a secret: pinning the account here means deploys only need the API token.
+  "account_id": "406430af4f7b8e5f48fdf0c6174b4051",
   "main": "worker.js",
   "compatibility_date": "2026-09-17",
   "observability": { "enabled": true },

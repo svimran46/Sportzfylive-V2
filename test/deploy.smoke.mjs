@@ -152,7 +152,8 @@ ok("_headers carries the rules netlify.toml used to set");
 const workflow = read(".github/workflows/deploy.yml").toString("utf8");
 assert.match(workflow, /cloudflare\/wrangler-action@v3/, "workflow deploys with wrangler-action");
 assert.match(workflow, /secrets\.CLOUDFLARE_API_TOKEN/, "workflow reads the Cloudflare API token secret");
-assert.match(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/, "workflow reads the Cloudflare account id secret");
+assert.ok(!/secrets\.CLOUDFLARE_ACCOUNT_ID/.test(workflow), "account id comes from wrangler.jsonc, not a secret");
+assert.match(read("wrangler.jsonc").toString("utf8"), /"account_id":\s*"[0-9a-f]{32}"/, "wrangler.jsonc pins the Cloudflare account id");
 assert.match(workflow, /branches: \[main\]/, "workflow deploys on pushes to main");
 assert.match(
   workflow,
