@@ -2,16 +2,16 @@
 
 [![Deploy to Cloudflare](https://github.com/svimran46/Sportzfylive-V2/actions/workflows/deploy.yml/badge.svg)](https://github.com/svimran46/Sportzfylive-V2/actions/workflows/deploy.yml)
 
-A modern, responsive web application for streaming live sports matches and 24/7 TV channels. The public site is static HTML/JS; the backend is a Cloudflare Worker that syncs matches from the Streamed API, resolves per-source stream metadata, runs the Live TV channel catalog, and backs the admin panel.
+A modern, responsive web application for streaming live sports matches and 24/7 TV channels. The public site is static HTML/JS; the backend is a Cloudflare Worker that syncs matches from the PPV.st API (`api.ppv.st`), resolves per-source stream metadata, runs the Live TV channel catalog, and backs the admin panel.
 
 ## Features
 
-- ⚽ **Match Listing**: Live and upcoming fixtures grouped by sport, synced from the Streamed API every 10 minutes
+- ⚽ **Match Listing**: Live and upcoming fixtures grouped by sport, synced from the PPV.st API every 10 minutes
 - 🎬 **Smart Player**: Automatically detects and plays HLS streams (.m3u8) or iframe embeds
 - 🔍 **Advanced Search**: Real-time search across all available matches
 - 🏷️ **Category Filtering**: Filter matches by sport (FOOTBALL, CRICKET, TENNIS, and more)
 - 🛡️ **Secure**: Playback URLs are resolved server-side only and never exposed to the client; XSS-safe rendering
-- ⚠️ **Error Handling**: Per-source failure isolation — one bad Streamed source never breaks a match list
+- ⚠️ **Error Handling**: A failed feed fetch never empties the site — the last good match list stays served
 - 🎯 **Watch page**: match identity (crests + share) on top, the player, stream chips labelled with language/provider/HD, then a rail of other matches — all rendered from the match list already in memory, so opening a match costs no extra requests
 - 🔗 **Shareable matches**: share buttons emit `#match=<id>` links, and the site opens that match directly on load
 - 📺 **Live TV** (`/live-tv`): the channels from the [`channels.json`](https://github.com/svimran46/playlist.m3u) list on `main` — country filter, sport chips, search, a universal player (HLS, MPEG-TS, DASH, FLV, MP4/WebM, audio, embeds) with previous/next, reload, full screen and share, `#ch=<id>` deep links, and an "Up next" rail on wide screens
@@ -40,14 +40,14 @@ A channel that needs custom request headers is probed with them, but left out of
 ## Architecture
 
 ```
-Streamed API ──▶ Cloudflare Worker (worker.js)
-channels.json ─▶ ├─ 10-min cron sync + source resolution (SWR cache in KV) + live-window cleanup
+PPV.st API ────▶ Cloudflare Worker (worker.js)
+channels.json ─▶ ├─ 10-min cron sync + event mapping (SWR cache in KV) + live-window cleanup
                  ├─ Live TV catalog: playlist sync (cron every 6 h + on demand), manual channels
                  ├─ Android app config: /api/app/config (edited on the admin "Android app" page)
                  ├─ Public API: /api/matches/all-today, /api/site-content, /api/tv/channels
                  │    (sanitized: no embedUrl, no stream URLs, no admin fields)
                  ├─ Playback redirects: /api/play/tv/:id, /api/play/stream/:matchId/:streamId
-                 ├─ Image proxy: /api/images?url= (same-origin posters/crests, streamed.pk only)
+                 ├─ Image proxy: /api/images?url= (same-origin posters/crests, ppv.st + streamed.pk hosts only)
                  ├─ On-demand resolver: /api/streamed/streams?source=&id=
                  └─ Admin API (password → 24h session; matches, channels, settings, logs)
                        │
@@ -61,7 +61,7 @@ admin.html + admin.js     Admin SPA (dashboard, matches, Live TV, fetch logs, se
 
 ```
 Sportzfylive-V2/
-├── worker.js          # Cloudflare Worker: API, auth, Streamed sync + resolver
+├── worker.js          # Cloudflare Worker: API, auth, PPV.st sync + resolver
 ├── index.html         # Public site (embedded CSS and JavaScript) — source copy
 ├── live-tv.html       # Live TV page — source copy
 ├── player.html        # HLS (.m3u8) player page framed by the watch view and Live TV — source copy
@@ -128,10 +128,14 @@ a hash-routed single page app, so the browser Back button and bookmarks work:
 | Fetch Logs | `#/logs` | The last 30 schedule fetches (manual or cron) with counts, duration and errors, plus the last Live TV playlist sync |
 | Settings | `#/settings` | Schedule ingest, TV source, live windows, site notice, analytics + house banner, site identity, maintenance (fetch / playlist sync / cleanup), admin password, data storage report |
 
-Matches are synced from the Streamed API every 10 minutes. The feed owns a
-streamed match's title, sport, kickoff and status; everything an admin sets
-(teams, streams, featured image, featured/active flags, live-window override)
-survives every sync.
+Matches are synced from the PPV.st API (`api.ppv.st/api/streams`) every 10
+minutes. The feed owns a match's title, sport, kickoff and status; everything an
+admin sets (teams, streams, featured image, featured/active flags, live-window
+override) survives every sync. The on-demand stream resolver under
+`/api/streamed/streams?source=ppv&id=` serves the same ppv.st catalog to
+whatever still asks for it. The Android app is unaffected by this switch: it
+reads streamed.pk directly (with the Worker fallback) and does not consume this
+catalog.
 
 **Live windows** decide how long after kickoff a match stays on the site: a
 per-match override, then match-type keyword rules (e.g. *Cricket T20*: `t20,
@@ -228,7 +232,7 @@ bun run test     # or: npm test
 # equivalent to:
 #   node test/dom-ux.smoke.mjs    # keyboard access, modal behavior, stream picker selection
 #   node test/ui-polish.smoke.mjs # design-system structure, layout order, a11y semantics
-#   node test/resolver.smoke.mjs  # Streamed sync, per-source failure isolation, API shaping, image proxy
+#   node test/resolver.smoke.mjs  # PPV feed sync, failure isolation, API shaping, image proxy
 #   node test/live-tv.smoke.mjs   # Live TV page: filters, batching, kind routing, deep links
 #   node test/player.smoke.mjs    # universal player engine selection, fallbacks, autoplay
 #   node test/stream-proxy.smoke.mjs # Worker stream proxy, sealing, HLS/DASH rewriting, logos
@@ -252,8 +256,8 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 ## Security
 
 - **XSS Prevention**: All user data is sanitized and rendered safely using DOM methods
-- **Embeds**: Streamed match embeds are not sandboxed (those players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. A Live TV channel marked `"sandbox": true` in `channels.json` runs in a sandboxed iframe (no pop-ups, no top-level navigation) on the website and when attached to a match (the Android app sandboxes by default too — its pop-up shim keeps `window.open` from answering `null`, so the embed's anti-sandbox check passes — and additionally traps pop-ups and ad redirects in the WebView, refuses ad frames, images and beacons, and still lets the embeds' own ad scripts load so the player does not go black; `embedSandbox: false` in the app's remote config turns its sandbox off; the app also runs each `embed.st` page in a hidden WebView just long enough to capture the real media URL, then plays that in its own Media3 player — `embedResolve: false` turns that off too); other channels load directly, because some render a black frame inside a sandbox. Admins can flip the flag per channel or per stream
-- **Playback URLs**: public JSON never carries TV channel or admin stream URLs; `/api/play/*` redirects to them (errors answer as sandboxed plain text), and `player.html` only plays those `/api/play/*` paths
+- **Embeds**: Match embeds are not sandboxed (those players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. A Live TV channel marked `"sandbox": true` in `channels.json` runs in a sandboxed iframe (no pop-ups, no top-level navigation) on the website and when attached to a match (the Android app sandboxes by default too — its pop-up shim keeps `window.open` from answering `null`, so the embed's anti-sandbox check passes — and additionally traps pop-ups and ad redirects in the WebView, refuses ad frames, images and beacons, and still lets the embeds' own ad scripts load so the player does not go black; `embedSandbox: false` in the app's remote config turns its sandbox off; the app also runs each `embed.st` page in a hidden WebView just long enough to capture the real media URL, then plays that in its own Media3 player — `embedResolve: false` turns that off too); other channels load directly, because some render a black frame inside a sandbox. Admins can flip the flag per channel or per stream
+- **Playback URLs**: public JSON never carries TV channel, admin stream or ppv media URLs (the whitelisted ppv frame-page link is the one exception — it feeds the player page's fallback); `/api/play/*` redirects to the real target (errors answer as sandboxed plain text), and `player.html` only plays those `/api/play/*` paths
 - **Admin password**: `ADMIN_TOKEN` signs sessions and is the bootstrap login. A password set in Settings is stored as a salted PBKDF2 hash in KV and replaces it for logins until reset; logins and password changes share the per-IP failure throttle. Locked out? Delete the `admin_credential` key in the KV namespace
 - **Input Validation**: All data is validated before rendering
 
@@ -381,10 +385,11 @@ serve over HTTPS for embedded content.
 - Some streams may require a VPN or geolocation
 
 ### Posters or team crests missing on desktop?
-- Poster art is hotlinked from `streamed.pk`; a blocked or filtered request retries
-  once through `/api/images?url=` (same origin) and then falls back to team initials
+- Poster art is hotlinked from the ppv.st hosts (`static.ppvservices.st`,
+  `api.ppv.st`); a blocked or filtered request retries once through
+  `/api/images?url=` (same origin) and then falls back to team initials
 - If every image is missing, redeploy so `/api/images` is live: `bun run deploy`
-- Matches the Streamed API ships without a badge (`badge: ""`) show team initials by design
+- Matches without poster art in the feed show team initials by design
 
 ### A change is not showing up on the live site?
 - Run `bun run test`: the deploy suite fails when `public/index.html` drifts from `index.html`

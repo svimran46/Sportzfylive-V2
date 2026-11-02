@@ -1,18 +1,35 @@
 // SportzfyLive Worker
-// Streamed match/source sync, the Live TV channel catalog, site settings and
+// ppv.st match/source sync, the Live TV channel catalog, site settings and
 // the admin API. Legacy match-linked TV-channel storage is migrated away on
 // the first sync; the Live TV catalog lives under its own key.
 
 const SNAPSHOT_ALL_TODAY = "snapshot:all-today";
 const SNAPSHOT_FEATURED = "snapshot:featured";
 const MIGRATION_KEY = "channel_system_migrated";
+// Matches catalog: ppv.st, a sports aggregation API. One request powers the
+// whole sync — every event arrives with its substreams (SD/HD variants) and a
+// schedule (start/end timestamps) inline, so the old per-source resolution
+// pass (and its subrequest budget) is gone. Playback on ppv is a per-event
+// embed page (the /embed/<uri> frame); the play route digs the media out of
+// that page server-side and falls back to the frame itself when the dig
+// finds nothing (the anti-frame loader changes, embed-like behavior).
+const PPV_STREAMS_URL = "https://api.ppv.st/api/streams";
+const PPV_SOURCE_NAME = "ppv";
+const PPV_SYNC_TIMEOUT_MS = 20000;               // whole-catalog fetch timeout
+const PPV_EVENT_FRESH_MS = 5 * 60 * 1000;        // event detail reused this long at play time
+const PPV_EVENT_TTL_SECONDS = 24 * 60 * 60;      // KV ceiling for event detail
+const PPV_EVENT_KEY_PREFIX = "ppv:event:";       // <externalId> -> normalized stream entries
+// On-demand resolver still speaks the STREAMED protocol: the Android app
+// resolves direct-streamed source groups through it (and can now resolve ppv
+// groups through the same route), so the wire shape is kept byte-compatible.
 const STREAMED_STREAM_ENDPOINT = "https://streamed.pk/api/stream";
+const PPV_STREAM_ENDPOINT = "https://api.ppv.st/api/streams"; // + "/<externalId|uri>"
 const STREAMED_STREAMS_KEY_PREFIX = "streamed:streams:";
 const STREAMED_FRESH_TTL_MS = 45 * 60 * 1000;    // serve-from-cache window per source
 const STREAMED_STALE_TTL_SECONDS = 6 * 60 * 60;  // KV retention (stale ceiling) per source
 const STREAMED_EMPTY_TTL_SECONDS = 15 * 60;      // empty results re-check quickly (lineups appear near go-live)
 const STREAMED_SOURCE_TIMEOUT_MS = 8000;         // per-source fetch timeout
-const MAX_SYNC_RESOLVE_OPS = 6;                  // default subrequest budget for source resolution per sync (stays within 1k/day KV free quota)
+const MAX_SYNC_RESOLVE_OPS = 6;                  // legacy: per-sync resolve budget is inert since the ppv.st switch (kept so stored settings JSON keeps parsing)
 const SYNC_STATE_KEY = "sync:state";             // resolve cursor + recent sync runs, written once per sync
 const SYNC_LOG_LIMIT = 30;                       // sync runs kept for the admin Fetch Logs page
 
@@ -306,6 +323,9 @@ const APP_SPORTS = [
 ];
 
 const DEFAULT_SETTINGS = {
+  // resolveBudget is deliberately kept (not removed): it is parsed and echoed
+  // back so stored settings JSON keeps parsing, but the ppv.st sync is one fetch
+  // with inline substreams, so there is no resolve pass to budget anymore.
   ingest: { autoSync: true, resolveBudget: MAX_SYNC_RESOLVE_OPS },
   tvSource: { url: DEFAULT_TV_SOURCE_URL, timeoutSec: 120, concurrency: 6, autoSync: true, defaultCategory: "Sports" },
   liveWindows: {
@@ -361,6 +381,8 @@ const SETTINGS_SECTIONS = {
   ingest(input) {
     return {
       autoSync: input.autoSync !== false && input.autoSync !== "false",
+      // Inert since the ppv.st switch — validated and echoed only so older
+      // stored settings round-trip; the sync itself never reads it.
       resolveBudget: Math.round(clampNumber(input.resolveBudget, 1, 20, MAX_SYNC_RESOLVE_OPS))
     };
   },
@@ -1013,41 +1035,181 @@ async function createAdminSession(request, env, ctx) {
   return { session, expiresAt };
 }
 
-async function fetchStreamedMatches(path = "all-today") {
-  const response = await fetch("https://streamed.pk/api/matches/" + path, {
-    headers: { "Accept": "application/json" }
-  });
-  if (!response.ok) throw new Error("Streamed API returned " + response.status);
+// ---------------------------------------------------------------------------
+// ppv.st catalog
+//
+// GET /api/streams returns groups by sport category; every event carries its
+// playback frame (iframe), schedule timestamps and substreams (SD variants)
+// inline, so a sync is a single fetch with no per-source resolution.
+// ---------------------------------------------------------------------------
+
+async function fetchPpvStreams() {
+  const response = await fetchWithTimeout(
+    PPV_STREAMS_URL,
+    { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
+    PPV_SYNC_TIMEOUT_MS
+  );
+  if (!response.ok) throw new Error("PPV API returned " + response.status);
 
   const data = await response.json();
-  return Array.isArray(data) ? data : [];
+  return data && typeof data === "object" && Array.isArray(data.streams) ? data.streams : [];
 }
 
-function toStreamedMatch(match, liveIds = new Set()) {
-  const externalId = String(match?.id || "");
-  return {
-    id: "streamed-" + (externalId || crypto.randomUUID()),
-    externalId,
-    title: String(match?.title || ""),
-    category: String(match?.category || "other").toUpperCase(),
-    startTime: match?.date ? new Date(Number(match.date)).toISOString() : "",
-    status: liveIds.has(externalId) ? "live" : "scheduled",
-    poster: match?.poster
-      ? (String(match.poster).startsWith("http")
-        ? String(match.poster)
-        : "https://streamed.pk" + String(match.poster))
-      : "",
-    description: "",
-    teams: match?.teams || null,
-    popular: Boolean(match?.popular),
-    sources: Array.isArray(match?.sources)
-      ? match.sources.map(source => ({
-          source: String(source?.source || ""),
-          id: String(source?.id || "")
-        })).filter(source => source.source && source.id)
-      : [],
-    source: "streamed"
+// "HD | Paramount+" / "SD | NFL Network (ESPN)" — the quality column ppv puts
+// on every source line. Mirrors sanitizeStreamedStreams' HD regex.
+function ppvHdFromTag(tag) {
+  return /(^|[\s|])(HD|FHD|4K)([\s|]|$)/i.test(String(tag ?? ""));
+}
+
+// Playback link: only absolute https URLs on an /embed/ path count. The
+// value goes into public responses (as stream.embed), so anything not a
+// plain player-page link is dropped here — this is the whitelist.
+function ppvEmbedUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!/^https:\/\/[a-z0-9.-]+\/embed\/[A-Za-z0-9][A-Za-z0-9_/-]*$/.test(raw)) return "";
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" && url.pathname.startsWith("/embed/") ? url.href : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+// One normalized playback entry: a stream number, metadata and the embed
+// page it plays through. Built from both payload shapes (list event and
+// detail event) so the sync and the play route agree byte for byte.
+function ppvStreamEntries(event) {
+  const entries = [];
+  const locale = String(event?.locale ?? "").trim();
+  const main = {
+    streamNo: 1,
+    language: locale,
+    // Both payload shapes carry "HD | <provider>" in source_tag only.
+    hd: ppvHdFromTag(event?.source_tag ?? event?.source_tag_raw ?? event?.name),
+    source: PPV_SOURCE_NAME,
+    embed: ppvEmbedUrl(event?.sources?.find(source => String(source?.type) === "iframe")?.data)
   };
+  if (!main.embed) main.embed = ppvEmbedUrl(event?.iframe);
+  entries.push(main);
+
+  const substreams = Array.isArray(event?.substreams) ? event.substreams : [];
+  substreams.forEach((sub, index) => {
+    entries.push({
+      streamNo: index + 2,                       // main = 1, substreams pick up after it
+      language: String(sub?.locale ?? "").trim() || locale,
+      hd: ppvHdFromTag(sub?.source_tag ?? sub?.source_tag_raw ?? sub?.name),
+      source: PPV_SOURCE_NAME,
+      embed: ppvEmbedUrl(sub?.sources?.find(source => String(source?.type) === "iframe")?.data) ||
+        ppvEmbedUrl(sub?.iframe)
+    });
+  });
+
+  // Dedup: the numbered identity key, and the same player frame twice (a
+  // junk row repeating the event's main iframe must not become a stream).
+  const seen = new Set();
+  const embeds = new Set();
+  return entries.filter(entry => {
+    const key = entry.streamNo + "|" + entry.language + "|" + (entry.hd ? "1" : "0");
+    if (seen.has(key)) return false;
+    if (entry.embed) {
+      if (embeds.has(entry.embed)) return false;
+      embeds.add(entry.embed);
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+// "Sassuolo vs. Fiorentina" / "Chicago Bears at Seattle Seahawks" — the ppv
+// title is the pair; the site's team chips read { home, away } names. The
+// "vs" form is home-first; the American "at" form is away-at-home.
+function ppvTeamsFromTitle(title) {
+  const name = String(title ?? "").trim();
+  const versus = name.match(/^(.{1,60}?)\s+(?:vs\.?|v)\s+(.{1,60}?)$/i);
+  if (versus) return { home: { name: versus[1].trim() }, away: { name: versus[2].trim() } };
+  const at = name.match(/^(.{1,60}?)\s+at\s+(.{1,60}?)$/i);
+  if (at) return { home: { name: at[2].trim() }, away: { name: at[1].trim() } };
+  return null;
+}
+
+// seconds -> ISO; ppv carries 0 for 24/7 entries, which never expire
+// (expiryFor rejects pre-2000 start times).
+function ppvIsoTimestamp(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return new Date(value * 1000).toISOString();
+}
+
+// One list event (or detail response) -> an internal match record. The
+// resolver data (streams) is built inline — no second fetch, no budget.
+function toPpvMatch(raw, categoryGroup = null) {
+  if (!raw || typeof raw !== "object") return null;
+  const externalId = String(raw.id ?? raw.event?.id ?? "");
+  if (!externalId) return null;
+
+  const start = ppvIsoTimestamp(raw.starts_at ?? raw.start_timestamp);
+  const end = ppvIsoTimestamp(raw.ends_at ?? raw.end_timestamp);
+  const startMs = start ? Date.parse(start) : NaN;
+  const endMs = end ? Date.parse(end) : NaN;
+  const now = Date.now();
+  const alwaysLive = raw.always_live === 1 || raw.always_live === true ||
+    raw.always_live === "1" || raw.always_live === "true";
+  // Expire exactly at the feed's own end timestamp: the window is the
+  // match duration in minutes (admin override still wins on resync).
+  const windowMinutes = startMs && endMs && endMs > startMs
+    ? Math.ceil((endMs - startMs) / 60000)
+    : "";
+
+  const streams = ppvStreamEntries(raw);
+  const poster = String(raw.poster ?? "").trim();
+  const safePoster = /^https:\/\/[a-z0-9.-]+\//.test(poster) ? poster : "";
+
+  const category = String((raw.category_name ?? categoryGroup?.category ?? raw.category ?? "") || "other").toUpperCase();
+  const competition = String(raw.tag ?? raw.competition ?? "").trim();
+
+  return {
+    id: "ppv-" + externalId,
+    externalId,
+    title: String(raw.name ?? raw.event?.name ?? "").trim(),
+    category,
+    startTime: start,
+    status: alwaysLive || (startMs && Number.isFinite(startMs) && startMs <= now &&
+      (!Number.isFinite(endMs) || endMs > now)) ? "live" : "scheduled",
+    poster: safePoster,
+    description: "",
+    teams: ppvTeamsFromTitle(raw.name ?? ""),
+    popular: Number(raw.viewers ?? 0) > 0,
+    sources: [{ source: PPV_SOURCE_NAME, id: externalId }],
+    source: PPV_SOURCE_NAME,
+    // The group entry preserves ppv's own competition tag for fresh events;
+    // admin edits still carry over at sync time.
+    competition: competition,
+    liveWindowOverride: windowMinutes || null,
+    // The public shape keeps the historical key so admin edits, snapshots
+    // and apps keep parsing it; the data is now ppv-derived.
+    streamedSummary: {
+      sourceCount: 1,
+      streamCount: streams.length,
+      sources: [{
+        source: PPV_SOURCE_NAME,
+        id: externalId,
+        streamCount: streams.length,
+        streams
+      }],
+      streams
+    }
+  };
+}
+
+function readPpvEventsFromGroups(groups) {
+  const events = [];
+  for (const group of groups) {
+    for (const raw of (group?.streams || [])) {
+      const match = toPpvMatch(raw, group);
+      if (match) events.push(match);
+    }
+  }
+  return events;
 }
 
 /*
@@ -1076,14 +1238,16 @@ async function fetchWithTimeout(url, options, timeoutMs) {
 /*
  * Same-origin image proxy
  *
- * Posters and team crests are hotlinked from streamed.pk, a DDoS-Guard fronted
- * host. Browsers, extensions and filtered networks that block those third-party
- * requests leave every card with an empty frame, so the public site retries a
- * failed image through /api/images?url=... and the Worker re-serves it from the
- * site's own origin, cached at the edge. Only https images on streamed.pk are
- * allowed, so the route cannot be turned into an open proxy.
+ * Posters and team crests are hotlinked from third-party hosts the feed
+ * controls (streamed.pk historically, now ppv's static/api hosts), all
+ * DDoS-Guard or CDN-fronted. Browsers, extensions and filtered networks that
+ * block those third-party requests leave every card with an empty frame, so
+ * the public site retries a failed image through /api/images?url=... and the
+ * Worker re-serves it from the site's own origin, cached at the edge. Only
+ * https images on the allow-listed hosts are accepted, so the route cannot
+ * be turned into an open proxy.
  */
-const IMAGE_PROXY_HOST = "streamed.pk";
+const IMAGE_PROXY_HOSTS = ["streamed.pk", "api.ppv.st", "static.ppvservices.st"];
 const IMAGE_CACHE_SECONDS = 24 * 60 * 60;
 
 function allowedImageUrl(value) {
@@ -1091,7 +1255,8 @@ function allowedImageUrl(value) {
     const url = new URL(String(value ?? ""));
     if (url.protocol !== "https:") return null;
     const host = url.hostname.toLowerCase();
-    if (host !== IMAGE_PROXY_HOST && !host.endsWith("." + IMAGE_PROXY_HOST)) return null;
+    const allowed = IMAGE_PROXY_HOSTS.some(base => host === base || host.endsWith("." + base));
+    if (!allowed) return null;
     return url;
   } catch (_) {
     return null;
@@ -1181,6 +1346,9 @@ function sanitizeStreamedStreams(data, sourceName) {
 // Fetch one source group's streams with a hard timeout. Returns
 // { ok: true, streams } or { ok: false, error }. Never throws.
 async function fetchStreamedSourceStreams(source, id) {
+  // ppv groups resolve from the ppv.st detail endpoint (same wire shape).
+  if (String(source) === PPV_SOURCE_NAME) return fetchPpvSourceStreams(id);
+
   // Streamed exposes per-source streams as a path, not query params:
   // /api/stream/{source}/{id} (query-param form returns 404 for everything).
   const endpoint = STREAMED_STREAM_ENDPOINT +
@@ -1206,6 +1374,43 @@ async function fetchStreamedSourceStreams(source, id) {
       return { ok: false, error: "fetch-failed" };
     }
     return { ok: true, streams: sanitizeStreamedStreams(data, source) };
+  } catch (error) {
+    return { ok: false, error: error?.name === "AbortError" ? "timeout" : "fetch-failed" };
+  }
+}
+
+// ppv detail endpoint: /api/streams/<externalId or event uri>. The response
+// wraps one event in { success, data }; its playback frame lives in
+// sources[] (type "iframe") and substreams likewise. Same return contract as
+// fetchStreamedSourceStreams so the SWR cache machinery shared with the
+// Play route keeps working unchanged.
+async function fetchPpvSourceStreams(id) {
+  const safeId = String(id ?? "").trim();
+  // External id or event uri ("seriea/2026-11-02/sas-fio") — nothing wider
+  // may reach the upstream path.
+  if (!/^[A-Za-z0-9][A-Za-z0-9_/-]*$/.test(safeId)) return { ok: false, error: "bad-id" };
+
+  try {
+    const response = await fetchWithTimeout(
+      PPV_STREAM_ENDPOINT + "/" + safeId,
+      { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
+      STREAMED_SOURCE_TIMEOUT_MS
+    );
+
+    if (response.status === 404) return { ok: true, streams: [] };
+    if (response.status === 429) return { ok: false, error: "ppv-429" };
+    if (!response.ok) return { ok: false, error: "ppv-503" };
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (_) {
+      return { ok: false, error: "fetch-failed" };
+    }
+    const event = data && typeof data === "object" && data.data && typeof data.data === "object"
+      ? data.data
+      : null;
+    return { ok: true, streams: event ? ppvStreamEntries(event) : [] };
   } catch (error) {
     return { ok: false, error: error?.name === "AbortError" ? "timeout" : "fetch-failed" };
   }
@@ -1246,94 +1451,11 @@ async function refreshStreamedSource(env, source, id) {
   return { ok: true, record };
 }
 
-// Sync-path resolver: cache-first, inline refresh of stale entries, cold fetch
-// on miss. The optional budget (a mutable { remaining } counter) keeps each
-// sync invocation inside Worker subrequest limits — groups that would exceed
-// it are reported as deferred and retried on later syncs.
-async function resolveStreamedSource(env, source, id, budget = null) {
-  if (budget) {
-    if (budget.remaining < 1) return { streams: [], resolvedAt: null, deferred: true };
-    budget.remaining -= 1;
-  }
-
-  const cached = await readStreamedSourceCache(env, source, id);
-
-  if (cached) {
-    if (cached.fresh) {
-      return { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: false };
-    }
-    if (budget && budget.remaining < 2) {
-      return { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: true };
-    }
-    const refreshed = await refreshStreamedSource(env, source, id);
-    return refreshed.ok
-      ? { streams: refreshed.record.streams, resolvedAt: refreshed.record.resolvedAt, stale: false }
-      : { streams: cached.streams, resolvedAt: cached.resolvedAt, stale: true, error: refreshed.error };
-  }
-
-  if (budget && budget.remaining < 2) return { streams: [], resolvedAt: null, deferred: true };
-  const refreshed = await refreshStreamedSource(env, source, id);
-  if (refreshed.ok) {
-    return { streams: refreshed.record.streams, resolvedAt: refreshed.record.resolvedAt, stale: false };
-  }
-  return { streams: [], resolvedAt: null, error: refreshed.error };
-}
+// ppv summaries are built inline at sync time (the catalog arrives with all
+// stream metadata), so the old budgeted per-group resolver is retired with it.
 
 function emptyStreamedSummary(groups = []) {
   return { sourceCount: groups.length, streamCount: 0, sources: [], streams: [] };
-}
-
-// Resolve every source group of a streamed match into a public-safe summary.
-// Uses all-settled semantics per group: one failing source never breaks the
-// match. Groups the budget could not cover keep their previously resolved
-// data, if any.
-async function buildStreamedSummary(env, match, previousSummary, budget) {
-  const groups = Array.isArray(match.sources) ? match.sources : [];
-  if (!groups.length) return emptyStreamedSummary();
-
-  const previousGroups = new Map();
-  for (const group of (previousSummary && Array.isArray(previousSummary.sources) ? previousSummary.sources : [])) {
-    if (group && group.source && group.id) {
-      previousGroups.set(group.source + ":" + group.id, group);
-    }
-  }
-
-  const resolvedGroups = [];
-  for (const group of groups) {
-    if (!group || !group.source || !group.id) continue;
-    const prior = previousGroups.get(group.source + ":" + group.id);
-    const result = await resolveStreamedSource(env, group.source, group.id, budget);
-    if (result.deferred) {
-      if (prior) resolvedGroups.push(prior);
-      continue;
-    }
-    resolvedGroups.push({
-      source: group.source,
-      id: group.id,
-      streamCount: result.streams.length,
-      streams: result.streams,
-      ...(result.stale ? { stale: true } : {}),
-      ...(result.error ? { error: result.error } : {})
-    });
-  }
-
-  const streams = [];
-  const seen = new Set();
-  for (const group of resolvedGroups) {
-    for (const stream of (group.streams || [])) {
-      const key = stream.streamNo + "|" + stream.language + "|" + (stream.hd ? "1" : "0");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      streams.push(stream);
-    }
-  }
-
-  return {
-    sourceCount: groups.length,
-    streamCount: streams.length,
-    sources: resolvedGroups,
-    streams
-  };
 }
 
 function publicStreamMeta(stream) {
@@ -1341,8 +1463,17 @@ function publicStreamMeta(stream) {
     streamNo: Number(stream?.streamNo) || 0,
     language: String(stream?.language ?? ""),
     hd: Boolean(stream?.hd),
-    source: String(stream?.source ?? "")
+    source: String(stream?.source ?? ""),
+    // ppv streams carry their public player-page link (whitelisted by
+    // ppvEmbedUrl upstream). It is a page URL, not a secret: the same class
+    // of reference the site already reconstructs for embed.st client-side.
+    ...(stream?.embed ? { embed: safePpvPublicEmbed(stream.embed) } : {})
   };
+}
+
+// Re-validate the stored embed link before it crosses a public response.
+function safePpvPublicEmbed(value) {
+  return ppvEmbedUrl(value);
 }
 
 // How a stream plays: "embed" pages go in an iframe, every other kind plays in
@@ -1530,73 +1661,61 @@ async function runStreamedSync(env, state) {
 
   const settings = await readSettings(env);
   const existing = await readArray(env, "matches");
-  const streamedRaw = await fetchStreamedMatches("all-today");
 
-  let liveIds = new Set();
-  try {
-    const liveRaw = await fetchStreamedMatches("live");
-    liveIds = new Set(liveRaw.map(match => String(match?.id || "")).filter(Boolean));
-  } catch (_) {}
+  // The ppv.st catalog is one request: events grouped by sport, each with
+  // schedule + substreams inline. No separate live fetch, no per-source
+  // resolution pass and no budget to distribute.
+  const groups = await fetchPpvStreams();
+  const freshRaw = readPpvEventsFromGroups(groups);
 
-  const existingStreamed = new Map(
+  const existingPpv = new Map(
     existing
-      .filter(match => match.source === "streamed" && match.externalId)
+      .filter(match => match.source === PPV_SOURCE_NAME && match.externalId)
       .map(match => [String(match.externalId), match])
   );
 
-  const manual = existing.filter(match => match.source !== "streamed");
+  // Admin/manual matches carry over untouched. Every feed-derived match
+  // (ppv now, the retired streamed pipeline too) comes back from the current
+  // catalog or is dropped this sync.
+  const manual = existing.filter(match => match.source !== PPV_SOURCE_NAME && match.source !== "streamed");
   const now = new Date().toISOString();
 
-  // The feed owns title, category, kickoff, status and poster; everything the
-  // admin edits (teams, streams, flags, featured image, window) is carried over.
-  const fresh = streamedRaw.map(raw => {
-    const previous = existingStreamed.get(String(raw.id || ""));
-    const base = toStreamedMatch(raw, liveIds);
+  // The feed owns title, category, kickoff, status, poster and stream lineup;
+  // everything the admin edits (competition label, streams, flags, featured
+  // image, window override) is carried over.
+  const fresh = freshRaw.map(base => {
+    const previous = existingPpv.get(String(base.externalId || ""));
 
-    return {
+    const carriedOver = {
       ...base,
       id: previous?.id || base.id,
       createdAt: previous?.createdAt || now,
       updatedAt: now,
-      competition: previous?.competition || "",
       home: previous?.home || "",
       away: previous?.away || "",
       teams: previous?.teams || base.teams || null,
       description: previous?.description || "",
-      liveWindowOverride: previous?.liveWindowOverride ?? null,
+      liveWindowOverride: hasLiveWindowOverride(previous)
+        ? previous.liveWindowOverride
+        : base.liveWindowOverride,
       url: previous?.url || "",
       image: previous?.image || "",
       featured: Boolean(previous?.featured),
       active: previous ? previous.active !== false : true,
       streams: Array.isArray(previous?.streams) ? previous.streams : []
     };
+    // An existing record's competition label (admin-set or last sync's tag)
+    // survives; a brand-new event takes the ppv tag.
+    carriedOver.competition = previous?.competition || base.competition || "";
+    return carriedOver;
   });
 
   const freshIds = new Set(fresh.map(match => String(match.externalId || "")));
   const removed = existing.filter(match =>
-    match.source === "streamed" &&
+    (match.source === PPV_SOURCE_NAME || match.source === "streamed") &&
     !freshIds.has(String(match.externalId || ""))
   );
 
-  // Resolve Streamed source groups through the SWR cache. The resolve budget
-  // keeps each sync invocation inside Worker subrequest limits (50 on the free
-  // plan); groups it cannot cover are deferred and retried on later syncs via
-  // a rotating cursor so no match is starved.
-  const budget = { remaining: settings.ingest.resolveBudget };
-  const rotateBy = fresh.length ? state.cursor % fresh.length : 0;
-
-  for (let index = 0; index < fresh.length; index++) {
-    const match = fresh[(index + rotateBy) % fresh.length];
-    const previous = existingStreamed.get(String(match.externalId || ""));
-    match.streamedSummary = await buildStreamedSummary(
-      env,
-      match,
-      previous?.streamedSummary,
-      budget
-    );
-  }
-
-  if (fresh.length) state.cursor = (rotateBy + 1) % fresh.length;
   const resolveCount = fresh.reduce(
     (total, match) => total + (Number(match.streamedSummary?.streamCount) || 0),
     0
@@ -1623,6 +1742,14 @@ async function runStreamedSync(env, state) {
     expired,
     resolvedCount: resolveCount
   };
+}
+
+// The admin can pin a custom live-window (minutes); a falsy value means the
+// feed-derived window from the current event is authoritative.
+function hasLiveWindowOverride(previous) {
+  const value = Number(previous?.liveWindowOverride);
+  return previous?.liveWindowOverride !== null && previous?.liveWindowOverride !== undefined &&
+    previous?.liveWindowOverride !== "" && Number.isFinite(value) && value > 0;
 }
 
 async function runCleanup(env) {
@@ -3800,8 +3927,13 @@ async function writeEmbedCache(env, route, record) {
 }
 
 // /api/play/embed/:source/:id/:streamNo — the media behind embed.st's player
-// page, served with the same proxy contract as every other playback route.
+// page (or ppv.st's frame for ppv groups), served with the same proxy
+// contract as every other playback route.
 async function serveEmbedRoute(request, env, url, route) {
+  if (String(route.source) === PPV_SOURCE_NAME) {
+    return servePpvEmbedRoute(request, env, url, route);
+  }
+
   let record = await readEmbedCache(env, route);
   if (!record || !(Date.now() - (Number(record.found) || 0) < EMBED_RESOLVE_FRESH_MS)) {
     // Stale (or missing): re-resolve. A stale record is kept as the answer
@@ -3821,6 +3953,119 @@ async function serveEmbedRoute(request, env, url, route) {
   if (!needsProxy(pseudoSource)) return redirectTo(target);
 
   // ?format=hls (iPhones without MSE) mirrors the plain-stream route.
+  let upstreamUrl = target;
+  if (url.searchParams.get("format") === "hls") {
+    const parsed = new URL(target);
+    if (/\.ts$/i.test(parsed.pathname)) parsed.pathname = parsed.pathname.replace(/\.ts$/i, ".m3u8");
+    else if (/\/live\/[^/]+\/[^/]+\/\d+$/.test(parsed.pathname)) parsed.pathname += ".m3u8";
+    upstreamUrl = parsed.href;
+  }
+  return proxyStream(request, env, {
+    ...route,
+    target: upstreamUrl,
+    headers: cleanStreamHeaders(pseudoSource.headers),
+    kind: streamKind(upstreamUrl)
+  });
+}
+
+/*
+ * ppv embed route
+ *
+ * ppv.st events play through a per-event (or per-substream) player frame on
+ * their embed host — a page behind the same loader family as embed.st, where
+ * the media URL is built by obfuscated JS and never named in the markup.
+ * Same drill as embed.st, ordered by what the feed already told us:
+ *   1. resolve the event from ppv.st's detail endpoint (SWR-cached),
+ *   2. pick the streamNo's iframe link,
+ *   3. try the same page-walking embed dig via resolveEmbedMedia,
+ *   4. dig hit  -> sealed-token stream proxy (never the page itself),
+ *      dig miss -> 302 to the plain iframe the client asked for (the player
+ *                  page already carries exactly this URL as its fallback), so
+ *                  playback degrades to today's embed-frame behavior, never
+ *                  to a dead stream.
+ */
+async function ppvEventDetail(env, route) {
+  const safeId = String(route.id ?? "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_/-]*$/.test(safeId)) return null;
+
+  const db = env.SPORTZFY_DB;
+  let cached = null;
+  if (db && typeof db.get === "function") {
+    try {
+      cached = await db.get(PPV_EVENT_KEY_PREFIX + safeId, "json");
+    } catch (_) {
+      cached = null;
+    }
+  }
+  if (cached && typeof cached === "object" && cached.event &&
+      Date.now() - (Number(cached.fetchedAt) || 0) < PPV_EVENT_FRESH_MS) {
+    return cached.event;
+  }
+
+  // Fresh fetch; stale data is the answer of record while the network fails.
+  let event = null;
+  try {
+    const response = await fetchWithTimeout(
+      PPV_STREAM_ENDPOINT + "/" + safeId,
+      { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
+      EMBED_FETCH_TIMEOUT_MS
+    );
+    if (response.ok) {
+      const data = await response.json();
+      event = data && typeof data === "object" && data.data && typeof data.data === "object"
+        ? data.data
+        : null;
+    } else {
+      discardBody(response);
+    }
+  } catch (_) {
+    event = null;
+  }
+
+  if (event && db && typeof db.put === "function") {
+    try {
+      await db.put(
+        PPV_EVENT_KEY_PREFIX + safeId,
+        JSON.stringify({ event, fetchedAt: Date.now() }),
+        // TTL no lower than EMBED fallback rotation needs
+        { expirationTtl: PPV_EVENT_TTL_SECONDS }
+      );
+    } catch (_) {}
+  }
+  return event || (cached && typeof cached === "object" && cached.event ? cached.event : null);
+}
+
+// Look the stream number up: 1 = the event's main frame, 2..n = its
+// substreams in feed order. Unknown numbers have no frame — the route then
+// answers unavailable, like every other playback route for a bad id.
+function ppvStreamIframe(event, streamNo) {
+  if (!event || typeof event !== "object") return "";
+  const entries = ppvStreamEntries(event);
+  const entry = entries.find(item => Number(item.streamNo) === Number(streamNo));
+  return entry ? entry.embed : "";
+}
+
+async function servePpvEmbedRoute(request, env, url, route) {
+  const iframe = ppvStreamIframe(await ppvEventDetail(env, route), route.streamNo);
+  if (!iframe) return playUnavailable();
+
+  let record = await readEmbedCache(env, route);
+  if (!record || !(Date.now() - (Number(record.found) || 0) < EMBED_RESOLVE_FRESH_MS)) {
+    const resolved = await resolveEmbedMedia(iframe).catch(() => null);
+    if (resolved) {
+      record = { u: resolved.url, h: cleanStreamHeaders(resolved.headers), found: Date.now() };
+      await writeEmbedCache(env, route, record);
+    }
+  }
+
+  const target = record ? safeStreamUrl(record.u) : "";
+  // Unresolvable frame: hand the player its own iframe (same URL the site
+  // already built as the fallback hop), so the plain embed frame plays.
+  if (!target) return redirectTo(iframe);
+
+  const pseudoSource = { url: target, headers: cleanStreamHeaders(record.h || {}) };
+  if (!needsProxy(pseudoSource)) return redirectTo(target);
+
   let upstreamUrl = target;
   if (url.searchParams.get("format") === "hls") {
     const parsed = new URL(target);
@@ -4462,20 +4707,6 @@ async function apiHandler(request, env, ctx) {
       }
     }
     return adminJson({ success: true });
-  }
-
-  if (request.method === "GET" && url.pathname === "/api/streamed/matches") {
-    try {
-      const raw = await fetchStreamedMatches("all-today");
-      let liveIds = new Set();
-      try {
-        const live = await fetchStreamedMatches("live");
-        liveIds = new Set(live.map(match => String(match?.id || "")).filter(Boolean));
-      } catch (_) {}
-      return json(raw.map(match => toStreamedMatch(match, liveIds)));
-    } catch (error) {
-      return json({ error: "Unable to fetch Streamed matches" }, 502);
-    }
   }
 
   if (request.method === "GET" && url.pathname === "/api/matches") {
