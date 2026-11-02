@@ -16,6 +16,8 @@ const MIGRATION_KEY = "channel_system_migrated";
 const PPV_STREAMS_URL = "https://api.ppv.st/api/streams";
 const PPV_SOURCE_NAME = "ppv";
 const PPV_SYNC_TIMEOUT_MS = 20000;               // whole-catalog fetch timeout
+const PPV_RELAY_KV_KEY = "ppv:relay-catalog";    // owner-machine agent ingest (scripts/ppv-relay-agent.mjs)
+const PPV_RELAY_FRESH_MS = 20 * 60 * 1000;       // a record older than this falls back to the network paths
 const PPV_EVENT_FRESH_MS = 5 * 60 * 1000;        // event detail reused this long at play time
 const PPV_EVENT_TTL_SECONDS = 24 * 60 * 60;      // KV ceiling for event detail
 const PPV_EVENT_KEY_PREFIX = "ppv:event:";       // <externalId> -> normalized stream entries
@@ -1043,16 +1045,75 @@ async function createAdminSession(request, env, ctx) {
 // inline, so a sync is a single fetch with no per-source resolution.
 // ---------------------------------------------------------------------------
 
-async function fetchPpvStreams() {
-  const response = await fetchWithTimeout(
-    PPV_STREAMS_URL,
-    { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
-    PPV_SYNC_TIMEOUT_MS
-  );
-  if (!response.ok) throw new Error("PPV API returned " + response.status);
+// DDoS-Guard fronts ppv.st and answers Cloudflare Workers' egress with
+// {"success":false,"error":"IP blocked. Please stop harassing our API."} on a
+// 200 — viewer and other-network IPs get the real catalog. So a payload-less
+// answer is retried once through a neutral text relay that fetches from its
+// own (non-Cloudflare) egress; browsers never need this path. The relay
+// reader accepts "https://r.jina.ai/<url>" and returns the body as text.
+const PPV_RELAY_PREFIX = "https://r.jina.ai/";
 
-  const data = await response.json();
-  return data && typeof data === "object" && Array.isArray(data.streams) ? data.streams : [];
+// Tolerant parse for relayed bodies: raw JSON, a markdown code fence, or the
+// JSON object embedded in surrounding noise all count.
+function ppvJsonFromRelayedText(text) {
+  const raw = String(text ?? "").trim();
+  const candidates = [raw];
+  if (/^```/.test(raw)) candidates.push(raw.replace(/```[a-z]*\n?/gi, "").trim());
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start >= 0 && end > start) candidates.push(raw.slice(start, end + 1));
+  for (const candidate of candidates) {
+    try { return JSON.parse(candidate); } catch (_) {}
+  }
+  return null;
+}
+
+// Direct fetch first; when the direct answer is anything but a usable JSON
+// payload (the blocked-success-false object, a 429 from the same egress
+// block, a challenge page, junk), the relay answers with the same document.
+// Real upstream faults stay non-relayed with their exact handling: 404 is a
+// real miss, 5xx is a real outage. ppv 404/5xx keep their statuses.
+async function fetchPpvDocument(url, timeoutMs, isUsable) {
+  const direct = await fetchWithTimeout(
+    url,
+    { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
+    timeoutMs
+  );
+  let parsed;
+  let usable = false;
+  if (!direct.ok) {
+    if (direct.status !== 429) {
+      throw Object.assign(new Error("PPV API returned " + direct.status), { ppvStatus: direct.status });
+    }
+  } else {
+    try { parsed = await direct.json(); } catch (_) { parsed = undefined; }
+    usable = isUsable(parsed);
+  }
+  if (usable) return { direct: true, data: parsed };
+
+  const relayed = await fetchWithTimeout(
+    PPV_RELAY_PREFIX + url,
+    { headers: { "User-Agent": CHROME_UA, "Accept": "application/json", "X-Return-Format": "text", "X-No-Cache": "true" } },
+    timeoutMs
+  );
+  if (!relayed.ok) throw Object.assign(new Error("PPV relay returned " + relayed.status), { ppvStatus: relayed.status });
+  const data = ppvJsonFromRelayedText(await relayed.text());
+  if (!data) throw new Error("PPV relay payload unreadable");
+  console.warn("PPV payload served through the relay (direct fetch unusable)");
+  return { direct: false, data };
+}
+
+async function fetchPpvStreams() {
+  const { direct, data } = await fetchPpvDocument(PPV_STREAMS_URL, PPV_SYNC_TIMEOUT_MS,
+    (value) => value && typeof value === "object" && Array.isArray(value.streams));
+  if (!data || !Array.isArray(data.streams)) {
+    // A body without a streams array is not a valid empty day: say what
+    // arrived and fail the run so the next sync retries and the served
+    // catalog is never erased.
+    console.warn((direct ? "PPV catalog payload" : "PPV relayed payload") + " without a streams array:", JSON.stringify(data)?.slice(0, 300));
+    throw new Error("PPV catalog shape unexpected (no streams array)");
+  }
+  return data.streams;
 }
 
 // "HD | Paramount+" / "SD | NFL Network (ESPN)" — the quality column ppv puts
@@ -1391,27 +1452,22 @@ async function fetchPpvSourceStreams(id) {
   if (!/^[A-Za-z0-9][A-Za-z0-9_/-]*$/.test(safeId)) return { ok: false, error: "bad-id" };
 
   try {
-    const response = await fetchWithTimeout(
+    const { data } = await fetchPpvDocument(
       PPV_STREAM_ENDPOINT + "/" + safeId,
-      { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
-      STREAMED_SOURCE_TIMEOUT_MS
+      STREAMED_SOURCE_TIMEOUT_MS,
+      (value) => value && typeof value === "object" && value.data && typeof value.data === "object"
     );
-
-    if (response.status === 404) return { ok: true, streams: [] };
-    if (response.status === 429) return { ok: false, error: "ppv-429" };
-    if (!response.ok) return { ok: false, error: "ppv-503" };
-
-    let data;
-    try {
-      data = await response.json();
-    } catch (_) {
-      return { ok: false, error: "fetch-failed" };
-    }
     const event = data && typeof data === "object" && data.data && typeof data.data === "object"
       ? data.data
       : null;
+    if (!event) {
+      console.warn("PPV detail payload without data at", safeId + ":", JSON.stringify(data)?.slice(0, 300));
+    }
     return { ok: true, streams: event ? ppvStreamEntries(event) : [] };
   } catch (error) {
+    if (error?.ppvStatus === 404) return { ok: true, streams: [] };
+    if (error?.ppvStatus === 429) return { ok: false, error: "ppv-429" };
+    if (error?.ppvStatus) return { ok: false, error: "ppv-503" };
     return { ok: false, error: error?.name === "AbortError" ? "timeout" : "fetch-failed" };
   }
 }
@@ -1656,6 +1712,22 @@ async function syncStreamedMatches(env, options = {}) {
   }
 }
 
+// The owner's relay agent (scripts/ppv-relay-agent.mjs) writes the catalog
+// into KV from its own (non-Cloudflare) egress: DDoS-Guard blocks Workers'
+// egress, so a recent record is used verbatim before any network attempt.
+// Freshness is the agent's fetchedAt stamp; the KV TTL is just garbage pickup.
+async function readPpvRelayCatalog(env) {
+  try {
+    const record = await env.SPORTZFY_DB.get(PPV_RELAY_KV_KEY, "json");
+    if (!record || !Array.isArray(record.streams) || !record.streams.length) return null;
+    if (Date.now() - (Number(record.fetchedAt) || 0) > PPV_RELAY_FRESH_MS) return null;
+    console.log("PPV catalog from the relay agent record (" + record.streams.length + " groups)");
+    return record.streams;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function runStreamedSync(env, state) {
   await migrateLegacyChannelSystem(env);
 
@@ -1664,9 +1736,21 @@ async function runStreamedSync(env, state) {
 
   // The ppv.st catalog is one request: events grouped by sport, each with
   // schedule + substreams inline. No separate live fetch, no per-source
-  // resolution pass and no budget to distribute.
-  const groups = await fetchPpvStreams();
+  // resolution pass and no budget to distribute. The relay agent record
+  // (owner machine, non-Cloudflare egress) is authoritative while fresh.
+  const groups = (await readPpvRelayCatalog(env)) ?? await fetchPpvStreams();
   const freshRaw = readPpvEventsFromGroups(groups);
+
+  // A catalog that reads empty must never erase the served matches — the
+  // removal pass below would drop every feed-derived match and store an
+  // empty list. Fail the run instead; nothing is written, the next sync
+  // retries, and viewers keep the last good catalog until it expires out.
+  const feedDerived = existing.filter(match =>
+    (match.source === PPV_SOURCE_NAME || match.source === "streamed")).length;
+  if (!freshRaw.length && feedDerived > 0) {
+    throw new Error("PPV catalog yielded no events from " + groups.length +
+      " group(s); keeping " + feedDerived + " existing matches");
+  }
 
   const existingPpv = new Map(
     existing
@@ -4005,19 +4089,14 @@ async function ppvEventDetail(env, route) {
   // Fresh fetch; stale data is the answer of record while the network fails.
   let event = null;
   try {
-    const response = await fetchWithTimeout(
+    const { data } = await fetchPpvDocument(
       PPV_STREAM_ENDPOINT + "/" + safeId,
-      { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
-      EMBED_FETCH_TIMEOUT_MS
+      EMBED_FETCH_TIMEOUT_MS,
+      (value) => value && typeof value === "object" && value.data && typeof value.data === "object"
     );
-    if (response.ok) {
-      const data = await response.json();
-      event = data && typeof data === "object" && data.data && typeof data.data === "object"
-        ? data.data
-        : null;
-    } else {
-      discardBody(response);
-    }
+    event = data && typeof data === "object" && data.data && typeof data.data === "object"
+      ? data.data
+      : null;
   } catch (_) {
     event = null;
   }
@@ -4045,8 +4124,34 @@ function ppvStreamIframe(event, streamNo) {
   return entry ? entry.embed : "";
 }
 
+// The sync already stores each ppv event's whitelisted frame links inside
+// the match record (streamedSummary.streams[].embed). When every upstream
+// path to the detail endpoint is blocked on this egress (DDoS-Guard blocks
+// Workers, and the relay can throttle too), the record answers instead, so
+// playback keeps its iframe hop instead of going dead.
+async function ppvIframeFromMatchRecord(env, route) {
+  try {
+    const matches = await readArray(env, "matches");
+    const wanted = String(route.id ?? "");
+    const match = matches.find(match => match && match.source === PPV_SOURCE_NAME &&
+      (String(match.externalId ?? "") === wanted || String(match.id ?? "") === "ppv-" + wanted));
+    const summary = match && match.streamedSummary && typeof match.streamedSummary === "object"
+      ? match.streamedSummary
+      : null;
+    const streams = summary && Array.isArray(summary.streams)
+      ? summary.streams
+      : (summary?.sources?.[0]?.streams || []);
+    const entry = streams.find(item => item && Number(item.streamNo) === Number(route.streamNo) && item.embed);
+    return entry ? String(entry.embed) : "";
+  } catch (_) {
+    return "";
+  }
+}
+
 async function servePpvEmbedRoute(request, env, url, route) {
-  const iframe = ppvStreamIframe(await ppvEventDetail(env, route), route.streamNo);
+  const event = await ppvEventDetail(env, route);
+  let iframe = ppvStreamIframe(event, route.streamNo);
+  if (!iframe) iframe = await ppvIframeFromMatchRecord(env, route);
   if (!iframe) return playUnavailable();
 
   let record = await readEmbedCache(env, route);

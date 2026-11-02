@@ -648,6 +648,207 @@ ok("ppv 404 and 5xx mirror the streamed error contract");
 ok("ppv ids restricted to the [A-Za-z0-9_/-] shape");
 
 // ---------------------------------------------------------------------------
+// 3b. DDoS-Guard relay: ppv.st answers Cloudflare-workers' egress with a 200
+//     {"success":false,"error":"IP blocked..."}; viewer IPs get the real
+//     catalog. An unusable direct payload is retried through a text relay so
+//     the Worker still syncs; a fully blocked catalog must fail loudly and
+//     keep the last-good matches instead of storing an empty list.
+// ---------------------------------------------------------------------------
+
+const PPV_DETAIL_31167 = {
+  success: true,
+  data: {
+    id: 31167,
+    name: "Valencia vs. Real Sociedad",
+    tag: "LaLiga",
+    source_tag: "HD | StreamFutbol",
+    poster: "https://api.ppv.st/assets/thumb/val-detail-thumb.jpg",
+    uri: "laliga/2026-11-02/val-rso",
+    locale: "en",
+    sources: [
+      { name: "External Player Frame", default: true, type: "iframe", data: PPV_EMBED_HOST + "laliga/2026-11-02/val-rso" }
+    ],
+    substreams: [
+      {
+        id: 1031167,
+        name: "Valencia vs. Real Sociedad",
+        tag: "LaLiga",
+        uri: "laliga/2026-11-02/val-rso_540p",
+        source_tag: "SD | StreamFutbol",
+        locale: "es",
+        sources: [
+          { name: "External Player Frame", default: true, type: "iframe", data: PPV_EMBED_HOST + "laliga/2026-11-02/val-rso_540p" }
+        ]
+      }
+    ]
+  }
+};
+
+console.log("# ppv relay");
+
+// 3b-i. Sync through the relay: blocked direct fetch, fenced relayed catalog.
+{
+  installMatchHandler();
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (u === "https://api.ppv.st/api/streams") return jsonResponse(200, {
+      success: false,
+      error: "IP blocked. Please stop harassing our API."
+    });
+    if (u === "https://r.jina.ai/https://api.ppv.st/api/streams") {
+      // The relay reader returns the body as text; be tolerant of fences.
+      return {
+        ok: true,
+        status: 200,
+        text: async () => "```json\n" + JSON.stringify({ success: true, streams: PPV_GROUPS }) + "\n```"
+      };
+    }
+    throw new Error("unexpected fetch: " + u);
+  };
+
+  await worker.default.queue(
+    { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() {
+      throw new Error("queue message retried unexpectedly");
+    } }] },
+    env
+  );
+  const matchesAfter = JSON.parse(kv.store.get("matches"));
+  assert.equal(matchesAfter.filter(match => match.source === "ppv").length, 3, "relayed catalog synced");
+  assert.equal(
+    matchesAfter.find(match => match.id === "ppv-31164")?.title,
+    "Valencia vs. Real Sociedad",
+    "the catalog content came through the relay, not from stale KV"
+  );
+}
+ok("a blocked direct fetch is served through the relay");
+
+// 3b-ii. Both transports blocked: the sync fails loudly, keeps old matches,
+//        and the queue message is retried next cron. (No agent record — the
+//        3b-v case covers the blocked network WITH a fresh record.)
+{
+  installMatchHandler();
+  kv.store.delete("ppv:relay-catalog");
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (u === "https://api.ppv.st/api/streams" ||
+        u === "https://r.jina.ai/https://api.ppv.st/api/streams") {
+      if (u.startsWith("https://r.jina.ai/")) {
+        // Relay transport works but the payload carries no JSON at all.
+        return { ok: true, status: 200, text: async () => "no catalog today" };
+      }
+      return jsonResponse(200, { success: false, error: "IP blocked. Please stop harassing our API." });
+    }
+    throw new Error("unexpected fetch: " + u);
+  };
+
+  const preserved = kv.store.get("matches");
+  let retries = 0;
+  try {
+    await worker.default.queue(
+      { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() { retries += 1; } }] },
+      env
+    );
+  } finally {
+    assert.equal(retries, 1, "failed sync asks the queue for a retry");
+    assert.equal(kv.store.get("matches"), preserved, "a fully blocked catalog erases nothing");
+  }
+}
+ok("an unreachable catalog fails loudly and keeps the last-good matches");
+
+// 3b-iii. The on-demand resolver takes the same ride: blocked direct detail,
+//         real detail via the relay.
+{
+  installMatchHandler();
+  const standard = fetchHandler;
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (new URL(u).pathname === "/api/streams/31167") {
+      return jsonResponse(200, { success: false, error: "IP blocked. Please stop harassing our API." });
+    }
+    if (u.startsWith("https://r.jina.ai/https://api.ppv.st/api/streams/31167")) {
+      return { ok: true, status: 200, text: async () => JSON.stringify(PPV_DETAIL_31167) };
+    }
+    return standard(url);
+  };
+
+  const res = await worker.default.fetch(
+    req("/api/streamed/streams?source=ppv&id=31167"),
+    env,
+    ctx
+  );
+  const data = await res.json();
+  assert.equal(data.source, "ppv");
+  assert.equal(data.streamCount, 2, "relay serves the blocked detail");
+  assert.equal(data.streams[0].embed, PPV_EMBED_HOST + "laliga/2026-11-02/val-rso");
+}
+ok("an upstream-blocked detail resolves through the relay");
+
+// 3b-iv. The extended egress block: HTTP 429 on the direct fetch answers the
+//        relay too (the same class of IP damage); message truncations keep
+//        real upstream faults (404/5xx) non-relayed.
+{
+  installMatchHandler();
+  const standard = fetchHandler;
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (new URL(u).pathname === "/api/streams/31168") {
+      return jsonResponse(429, { success: false, error: "too many requests" });
+    }
+    if (u.startsWith("https://r.jina.ai/https://api.ppv.st/api/streams/31168")) {
+      return { ok: true, status: 200, text: async () => JSON.stringify(PPV_DETAIL_31167) };
+    }
+    return standard(url);
+  };
+
+  const res = await worker.default.fetch(
+    req("/api/streamed/streams?source=ppv&id=31168"),
+    env,
+    ctx
+  );
+  const data = await res.json();
+  assert.equal(data.source, "ppv");
+  assert.equal(data.streamCount, 2, "a 429 direct fetch reaches the relay");
+  assert.ok(!data.error);
+}
+ok("a 429 direct fetch is relayed like the blocked JSON");
+
+// 3b-v. The owner-machine agent record: a fresh `ppv:relay-catalog` KV item
+//       is authoritative — the sync never touches the network while it is
+//       fresh; a stale record falls back to the network paths.
+{
+  kv.store.set("ppv:relay-catalog", JSON.stringify({ fetchedAt: Date.now(), streams: PPV_GROUPS }));
+  fetchHandler = async (url) => {
+    throw new Error("network must not be used with a fresh agent record: " + url);
+  };
+  await worker.default.queue(
+    { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() {
+      throw new Error("queue message retried unexpectedly");
+    } }] },
+    env
+  );
+  const agentSynced = JSON.parse(kv.store.get("matches"));
+  assert.equal(agentSynced.filter(match => match.source === "ppv").length, 3, "agent record synced");
+}
+ok("a fresh relay-agent record syncs without touching the network");
+
+// 3b-vi. Past its 20-minute freshness stamp the record is ignored: the same
+//        blocked-network verdicts apply (here: the fixture handlers win).
+{
+  kv.store.set("ppv:relay-catalog", JSON.stringify({ fetchedAt: Date.now() - 21 * 60 * 1000, streams: PPV_GROUPS }));
+  installMatchHandler();
+  await worker.default.queue(
+    { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() {
+      throw new Error("queue message retried unexpectedly");
+    } }] },
+    env
+  );
+  const afterStale = JSON.parse(kv.store.get("matches"));
+  assert.equal(afterStale.filter(match => match.source === "ppv").length, 3, "stale record falls back to the network sync");
+  kv.store.delete("ppv:relay-catalog");
+}
+ok("a stale relay-agent record falls back to the network sync");
+
+// ---------------------------------------------------------------------------
 // 4. Repeat sync: manual streams preserved, ids stable, caches honored.
 // ---------------------------------------------------------------------------
 
