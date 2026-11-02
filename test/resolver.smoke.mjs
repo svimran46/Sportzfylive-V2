@@ -723,9 +723,11 @@ console.log("# ppv relay");
 ok("a blocked direct fetch is served through the relay");
 
 // 3b-ii. Both transports blocked: the sync fails loudly, keeps old matches,
-//        and the queue message is retried next cron.
+//        and the queue message is retried next cron. (No agent record — the
+//        3b-v case covers the blocked network WITH a fresh record.)
 {
   installMatchHandler();
+  kv.store.delete("ppv:relay-catalog");
   fetchHandler = async (url) => {
     const u = String(url);
     if (u === "https://api.ppv.st/api/streams" ||
@@ -809,6 +811,42 @@ ok("an upstream-blocked detail resolves through the relay");
   assert.ok(!data.error);
 }
 ok("a 429 direct fetch is relayed like the blocked JSON");
+
+// 3b-v. The owner-machine agent record: a fresh `ppv:relay-catalog` KV item
+//       is authoritative — the sync never touches the network while it is
+//       fresh; a stale record falls back to the network paths.
+{
+  kv.store.set("ppv:relay-catalog", JSON.stringify({ fetchedAt: Date.now(), streams: PPV_GROUPS }));
+  fetchHandler = async (url) => {
+    throw new Error("network must not be used with a fresh agent record: " + url);
+  };
+  await worker.default.queue(
+    { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() {
+      throw new Error("queue message retried unexpectedly");
+    } }] },
+    env
+  );
+  const agentSynced = JSON.parse(kv.store.get("matches"));
+  assert.equal(agentSynced.filter(match => match.source === "ppv").length, 3, "agent record synced");
+}
+ok("a fresh relay-agent record syncs without touching the network");
+
+// 3b-vi. Past its 20-minute freshness stamp the record is ignored: the same
+//        blocked-network verdicts apply (here: the fixture handlers win).
+{
+  kv.store.set("ppv:relay-catalog", JSON.stringify({ fetchedAt: Date.now() - 21 * 60 * 1000, streams: PPV_GROUPS }));
+  installMatchHandler();
+  await worker.default.queue(
+    { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() {
+      throw new Error("queue message retried unexpectedly");
+    } }] },
+    env
+  );
+  const afterStale = JSON.parse(kv.store.get("matches"));
+  assert.equal(afterStale.filter(match => match.source === "ppv").length, 3, "stale record falls back to the network sync");
+  kv.store.delete("ppv:relay-catalog");
+}
+ok("a stale relay-agent record falls back to the network sync");
 
 // ---------------------------------------------------------------------------
 // 4. Repeat sync: manual streams preserved, ids stable, caches honored.

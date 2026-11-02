@@ -16,6 +16,8 @@ const MIGRATION_KEY = "channel_system_migrated";
 const PPV_STREAMS_URL = "https://api.ppv.st/api/streams";
 const PPV_SOURCE_NAME = "ppv";
 const PPV_SYNC_TIMEOUT_MS = 20000;               // whole-catalog fetch timeout
+const PPV_RELAY_KV_KEY = "ppv:relay-catalog";    // owner-machine agent ingest (scripts/ppv-relay-agent.mjs)
+const PPV_RELAY_FRESH_MS = 20 * 60 * 1000;       // a record older than this falls back to the network paths
 const PPV_EVENT_FRESH_MS = 5 * 60 * 1000;        // event detail reused this long at play time
 const PPV_EVENT_TTL_SECONDS = 24 * 60 * 60;      // KV ceiling for event detail
 const PPV_EVENT_KEY_PREFIX = "ppv:event:";       // <externalId> -> normalized stream entries
@@ -1710,6 +1712,22 @@ async function syncStreamedMatches(env, options = {}) {
   }
 }
 
+// The owner's relay agent (scripts/ppv-relay-agent.mjs) writes the catalog
+// into KV from its own (non-Cloudflare) egress: DDoS-Guard blocks Workers'
+// egress, so a recent record is used verbatim before any network attempt.
+// Freshness is the agent's fetchedAt stamp; the KV TTL is just garbage pickup.
+async function readPpvRelayCatalog(env) {
+  try {
+    const record = await env.SPORTZFY_DB.get(PPV_RELAY_KV_KEY, "json");
+    if (!record || !Array.isArray(record.streams) || !record.streams.length) return null;
+    if (Date.now() - (Number(record.fetchedAt) || 0) > PPV_RELAY_FRESH_MS) return null;
+    console.log("PPV catalog from the relay agent record (" + record.streams.length + " groups)");
+    return record.streams;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function runStreamedSync(env, state) {
   await migrateLegacyChannelSystem(env);
 
@@ -1718,8 +1736,9 @@ async function runStreamedSync(env, state) {
 
   // The ppv.st catalog is one request: events grouped by sport, each with
   // schedule + substreams inline. No separate live fetch, no per-source
-  // resolution pass and no budget to distribute.
-  const groups = await fetchPpvStreams();
+  // resolution pass and no budget to distribute. The relay agent record
+  // (owner machine, non-Cloudflare egress) is authoritative while fresh.
+  const groups = (await readPpvRelayCatalog(env)) ?? await fetchPpvStreams();
   const freshRaw = readPpvEventsFromGroups(groups);
 
   // A catalog that reads empty must never erase the served matches — the
