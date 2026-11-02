@@ -648,6 +648,140 @@ ok("ppv 404 and 5xx mirror the streamed error contract");
 ok("ppv ids restricted to the [A-Za-z0-9_/-] shape");
 
 // ---------------------------------------------------------------------------
+// 3b. DDoS-Guard relay: ppv.st answers Cloudflare-workers' egress with a 200
+//     {"success":false,"error":"IP blocked..."}; viewer IPs get the real
+//     catalog. An unusable direct payload is retried through a text relay so
+//     the Worker still syncs; a fully blocked catalog must fail loudly and
+//     keep the last-good matches instead of storing an empty list.
+// ---------------------------------------------------------------------------
+
+const PPV_DETAIL_31167 = {
+  success: true,
+  data: {
+    id: 31167,
+    name: "Valencia vs. Real Sociedad",
+    tag: "LaLiga",
+    source_tag: "HD | StreamFutbol",
+    poster: "https://api.ppv.st/assets/thumb/val-detail-thumb.jpg",
+    uri: "laliga/2026-11-02/val-rso",
+    locale: "en",
+    sources: [
+      { name: "External Player Frame", default: true, type: "iframe", data: PPV_EMBED_HOST + "laliga/2026-11-02/val-rso" }
+    ],
+    substreams: [
+      {
+        id: 1031167,
+        name: "Valencia vs. Real Sociedad",
+        tag: "LaLiga",
+        uri: "laliga/2026-11-02/val-rso_540p",
+        source_tag: "SD | StreamFutbol",
+        locale: "es",
+        sources: [
+          { name: "External Player Frame", default: true, type: "iframe", data: PPV_EMBED_HOST + "laliga/2026-11-02/val-rso_540p" }
+        ]
+      }
+    ]
+  }
+};
+
+console.log("# ppv relay");
+
+// 3b-i. Sync through the relay: blocked direct fetch, fenced relayed catalog.
+{
+  installMatchHandler();
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (u === "https://api.ppv.st/api/streams") return jsonResponse(200, {
+      success: false,
+      error: "IP blocked. Please stop harassing our API."
+    });
+    if (u === "https://r.jina.ai/https://api.ppv.st/api/streams") {
+      // The relay reader returns the body as text; be tolerant of fences.
+      return {
+        ok: true,
+        status: 200,
+        text: async () => "```json\n" + JSON.stringify({ success: true, streams: PPV_GROUPS }) + "\n```"
+      };
+    }
+    throw new Error("unexpected fetch: " + u);
+  };
+
+  await worker.default.queue(
+    { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() {
+      throw new Error("queue message retried unexpectedly");
+    } }] },
+    env
+  );
+  const matchesAfter = JSON.parse(kv.store.get("matches"));
+  assert.equal(matchesAfter.filter(match => match.source === "ppv").length, 3, "relayed catalog synced");
+  assert.equal(
+    matchesAfter.find(match => match.id === "ppv-31164")?.title,
+    "Valencia vs. Real Sociedad",
+    "the catalog content came through the relay, not from stale KV"
+  );
+}
+ok("a blocked direct fetch is served through the relay");
+
+// 3b-ii. Both transports blocked: the sync fails loudly, keeps old matches,
+//        and the queue message is retried next cron.
+{
+  installMatchHandler();
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (u === "https://api.ppv.st/api/streams" ||
+        u === "https://r.jina.ai/https://api.ppv.st/api/streams") {
+      if (u.startsWith("https://r.jina.ai/")) {
+        // Relay transport works but the payload carries no JSON at all.
+        return { ok: true, status: 200, text: async () => "no catalog today" };
+      }
+      return jsonResponse(200, { success: false, error: "IP blocked. Please stop harassing our API." });
+    }
+    throw new Error("unexpected fetch: " + u);
+  };
+
+  const preserved = kv.store.get("matches");
+  let retries = 0;
+  try {
+    await worker.default.queue(
+      { messages: [{ body: { type: "scheduled-sync" }, ack() {}, retry() { retries += 1; } }] },
+      env
+    );
+  } finally {
+    assert.equal(retries, 1, "failed sync asks the queue for a retry");
+    assert.equal(kv.store.get("matches"), preserved, "a fully blocked catalog erases nothing");
+  }
+}
+ok("an unreachable catalog fails loudly and keeps the last-good matches");
+
+// 3b-iii. The on-demand resolver takes the same ride: blocked direct detail,
+//         real detail via the relay.
+{
+  installMatchHandler();
+  const standard = fetchHandler;
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (new URL(u).pathname === "/api/streams/31167") {
+      return jsonResponse(200, { success: false, error: "IP blocked. Please stop harassing our API." });
+    }
+    if (u.startsWith("https://r.jina.ai/https://api.ppv.st/api/streams/31167")) {
+      return { ok: true, status: 200, text: async () => JSON.stringify(PPV_DETAIL_31167) };
+    }
+    return standard(url);
+  };
+
+  const res = await worker.default.fetch(
+    req("/api/streamed/streams?source=ppv&id=31167"),
+    env,
+    ctx
+  );
+  const data = await res.json();
+  assert.equal(data.source, "ppv");
+  assert.equal(data.streamCount, 2, "relay serves the blocked detail");
+  assert.equal(data.streams[0].embed, PPV_EMBED_HOST + "laliga/2026-11-02/val-rso");
+}
+ok("an upstream-blocked detail resolves through the relay");
+
+// ---------------------------------------------------------------------------
 // 4. Repeat sync: manual streams preserved, ids stable, caches honored.
 // ---------------------------------------------------------------------------
 
