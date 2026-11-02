@@ -4124,8 +4124,34 @@ function ppvStreamIframe(event, streamNo) {
   return entry ? entry.embed : "";
 }
 
+// The sync already stores each ppv event's whitelisted frame links inside
+// the match record (streamedSummary.streams[].embed). When every upstream
+// path to the detail endpoint is blocked on this egress (DDoS-Guard blocks
+// Workers, and the relay can throttle too), the record answers instead, so
+// playback keeps its iframe hop instead of going dead.
+async function ppvIframeFromMatchRecord(env, route) {
+  try {
+    const matches = await readArray(env, "matches");
+    const wanted = String(route.id ?? "");
+    const match = matches.find(match => match && match.source === PPV_SOURCE_NAME &&
+      (String(match.externalId ?? "") === wanted || String(match.id ?? "") === "ppv-" + wanted));
+    const summary = match && match.streamedSummary && typeof match.streamedSummary === "object"
+      ? match.streamedSummary
+      : null;
+    const streams = summary && Array.isArray(summary.streams)
+      ? summary.streams
+      : (summary?.sources?.[0]?.streams || []);
+    const entry = streams.find(item => item && Number(item.streamNo) === Number(route.streamNo) && item.embed);
+    return entry ? String(entry.embed) : "";
+  } catch (_) {
+    return "";
+  }
+}
+
 async function servePpvEmbedRoute(request, env, url, route) {
-  const iframe = ppvStreamIframe(await ppvEventDetail(env, route), route.streamNo);
+  const event = await ppvEventDetail(env, route);
+  let iframe = ppvStreamIframe(event, route.streamNo);
+  if (!iframe) iframe = await ppvIframeFromMatchRecord(env, route);
   if (!iframe) return playUnavailable();
 
   let record = await readEmbedCache(env, route);

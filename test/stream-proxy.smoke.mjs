@@ -1081,4 +1081,48 @@ ok("ppv embed route: dig through the frame, sealed proxy, caches and streamNo ma
 }
 ok("ppv embed route: unresolvable frame falls back to a redirect on the player page");
 
+{
+  // Blocked egress: the detail endpoint answers the banned-IP JSON and the
+  // relay reader throttles too (its fetch throws here). The synced match
+  // record carries the same frame links, so playback keeps the iframe hop.
+  const env = makeEnv();
+  const recordStreams = [
+    { streamNo: 1, language: "", hd: true, source: "ppv", embed: "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea" },
+    { streamNo: 2, language: "", hd: false, source: "ppv", embed: "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea_540p" }
+  ];
+  env.SPORTZFY_DB.store.set("matches", JSON.stringify([{
+    id: "ppv-31166",
+    externalId: "31166",
+    source: "ppv",
+    status: "live",
+    streamedSummary: {
+      sourceCount: 1,
+      streamCount: 2,
+      sources: [{ source: "ppv", id: "31166", streamCount: 2, streams: recordStreams }],
+      streams: recordStreams
+    }
+  }]));
+  upstream["https://api.ppv.st/api/streams/31166"] = () =>
+    respond(JSON.stringify({ success: false, error: "IP blocked. Please stop harassing our API." }),
+      { headers: { "Content-Type": "application/json" } });
+  // The relayed URL is deliberately unmocked: its transport fails like a
+  // 429-throttled reader. The frame page is a dead-on-arrival dig target.
+  upstream["https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea"] = () =>
+    respond("<html><body>obfuscated loader, no media</body></html>", { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  upstream["https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea_540p"] = () =>
+    respond("<html><body>obfuscated loader, no media</body></html>", { headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+  const res = await call(env, "/api/play/embed/ppv/31166/1");
+  assert.equal(res.status, 302, "a blocked detail still serves the frame from the match record");
+  assert.equal(res.headers.get("Location"), "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea");
+
+  const sub = await call(env, "/api/play/embed/ppv/31166/2");
+  assert.equal(sub.status, 302, "substream numbers map through the record too");
+  assert.equal(sub.headers.get("Location"), "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea_540p");
+
+  const ghost = await call(env, "/api/play/embed/ppv/31168/1");
+  assert.equal(ghost.status, 404, "no record and no detail -> unavailable, as before");
+}
+ok("ppv embed route: a fully blocked detail falls back to the synced match record");
+
 console.log("\nAll " + passed + " stream proxy assertions passed.");
