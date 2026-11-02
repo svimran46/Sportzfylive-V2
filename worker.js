@@ -4018,11 +4018,16 @@ async function serveEmbedRoute(request, env, url, route) {
     return servePpvEmbedRoute(request, env, url, route);
   }
 
+  const embedUrl = EMBED_BASE + encodeURIComponent(route.source) + "/" + encodeURIComponent(route.id) + "/" + route.streamNo;
+  // ?frame=1 is the client's "hand this frame over now" hop: no dig, no
+  // cache read. The site uses it as the player page's same-origin fallback,
+  // so the page URL never has to be trusted as a redirect target.
+  if (url.searchParams.get("frame") === "1") return redirectTo(embedUrl);
+
   let record = await readEmbedCache(env, route);
   if (!record || !(Date.now() - (Number(record.found) || 0) < EMBED_RESOLVE_FRESH_MS)) {
     // Stale (or missing): re-resolve. A stale record is kept as the answer
     // when nothing new is found, so an embed-storm does not strand playback.
-    const embedUrl = EMBED_BASE + encodeURIComponent(route.source) + "/" + encodeURIComponent(route.id) + "/" + route.streamNo;
     const resolved = await resolveEmbedMedia(embedUrl).catch(() => null);
     if (resolved) {
       record = { u: resolved.url, h: cleanStreamHeaders(resolved.headers), found: Date.now() };
@@ -4064,9 +4069,12 @@ async function serveEmbedRoute(request, env, url, route) {
  *   3. try the same page-walking embed dig via resolveEmbedMedia,
  *   4. dig hit  -> sealed-token stream proxy (never the page itself),
  *      dig miss -> 302 to the plain iframe the client asked for (the player
- *                  page already carries exactly this URL as its fallback), so
- *                  playback degrades to today's embed-frame behavior, never
- *                  to a dead stream.
+ *                  page carries a same-origin ?frame=1 route as its fallback),
+ *                  so playback degrades to the embed frame, never to a dead
+ *                  stream.
+ *   5. ?frame=1 skips 1-3: the site's ppv streams go straight to the frame
+ *      (the loader is not server-resolvable), using the synced match record
+ *      first so no ppv.st request is made at playback time.
  */
 async function ppvEventDetail(env, route) {
   const safeId = String(route.id ?? "").trim();
@@ -4149,10 +4157,20 @@ async function ppvIframeFromMatchRecord(env, route) {
 }
 
 async function servePpvEmbedRoute(request, env, url, route) {
-  const event = await ppvEventDetail(env, route);
-  let iframe = ppvStreamIframe(event, route.streamNo);
+  const frameOnly = url.searchParams.get("frame") === "1";
+
+  // The direct frame hop is the site's known-good playback path (ppv builds
+  // its media URL in obfuscated JS, so the server-side dig cannot see it). It
+  // prefers the already-synced match record and never fetches ppv.st or the
+  // frame page itself.
+  let iframe = frameOnly ? await ppvIframeFromMatchRecord(env, route) : "";
+  if (!iframe) {
+    const event = await ppvEventDetail(env, route);
+    iframe = ppvStreamIframe(event, route.streamNo);
+  }
   if (!iframe) iframe = await ppvIframeFromMatchRecord(env, route);
   if (!iframe) return playUnavailable();
+  if (frameOnly) return redirectTo(iframe);
 
   let record = await readEmbedCache(env, route);
   if (!record || !(Date.now() - (Number(record.found) || 0) < EMBED_RESOLVE_FRESH_MS)) {

@@ -216,7 +216,12 @@ for `.m3u8`, mpegts.js for MPEG-TS and FLV (falling back to the Worker's HLS
 version on iPhones without MSE), dash.js for `.mpd`, and the native player for
 MP4/WebM/audio. Libraries load lazily from pinned CDN versions. Blocked
 autoplay retries muted with a *Tap to unmute* button; network drops reconnect
-with backoff. Embed pages open in an iframe (sandboxed when flagged).
+with backoff. Embed pages open in an iframe (sandboxed when flagged). A feed
+embed is never fetched as media: the first-party player carries a same-origin
+`/api/play/embed/...?frame=1` fallback and hands the frame over when the
+resolver misses. ppv streams use that hop directly — ppv's player builds its
+media URL in obfuscated JavaScript that the Worker cannot read, so a dig would
+only produce the retry loop this route exists to avoid.
 
 ### Watch page
 
@@ -268,7 +273,7 @@ Errors auto-dismiss after 5 seconds or when a new channel is selected.
 
 - **XSS Prevention**: All user data is sanitized and rendered safely using DOM methods
 - **Embeds**: Match embeds are not sandboxed (those players refuse to run inside a sandbox); they get `no-referrer` and only the autoplay/fullscreen permissions they need. A Live TV channel marked `"sandbox": true` in `channels.json` runs in a sandboxed iframe (no pop-ups, no top-level navigation) on the website and when attached to a match (the Android app sandboxes by default too — its pop-up shim keeps `window.open` from answering `null`, so the embed's anti-sandbox check passes — and additionally traps pop-ups and ad redirects in the WebView, refuses ad frames, images and beacons, and still lets the embeds' own ad scripts load so the player does not go black; `embedSandbox: false` in the app's remote config turns its sandbox off; the app also runs each `embed.st` page in a hidden WebView just long enough to capture the real media URL, then plays that in its own Media3 player — `embedResolve: false` turns that off too); other channels load directly, because some render a black frame inside a sandbox. Admins can flip the flag per channel or per stream
-- **Playback URLs**: public JSON never carries TV channel, admin stream or ppv media URLs (the whitelisted ppv frame-page link is the one exception — it feeds the player page's fallback); `/api/play/*` redirects to the real target (errors answer as sandboxed plain text), and `player.html` only plays those `/api/play/*` paths
+- **Playback URLs**: public JSON never carries TV channel, admin stream or ppv media URLs (the whitelisted ppv frame-page link is the one exception — the Worker's same-origin `?frame=1` hop serves it, so the player never redirects to a raw host from a query parameter); `/api/play/*` redirects to the real target (errors answer as sandboxed plain text), and `player.html` only plays those `/api/play/*` paths
 - **Admin password**: `ADMIN_TOKEN` signs sessions and is the bootstrap login. A password set in Settings is stored as a salted PBKDF2 hash in KV and replaces it for logins until reset; logins and password changes share the per-IP failure throttle. Locked out? Delete the `admin_credential` key in the KV namespace
 - **Input Validation**: All data is validated before rendering
 

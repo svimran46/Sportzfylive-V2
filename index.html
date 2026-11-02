@@ -2258,17 +2258,27 @@
                     // Feed source frames play through the Worker's embed
                     // resolver (/api/play/embed) in the first-party player
                     // page; when the resolver cannot extract the media, the
-                    // player page falls back to the plain frame the entry
-                    // came from (the Worker 302s there too).
+                    // player page hops to the same-origin ?frame=1 route,
+                    // which hands the frame over (the raw frame host is never
+                    // a redirect target the page trusts).
+                    //
+                    // ppv frames cannot be dug server-side (their player is
+                    // built by obfuscated JS), so they skip the first-party
+                    // page entirely and load the whitelisted frame through
+                    // the Worker's direct frame hop. That is the difference
+                    // between a working stream and a retry loop.
                     const resolvePath = "/api/play/embed/" +
                         encodeURIComponent(String(group && group.source || "")) + "/" +
                         encodeURIComponent(String(group && group.id || "")) + "/" +
                         (Number(stream.streamNo) || 1);
+                    const isPpv = String(group && group.source || "") === "ppv";
                     playable.push({
                         group: group,
                         stream: stream,
-                        url: PROXY_URL + "/player.html?src=" + encodeURIComponent(resolvePath) +
-                            "&fallback=" + encodeURIComponent(streamEmbedUrl(group, stream, stream.streamNo))
+                        url: isPpv
+                            ? PROXY_URL + resolvePath + "?frame=1"
+                            : PROXY_URL + "/player.html?src=" + encodeURIComponent(resolvePath) +
+                                "&fallback=" + encodeURIComponent(resolvePath + "?frame=1")
                     });
                 }
             }

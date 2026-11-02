@@ -1125,4 +1125,49 @@ ok("ppv embed route: unresolvable frame falls back to a redirect on the player p
 }
 ok("ppv embed route: a fully blocked detail falls back to the synced match record");
 
+{
+  // ?frame=1 is the site's direct handoff: answer the whitelisted frame now,
+  // without fetching ppv.st or walking the frame page. This is the path the
+  // watch view uses for ppv, whose loader builds the media URL in JS.
+  const env = makeEnv();
+  const recordStreams = [
+    { streamNo: 1, language: "en", hd: true, source: "ppv", embed: "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea" },
+    { streamNo: 2, language: "en", hd: false, source: "ppv", embed: "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea_540p" }
+  ];
+  env.SPORTZFY_DB.store.set("matches", JSON.stringify([{
+    id: "ppv-31169",
+    externalId: "31169",
+    source: "ppv",
+    status: "live",
+    streamedSummary: {
+      sourceCount: 1,
+      streamCount: 2,
+      sources: [{ source: "ppv", id: "31169", streamCount: 2, streams: recordStreams }],
+      streams: recordStreams
+    }
+  }]));
+  const before = upstreamLog.length;
+  const res = await call(env, "/api/play/embed/ppv/31169/1?frame=1");
+  assert.equal(res.status, 302, "frame hop answers the player page");
+  assert.equal(res.headers.get("Location"), "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea");
+  assert.equal(upstreamLog.length, before, "frame hop never touches ppv.st or the frame host");
+
+  const sub = await call(env, "/api/play/embed/ppv/31169/2?frame=1");
+  assert.equal(sub.headers.get("Location"), "https://taifood-blog.asia/embed/nfl/2026-11-02/chi-sea_540p",
+    "substream numbers hop to their own frame");
+}
+ok("ppv embed route: ?frame=1 hands over the synced frame without a dig");
+
+{
+  // The same handoff exists for embed.st groups: the player page's fallback
+  // is this same-origin route, never the raw frame host.
+  const env = makeEnv();
+  const before = upstreamLog.length;
+  const res = await call(env, "/api/play/embed/lteam/id-42/1?frame=1");
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("Location"), "https://embed.st/embed/lteam/id-42/1");
+  assert.equal(upstreamLog.length, before, "frame hop does not fetch the embed page");
+}
+ok("embed route: ?frame=1 hands embed.st's frame over without a dig");
+
 console.log("\nAll " + passed + " stream proxy assertions passed.");
