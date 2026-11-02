@@ -1067,22 +1067,27 @@ function ppvJsonFromRelayedText(text) {
 }
 
 // Direct fetch first; when the direct answer is anything but a usable JSON
-// payload (the blocked-success-false object, a challenge page, junk), the
-// relay answers with the same document. Real upstream errors (4xx/5xx) are
-// thrown with their status so callers keep their exact handling — never
-// relayed, so a rate-limited upstream stays a rate-limited upstream.
+// payload (the blocked-success-false object, a 429 from the same egress
+// block, a challenge page, junk), the relay answers with the same document.
+// Real upstream faults stay non-relayed with their exact handling: 404 is a
+// real miss, 5xx is a real outage. ppv 404/5xx keep their statuses.
 async function fetchPpvDocument(url, timeoutMs, isUsable) {
   const direct = await fetchWithTimeout(
     url,
     { headers: { "Accept": "application/json", "User-Agent": CHROME_UA } },
     timeoutMs
   );
-  if (!direct.ok) {
-    throw Object.assign(new Error("PPV API returned " + direct.status), { ppvStatus: direct.status });
-  }
   let parsed;
-  try { parsed = await direct.json(); } catch (_) { parsed = undefined; }
-  if (isUsable(parsed)) return { direct: true, data: parsed };
+  let usable = false;
+  if (!direct.ok) {
+    if (direct.status !== 429) {
+      throw Object.assign(new Error("PPV API returned " + direct.status), { ppvStatus: direct.status });
+    }
+  } else {
+    try { parsed = await direct.json(); } catch (_) { parsed = undefined; }
+    usable = isUsable(parsed);
+  }
+  if (usable) return { direct: true, data: parsed };
 
   const relayed = await fetchWithTimeout(
     PPV_RELAY_PREFIX + url,

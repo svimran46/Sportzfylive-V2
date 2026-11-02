@@ -781,6 +781,35 @@ ok("an unreachable catalog fails loudly and keeps the last-good matches");
 }
 ok("an upstream-blocked detail resolves through the relay");
 
+// 3b-iv. The extended egress block: HTTP 429 on the direct fetch answers the
+//        relay too (the same class of IP damage); message truncations keep
+//        real upstream faults (404/5xx) non-relayed.
+{
+  installMatchHandler();
+  const standard = fetchHandler;
+  fetchHandler = async (url) => {
+    const u = String(url);
+    if (new URL(u).pathname === "/api/streams/31168") {
+      return jsonResponse(429, { success: false, error: "too many requests" });
+    }
+    if (u.startsWith("https://r.jina.ai/https://api.ppv.st/api/streams/31168")) {
+      return { ok: true, status: 200, text: async () => JSON.stringify(PPV_DETAIL_31167) };
+    }
+    return standard(url);
+  };
+
+  const res = await worker.default.fetch(
+    req("/api/streamed/streams?source=ppv&id=31168"),
+    env,
+    ctx
+  );
+  const data = await res.json();
+  assert.equal(data.source, "ppv");
+  assert.equal(data.streamCount, 2, "a 429 direct fetch reaches the relay");
+  assert.ok(!data.error);
+}
+ok("a 429 direct fetch is relayed like the blocked JSON");
+
 // ---------------------------------------------------------------------------
 // 4. Repeat sync: manual streams preserved, ids stable, caches honored.
 // ---------------------------------------------------------------------------
