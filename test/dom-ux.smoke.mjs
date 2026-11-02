@@ -353,22 +353,25 @@ assert.ok(
 ok("watch view renders crests, share targets and a related-matches rail");
 
 // Streamed sources play through the Worker's embed resolver in the first-party
-// player page; the plain embed.st frame remains as the player page's own
-// fallback, encoded into the ?fallback= parameter.
+// player page; when the resolver cannot extract the media, the player page
+// hops to the same-origin ?frame=1 route, which hands the frame over. The raw
+// frame host is never a redirect target the page trusts.
 const embedPlain1 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1";
 const embedPlain2 = "https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/2";
-const cardUrl = (embedUrl) =>
-  "https://sportzfylive.svimranmy.workers.dev/player.html?src=" +
-  encodeURIComponent("/api/play/embed/admin/ppv-new-york-giants-at-los-angeles-rams/" + embedUrl.slice(-1)) +
-  "&fallback=" + encodeURIComponent(embedUrl);
+const cardUrl = (embedUrl) => {
+  const resolvePath = "/api/play/embed/admin/ppv-new-york-giants-at-los-angeles-rams/" + embedUrl.slice(-1);
+  return "https://sportzfylive.svimranmy.workers.dev/player.html?src=" +
+    encodeURIComponent(resolvePath) +
+    "&fallback=" + encodeURIComponent(resolvePath + "?frame=1");
+};
 assert.equal(chips[0].dataset.embedUrl, cardUrl(embedPlain1));
 assert.equal(chips[1].dataset.embedUrl, cardUrl(embedPlain2));
 const decodeChip = (chip) => decodeURIComponent(decodeURIComponent(chip.dataset.embedUrl));
 assert.ok(chips[0].dataset.embedUrl.includes("player.html") &&
     decodeChip(chips[0]).includes("/api/play/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1") &&
-    decodeChip(chips[0]).includes("fallback=https://embed.st/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1"),
-  "resolver path is the playback route, embed.st the fallback");
-ok("toggle embed URLs play via /api/play/embed with the embed.st frame as fallback");
+    decodeChip(chips[0]).includes("fallback=/api/play/embed/admin/ppv-new-york-giants-at-los-angeles-rams/1?frame=1"),
+  "resolver path is the playback route, the same-origin frame hop the fallback");
+ok("toggle embed URLs play via /api/play/embed with the frame hop as fallback");
 
 chips[0].click();
 const player2 = documentStub.getElementById("player-container");
@@ -406,9 +409,9 @@ assert.ok(
 ok("matches without resolved streams show the empty state");
 
 // ---------------------------------------------------------------------------
-// 2c. ppv feed chips: the frame link comes from the whitelisted stream.embed
-//     field, the resolver path stays /api/play/embed/ppv/<id>/<n>, and the
-//     provider chip labels as PPV.st.
+// 2c. ppv feed chips: playback goes straight to the Worker's frame hop for the
+//     whitelisted stream.embed link (ppv's loader cannot be dug server-side),
+//     and the provider chip labels as PPV.st.
 // ---------------------------------------------------------------------------
 
 windowStub.__SPORTZFY_MATCHES.set("ppv-31164", {
@@ -451,23 +454,21 @@ const ppvPicker = documentStub.getElementById("stream-picker");
 const ppvChips = ppvPicker.children.filter(el => el.classList && el.classList.contains("stream-toggle"));
 assert.equal(ppvChips.length, 2, "one toggle per ppv stream");
 
-const ppvCardUrl = (embedUrl, n) =>
-  "https://sportzfylive.svimranmy.workers.dev/player.html?src=" +
-  encodeURIComponent("/api/play/embed/ppv/31164/" + n) +
-  "&fallback=" + encodeURIComponent(embedUrl);
-assert.equal(ppvChips[0].dataset.embedUrl, ppvCardUrl("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp", 1));
-assert.equal(ppvChips[1].dataset.embedUrl, ppvCardUrl("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp_540p", 2));
+const ppvCardUrl = (n) =>
+  "https://sportzfylive.svimranmy.workers.dev/api/play/embed/ppv/31164/" + n + "?frame=1";
+assert.equal(ppvChips[0].dataset.embedUrl, ppvCardUrl(1));
+assert.equal(ppvChips[1].dataset.embedUrl, ppvCardUrl(2));
 const decodePpvChip = (chip) => decodeURIComponent(decodeURIComponent(chip.dataset.embedUrl));
-assert.ok(decodePpvChip(ppvChips[0]).includes("/api/play/embed/ppv/31164/1"), "resolver path routes by the ppv group id");
-assert.ok(decodePpvChip(ppvChips[0]).includes("fallback=https://taifood-blog.asia/embed/football/2026-11-02/lens-scp"), "frame link is the fallback");
+assert.ok(decodePpvChip(ppvChips[0]).includes("/api/play/embed/ppv/31164/1?frame=1"), "frame hop routes by the ppv group id");
+assert.ok(!decodePpvChip(ppvChips[0]).includes("taifood-blog.asia"), "the raw frame host stays behind the Worker hop");
 assert.ok(ppvChips[0].getAttribute("aria-label").includes("PPV.st"), "ppv chip labels as PPV.st");
-ok("ppv chips resolve through /api/play/embed with the published frame as fallback");
+ok("ppv chips hand the whitelisted frame to the player without a server-side dig");
 
 ppvChips[0].click();
 const ppvPlayer = documentStub.getElementById("player-container");
 assert.equal(ppvPlayer.children.length, 1, "ppv chip mounts exactly one iframe");
-assert.equal(ppvPlayer.children[0].src, ppvCardUrl("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp", 1), "iframe points at the first-party player page");
-ok("ppv toggle mounts the resolver player page in the first-party frame");
+assert.equal(ppvPlayer.children[0].src, ppvCardUrl(1), "iframe points at the Worker frame hop");
+ok("ppv toggle mounts the frame hop directly (no retry loop)");
 
 // Reset for the following scenarios: restore the previous watch view state.
 documentStub.dispatch("keydown", { key: "Escape", target: makeElement() });
