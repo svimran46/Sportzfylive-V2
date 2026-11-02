@@ -18,7 +18,7 @@
 // (npx wrangler whoami) — it writes KV under the account that login grants.
 
 import { spawnSync } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -28,8 +28,21 @@ const KV_NAMESPACE = "bd1be243a4494a369d16617100f09561"; // SPORTZFY_DB in wrang
 const KV_KEY = "ppv:relay-catalog";
 const RECORD_TTL_SECONDS = 60 * 60; // abs after one hour; freshness check is the fetchedAt stamp
 
+const REPO_ROOT = path.resolve(import.meta.dirname, "..");
+const LOG_FILE = path.join(REPO_ROOT, "logs", "ppv-relay-agent.log");
+mkdirSync(path.dirname(LOG_FILE), { recursive: true });
+if (existsSync(LOG_FILE) && statSync(LOG_FILE).size > 200 * 1024) {
+  // Keep enough history to diagnose a stalled run, drop the rest.
+  const tail = readFileSync(LOG_FILE, "utf8").split("\n").slice(-400).join("\n");
+  writeFileSync(LOG_FILE, tail);
+}
+const log = (line) => {
+  const entry = new Date().toISOString() + " " + line;
+  try { appendFileSync(LOG_FILE, entry + "\n"); } catch (_) {}
+  (line.startsWith("ERROR") ? console.error : console.log)(entry);
+};
+
 const now = Date.now();
-const stamp = () => new Date().toISOString();
 
 let groups = null;
 let dir = path.join(tmpdir(), "ppv-relay-" + now);
@@ -44,17 +57,17 @@ try {
   }
   groups = data.streams;
   const eventCount = groups.reduce((total, group) => total + (group?.streams?.length || 0), 0);
-  console.log(stamp() + " fetched " + groups.length + " groups (" + eventCount + " events)");
+  log("fetched " + groups.length + " groups (" + eventCount + " events)");
 } catch (error) {
-  console.error(stamp() + " fetch failed:", String(error?.message || error));
+  log("ERROR fetch failed: " + String(error?.message || error) + (error?.cause ? " / " + String(error.cause) : ""));
   process.exitCode = 1;
 }
 
 if (groups) {
   try {
-    await mkdir(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "relay-catalog.json");
-    await writeFile(file, JSON.stringify({ fetchedAt: now, streams: groups }));
+    writeFileSync(file, JSON.stringify({ fetchedAt: now, streams: groups }));
 
     const result = spawnSync(
       "npx",
@@ -63,17 +76,18 @@ if (groups) {
         "--namespace-id", KV_NAMESPACE,
         "--remote",
         "--ttl", String(RECORD_TTL_SECONDS)],
-      { shell: true, stdio: "pipe", encoding: "utf8", cwd: path.resolve(import.meta.dirname, "..") }
+      { shell: true, stdio: "pipe", encoding: "utf8", cwd: REPO_ROOT }
     );
 
-    if (result.status !== 0) {
-      throw new Error("wrangler kv put failed: " + (result.stderr || result.stdout || ("" + result.status)).slice(0, 400));
+    if (result.status !== 0 || result.error) {
+      throw new Error("wrangler kv put failed (status " + result.status + (result.error ? ", " + String(result.error.message || result.error) : "") + "): "
+        + String(result.stderr || result.stdout || "").replace(/\s+/g, " ").slice(0, 400));
     }
-    console.log(stamp() + " wrote " + KV_KEY + " (" + groups.length + " groups) into KV");
+    log("wrote " + KV_KEY + " (" + groups.length + " groups) into KV");
   } catch (error) {
-    console.error(stamp() + " store failed:", String(error?.message || error));
+    log("ERROR store failed: " + String(error?.message || error));
     process.exitCode = 1;
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
   }
 }
