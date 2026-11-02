@@ -571,13 +571,34 @@ ok("delete all matches requires confirmation");
 console.log("# system");
 
 {
-  routes["https://streamed.pk/api/matches/all-today"] = reply(500, "[]");
+  routes["https://api.ppv.st/api/streams"] = reply(500, "{}");
   const failed = await admin("/api/admin/sync-streamed", "POST");
   assert.equal(failed.status, 502);
-  routes["https://streamed.pk/api/matches/all-today"] = reply(200, JSON.stringify([
-    { id: "201", title: "Lens vs Sporting CP", category: "football", date: Date.now(), sources: [] }
-  ]));
-  routes["https://streamed.pk/api/matches/live"] = reply(200, "[]");
+  routes["https://api.ppv.st/api/streams"] = reply(200, JSON.stringify({
+    success: true,
+    streams: [
+      {
+        category: "Football",
+        id: 34,
+        always_live: false,
+        streams: [
+          {
+            id: 201,
+            name: "Lens vs Sporting CP",
+            tag: "Round X",
+            source_tag: "HD | StreamFutbol",
+            poster: "https://static.ppvservices.st/assets/thumb/lens-thumb.jpg",
+            uri_name: "football/2026-11-02/lens-scp",
+            starts_at: Math.floor(Date.now() / 1000) + 3600,
+            ends_at: Math.floor(Date.now() / 1000) + 7200,
+            locale: "en",
+            iframe: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp",
+            substreams: []
+          }
+        ]
+      }
+    ]
+  }));
   const good = await (await admin("/api/admin/sync-streamed", "POST")).json();
   assert.equal(good.streamedCount, 1);
 

@@ -31,6 +31,9 @@
   <!-- Warm connections to the API worker and image host -->
   <link rel="preconnect" href="https://sportzfylive.svimranmy.workers.dev" crossorigin>
   <link rel="dns-prefetch" href="https://streamed.pk">
+  <link rel="dns-prefetch" href="https://static.ppvservices.st">
+  <link rel="preconnect" href="https://static.ppvservices.st" crossorigin>
+  <link rel="dns-prefetch" href="https://taifood-blog.asia">
 
   <!-- ============ CRITICAL CSS: tokens, fonts, reset, header, hero ============ -->
   <style id="sportzfy-critical">
@@ -2168,10 +2171,11 @@
     /*
      * WATCH VIEW
      *
-     * Streams come from two places: Streamed-origin source metadata (played
-     * through embed.st) and streams the admin attached to the match (played
-     * through the Worker's /api/play redirect). Neither carries a playback
-     * URL in the public match list.
+     * Streams come from two places: feed-derived source metadata — ppv.st
+     * events whose frames resolve and play through the Worker — and streams
+     * the admin attached to the match (played through the Worker's /api/play
+     * redirect). Neither carries a secret playback URL in the public match
+     * list.
      */
     let activeMatch = null;
     // True while the watch view has claimed its own history entry, so the
@@ -2190,12 +2194,19 @@
             }));
     }
 
-    // Streamed exposes playback via a deterministic embed pattern:
-    // https://embed.st/embed/{source}/{id}/{streamNo}
-    // Built client-side from the Worker's whitelisted metadata, so no
-    // embedUrl ever needs to cross a public API response.
-    function streamEmbedUrl(group, streamNo) {
+    // Feed groups embed their playback in an external player frame. The ppv
+    // feed publishes the frame link per stream (`stream.embed` — a public
+    // player page on the feed's own host, whitelisted server-side); embed.st
+    // source groups keep the historical deterministic pattern
+    // https://embed.st/embed/{source}/{id}/{streamNo}. Both are built from
+    // whitelisted metadata — no secret playback URL ever crosses a public
+    // API response.
+    function streamEmbedUrl(group, stream, streamNo) {
         const source = String(group && group.source || "");
+        if (source === "ppv") {
+            const link = String(stream && stream.embed || "");
+            if (/^https:\/\/[^/]+\/embed\//.test(link)) return link;
+        }
         const id = String(group && group.id || "");
         const no = String(Number(streamNo) || 1);
         return "https://embed.st/embed/" + encodeURIComponent(source) +
@@ -2244,10 +2255,11 @@
             const streams = Array.isArray(group && group.streams) ? group.streams : [];
             for (const stream of streams) {
                 if (stream && Number(stream.streamNo) > 0) {
-                    // Streamed sources play through the Worker's embed resolver
-                    // (/api/play/embed) in the first-party player page; when the
-                    // resolver cannot extract the media, the player page falls
-                    // back to the plain embed.st frame it came from.
+                    // Feed source frames play through the Worker's embed
+                    // resolver (/api/play/embed) in the first-party player
+                    // page; when the resolver cannot extract the media, the
+                    // player page falls back to the plain frame the entry
+                    // came from (the Worker 302s there too).
                     const resolvePath = "/api/play/embed/" +
                         encodeURIComponent(String(group && group.source || "")) + "/" +
                         encodeURIComponent(String(group && group.id || "")) + "/" +
@@ -2256,7 +2268,7 @@
                         group: group,
                         stream: stream,
                         url: PROXY_URL + "/player.html?src=" + encodeURIComponent(resolvePath) +
-                            "&fallback=" + encodeURIComponent(streamEmbedUrl(group, stream.streamNo))
+                            "&fallback=" + encodeURIComponent(streamEmbedUrl(group, stream, stream.streamNo))
                     });
                 }
             }
@@ -2286,6 +2298,7 @@
             const networkClean = (function() {
                 const p = rawProvider.trim().toLowerCase();
                 if (p === "admin") return "Feed " + (item.stream.streamNo || flatIndex);
+                if (p === "ppv") return "PPV.st";
                 if (p === "streamed") return "Official";
                 if (p === "yes") return "YES Network";
                 if (p === "masn") return "MASN";
@@ -2625,7 +2638,7 @@
                 ? '<div class="stream-empty-note">Lineups for this match are not published yet — streams appear here once the source publishes them.</div>'
                 : '<div class="no-stream-sources" style="padding:20px">' +
                   '<strong>' + esc(title) + '</strong>' +
-                  '<span>No Streamed source metadata is available yet.</span>' +
+                  '<span>No stream metadata is available yet.</span>' +
                   '</div>';
 
         picker.innerHTML =

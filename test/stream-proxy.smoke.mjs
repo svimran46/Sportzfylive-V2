@@ -984,4 +984,101 @@ ok("embed resolver: unresolved lookups fall back cleanly (404, no cache)");
 }
 ok("embed resolver: HTML answers fail the probe and the real playlist is used");
 
+{
+  // ppv events play through the same embed route: the play fetch resolves the
+  // event from ppv.st, digs the media out of the per-stream frame, and seals
+  // everything behind the first-party proxy like embed.st does.
+  const env = makeEnv();
+  const ppvEvent = {
+    success: true,
+    data: {
+      id: 31164,
+      name: "Lens vs Sporting CP",
+      uri: "football/2026-11-02/lens-scp",
+      locale: "en",
+      sources: [{ name: "External Player Frame", default: true, type: "iframe", data: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp" }],
+      substreams: [
+        {
+          id: 1031164,
+          name: "Lens vs Sporting CP",
+          uri: "football/2026-11-02/lens-scp_540p",
+          locale: "es",
+          sources: [{ default: true, type: "iframe", data: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp_540p" }]
+        }
+      ]
+    }
+  };
+  upstream["https://api.ppv.st/api/streams/31164"] = () =>
+    respond(JSON.stringify(ppvEvent), { headers: { "Content-Type": "application/json" } });
+  upstream["https://taifood-blog.asia/embed/football/2026-11-02/lens-scp"] = () =>
+    respond('<html><script>source="https://edge.example/live/master.m3u8?token=Z";</script></html>',
+      { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  upstream["https://taifood-blog.asia/embed/football/2026-11-02/lens-scp_540p"] = () =>
+    respond('<html><script>source="https://edge.example/live/540p.m3u8?token=Y";</script></html>',
+      { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  for (const token of ["Y", "Z"]) {
+    const path = token === "Z" ? "master" : "540p";
+    upstream["https://edge.example/live/" + path + ".m3u8?token=" + token] = () =>
+      respond("#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nseg.ts\n",
+        { headers: { "Content-Type": "application/vnd.apple.mpegurl" } });
+  }
+  upstream["https://edge.example/live/seg.ts"] = () =>
+    respond(new Uint8Array(188).fill(0x47), { headers: { "Content-Type": "video/mp2t" } });
+
+  const scope = "/api/play/embed/ppv/31164/1";
+  const res = await call(env, scope);
+  assert.equal(res.status, 200, "ppv main stream digs out of the frame and plays through the proxy");
+  let text = await res.text();
+  assertPrivate("ppv playlist", text);
+  assert.ok(upstreamLog.some(c => c.url === "https://api.ppv.st/api/streams/31164"), "event resolved via the ppv detail endpoint");
+  upstream["https://api.ppv.st/api/streams/31164"] = () => { throw new TypeError("should not refetch while fresh"); };
+
+  // Substream number picks the substream's own frame.
+  const sub = await call(env, "/api/play/embed/ppv/31164/2");
+  assert.equal(sub.status, 200);
+  const subText = await sub.text();
+  assertPrivate("ppv substream playlist", subText);
+  assert.ok(subText.includes("lens-scp_540p") === false, "540p playlist is proxied, not leaked");
+  assert.ok(subText.startsWith("#EXTM3U"));
+
+  // Repeat plays hit the caches: no new ppv event fetch, no new frame page fetch.
+  const frameFetches = upstreamLog.filter(c => c.url.startsWith("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp")).length;
+  const againMain = await call(env, scope);
+  assert.equal(againMain.status, 200);
+  await againMain.text();
+  assert.equal(upstreamLog.filter(c => c.url.startsWith("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp")).length, frameFetches, "resolution cached");
+  assert.ok([...env.SPORTZFY_DB.store.keys()].includes("ppv:event:31164"), "event detail cached in KV");
+
+  // Unknown stream number: no frame to offer.
+  const none = await call(env, "/api/play/embed/ppv/31164/9");
+  assert.equal(none.status, 404, "streamNo without a frame answers unavailable");
+}
+ok("ppv embed route: dig through the frame, sealed proxy, caches and streamNo map");
+
+{
+  // Nothing diggable in the frame: the route redirects to the plain player
+  // frame (exactly the URL the site built as player.html's fallback hop), so
+  // playback degrades to the embed frame instead of a dead stream.
+  const env = makeEnv();
+  upstream["https://api.ppv.st/api/streams/31165"] = () =>
+    respond(JSON.stringify({
+      success: true,
+      data: {
+        id: 31165,
+        name: "Michael Chandler vs Paddy Pimblett",
+        uri: "ufc/2026-11-02/chandler-pimblett",
+        locale: "en",
+        sources: [{ type: "iframe", data: "https://taifood-blog.asia/embed/ufc/2026-11-02/chandler-pimblett" }],
+        substreams: []
+      }
+    }), { headers: { "Content-Type": "application/json" } });
+  upstream["https://taifood-blog.asia/embed/ufc/2026-11-02/chandler-pimblett"] = () =>
+    respond("<html><body>pop-under circus</body></html>", { headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+  const res = await call(env, "/api/play/embed/ppv/31165/1");
+  assert.equal(res.status, 302, "dig miss redirects to the frame");
+  assert.equal(res.headers.get("Location"), "https://taifood-blog.asia/embed/ufc/2026-11-02/chandler-pimblett");
+}
+ok("ppv embed route: unresolvable frame falls back to a redirect on the player page");
+
 console.log("\nAll " + passed + " stream proxy assertions passed.");

@@ -406,6 +406,74 @@ assert.ok(
 ok("matches without resolved streams show the empty state");
 
 // ---------------------------------------------------------------------------
+// 2c. ppv feed chips: the frame link comes from the whitelisted stream.embed
+//     field, the resolver path stays /api/play/embed/ppv/<id>/<n>, and the
+//     provider chip labels as PPV.st.
+// ---------------------------------------------------------------------------
+
+windowStub.__SPORTZFY_MATCHES.set("ppv-31164", {
+  id: "ppv-31164",
+  title: "Lens vs Sporting CP",
+  status: "scheduled",
+  sources: [{ source: "ppv", id: "31164" }],
+  streamed: {
+    sourceCount: 1,
+    streamCount: 2,
+    sources: [{
+      source: "ppv",
+      id: "31164",
+      streamCount: 2,
+      streams: [
+        { streamNo: 1, language: "en", hd: true, source: "ppv", embed: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp" },
+        { streamNo: 2, language: "es", hd: false, source: "ppv", embed: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp_540p" }
+      ]
+    }],
+    streams: [
+      { streamNo: 1, language: "en", hd: true, source: "ppv", embed: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp" },
+      { streamNo: 2, language: "es", hd: false, source: "ppv", embed: "https://taifood-blog.asia/embed/football/2026-11-02/lens-scp_540p" }
+    ]
+  }
+});
+
+const ppvCard = makeElement("ppv-card");
+ppvCard.classList.add("sfy-match-item");
+ppvCard.dataset.matchId = "ppv-31164";
+ppvCard.closest = (selector) =>
+  selector === ".sfy-match-item" || selector === "[data-match-id]" ? ppvCard : null;
+documentStub.dispatch("click", { target: ppvCard });
+assert.equal(
+  documentStub.getElementById("stream-modal").style.display,
+  "flex",
+  "ppv match should open the watch view"
+);
+
+const ppvPicker = documentStub.getElementById("stream-picker");
+const ppvChips = ppvPicker.children.filter(el => el.classList && el.classList.contains("stream-toggle"));
+assert.equal(ppvChips.length, 2, "one toggle per ppv stream");
+
+const ppvCardUrl = (embedUrl, n) =>
+  "https://sportzfylive.svimranmy.workers.dev/player.html?src=" +
+  encodeURIComponent("/api/play/embed/ppv/31164/" + n) +
+  "&fallback=" + encodeURIComponent(embedUrl);
+assert.equal(ppvChips[0].dataset.embedUrl, ppvCardUrl("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp", 1));
+assert.equal(ppvChips[1].dataset.embedUrl, ppvCardUrl("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp_540p", 2));
+const decodePpvChip = (chip) => decodeURIComponent(decodeURIComponent(chip.dataset.embedUrl));
+assert.ok(decodePpvChip(ppvChips[0]).includes("/api/play/embed/ppv/31164/1"), "resolver path routes by the ppv group id");
+assert.ok(decodePpvChip(ppvChips[0]).includes("fallback=https://taifood-blog.asia/embed/football/2026-11-02/lens-scp"), "frame link is the fallback");
+assert.ok(ppvChips[0].getAttribute("aria-label").includes("PPV.st"), "ppv chip labels as PPV.st");
+ok("ppv chips resolve through /api/play/embed with the published frame as fallback");
+
+ppvChips[0].click();
+const ppvPlayer = documentStub.getElementById("player-container");
+assert.equal(ppvPlayer.children.length, 1, "ppv chip mounts exactly one iframe");
+assert.equal(ppvPlayer.children[0].src, ppvCardUrl("https://taifood-blog.asia/embed/football/2026-11-02/lens-scp", 1), "iframe points at the first-party player page");
+ok("ppv toggle mounts the resolver player page in the first-party frame");
+
+// Reset for the following scenarios: restore the previous watch view state.
+documentStub.dispatch("keydown", { key: "Escape", target: makeElement() });
+assert.equal(documentStub.getElementById("stream-modal").style.display, "none");
+
+// ---------------------------------------------------------------------------
 // 3. Back — in-app, from the button AND from the device/browser back control.
 //    The watch view claims one history entry on open (pushState #match=...);
 //    closing pops exactly that entry. The only history calls in the shipped

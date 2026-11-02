@@ -50,6 +50,7 @@ Requires JDK 17+ and the Android SDK (platform 36).
 ## Data flow
 
 - **Matches:** `MatchRepository` fetches `all-today` and `live` from `https://streamed.pk/api/matches/` at the same time and tags the matches in the live feed as `LIVE`. Results are cached in memory for 60 seconds.
+- **Website catalog switch (2026-11):** the website's match feed moved to `api.ppv.st/api/streams`; the app is unaffected — it still reads streamed.pk directly (with the Worker `streamProxyUrl` fallback) and does not consume that feed.
   - Only the live feed can mark a match as `LIVE`; kick-off time never does. If the live feed fails, its last good copy is reused for up to 5 minutes. After that, nothing is marked live, matches that have kicked off show as **Started**, and the app says it couldn't check live matches instead of claiming there are none.
   - A forced refresh that was queued behind a running one is dropped, so repeated taps on Refresh never stack requests.
   - If every feed fails, the last matches stay on screen with an error banner. Once the last live list is more than 5 minutes old, LIVE badges are dropped too.
