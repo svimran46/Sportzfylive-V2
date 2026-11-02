@@ -133,7 +133,18 @@ minutes. The feed owns a match's title, sport, kickoff and status; everything an
 admin sets (teams, streams, featured image, featured/active flags, live-window
 override) survives every sync. The on-demand stream resolver under
 `/api/streamed/streams?source=ppv&id=` serves the same ppv.st catalog to
-whatever still asks for it. The Android app is unaffected by this switch: it
+whatever still asks for it.
+
+**Source access:** ppv.st sits behind DDoS-Guard, which blocks the Worker's
+Cloudflare egress outright (`IP blocked. Please stop harassing our API.`), so
+the Worker cannot fetch the catalog from the edge. A scheduled agent on the
+owner's machine — `node scripts/ppv-relay-agent.mjs`, Task Scheduler task
+"Sportzfy ppv relay", every 10 minutes — fetches the catalog and writes it
+into the Worker's KV (`ppv:relay-catalog`); the sync prefers a record newer
+than 20 minutes and falls back through its own network relays otherwise. The
+on-demand resolver and the play route have the same relay fallbacks.
+
+The Android app is unaffected by this switch: it
 reads streamed.pk directly (with the Worker fallback) and does not consume this
 catalog.
 
