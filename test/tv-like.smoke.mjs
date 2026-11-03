@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 const worker = (await import("../worker.js")).default;
 
 const BASE = "https://worker.test";
-const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
+const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/channels.json";
 const PAGE_HOST = "links.example";      // the rotating short-link host
 const LIST_HOST = "lists.example";      // the signed encrypted list (never may leak)
 const MEDIA_HOST = "cdn.example";       // the resolved playlist + its segments

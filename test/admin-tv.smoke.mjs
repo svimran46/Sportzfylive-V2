@@ -114,7 +114,7 @@ const admin = (path, method = "GET", body) =>
 // (any supported format works there), and an M3U playlist.
 // ---------------------------------------------------------------------------
 
-const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
+const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/channels.json";
 const channelsJs = (list) => "const channels = " + JSON.stringify(list, null, 2) + ";\n";
 const UPSTREAM = [
   { name: "ESPN", logo: "https://img.example/espn.png?a=1&amp;amp;b=2", genre: "Sports", url: "https://tv.example/espn", sandbox: true },
@@ -357,6 +357,10 @@ console.log("# settings");
   assert.equal(legacy.settings.tvSource.url, PLAYLIST_URL, "the retired sports.m3u source maps to the default");
   assert.equal(legacy.settings.tvSource.defaultCategory, "Entertainment");
   assert.equal(legacy.tvSync, undefined, "same source: no resync");
+  const oldCopy = await (await admin("/api/admin/settings/tvSource", "PUT", {
+    url: "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json"
+  })).json();
+  assert.equal(oldCopy.settings.tvSource.url, PLAYLIST_URL, "the svimran46 channels.json maps to the default");
   await admin("/api/admin/settings/tvSource", "PUT", { defaultCategory: "Sports" });
   assert.equal(data.settings.liveWindows.defaultHours, 3);
   assert.equal(data.security.passwordSource, "env");
@@ -448,6 +452,9 @@ console.log("# android app config");
   assert.equal(after.maintenance.enabled, false);
   assert.equal(after.announcement.message, "Final tonight!");
   assert.equal(after.streamProxyUrl, "https://proxy.example.com/");
+  await admin("/api/admin/settings/app", "PUT", { channelsUrl: "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json" });
+  assert.equal((await (await call("/api/app/config")).json()).channelsUrl, PLAYLIST_URL, "an app list on the svimran46 copy follows the default");
+  await admin("/api/admin/settings/app", "PUT", { channelsUrl: "https://example.com/channels.json" });
 
   const content = await (await call("/api/site-content")).json();
   assert.ok(!("app" in content) && !JSON.stringify(content).includes("Final tonight"), "app config never leaks into the website's content");

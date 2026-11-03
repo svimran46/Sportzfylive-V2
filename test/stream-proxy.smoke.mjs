@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 const worker = (await import("../worker.js")).default;
 
 const BASE = "https://worker.test";
-const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
+const PLAYLIST_URL = "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/channels.json";
 const LEGACY_URL = "https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/public/sports.m3u";
 
 // Strings that must never reach a viewer: upstream hosts and the login.

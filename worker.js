@@ -41,13 +41,13 @@ const PLAY_INDEX_KEY = "play_index";             // matchId -> streamId -> playb
 const EMBED_RESOLVE_KEY_PREFIX = "embed_resolve:"; // source/id/streamNo lookup -> resolved media URL, for /api/play/embed
 const ADMIN_CREDENTIAL_KEY = "admin_credential"; // salted hash of a password set from the admin panel
 
-// The Live TV catalog is channels.json on main of svimran46/playlist.m3u (a
+// The Live TV catalog is channels.json on main of svimran48/Playlist.m3u (a
 // JavaScript snippet wrapping a JSON list of channels), read from GitHub so a
 // commit to the file reaches the site on the next sync. The Android app gets
 // the same URL as its channel list. Settings that still point at the retired
-// sports.m3u lists are moved over.
-const DEFAULT_TV_SOURCE_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
-const LEGACY_TV_SOURCE_URLS = ["https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/public/sports.m3u", "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u"];
+// sports.m3u lists or the old svimran46/playlist.m3u copy are moved over.
+const DEFAULT_TV_SOURCE_URL = "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/channels.json";
+const LEGACY_TV_SOURCE_URLS = ["https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json", "https://raw.githubusercontent.com/svimran46/Sportzfylive-V2/main/public/sports.m3u", "https://raw.githubusercontent.com/svimran46/channels.m3u/refs/heads/claude/youthful-knuth-czn4sp/sports.m3u"];
 const TV_AUTO_SYNC_EVERY_MS = 60 * 60 * 1000;     // cron re-pulls the playlist this often
 const TV_AUTO_RETRY_MS = 30 * 60 * 1000;          // ...and waits this long after a failed pull
 const TV_CHECK_TIMEOUT_MS = 8000;                 // per-URL health check timeout
@@ -73,10 +73,11 @@ const TV_APP_PLAYLIST_URL = "https://sportzfylive.svimranmy.workers.dev/api/tv/p
 // origin so a custom domain deployment reads its own copy.
 const EXTRA_TV_SOURCES = [
   { id: "sportzfy", url: new URL(TV_APP_PLAYLIST_URL).origin + "/sportzfy-channels.m3u" },
-  // Tapmad live matches (sm-monirulislam/Tapmad_Auto_Update_Playlist), read
-  // straight from upstream, which rewrites the file as matches go live and
-  // end, so each sync picks up the current ones and prunes finished ones.
-  { id: "tapmad", url: "https://raw.githubusercontent.com/sm-monirulislam/Tapmad_Auto_Update_Playlist/refs/heads/main/tapmad_sm.m3u" }
+  // Tapmad live matches: svimran48/Playlist.m3u mirrors
+  // sm-monirulislam/Tapmad_Auto_Update_Playlist every 15 minutes, and upstream
+  // rewrites the file as matches go live and end, so each sync picks up the
+  // current ones and prunes finished ones.
+  { id: "tapmad", url: "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/tapmad.m3u" }
 ];
 const TV_STATE_MEMO_MS = 30 * 1000;               // public routes reuse the parsed catalog this long per isolate
 const MAX_PLAYLIST_ENTRIES = 5000;
@@ -395,7 +396,7 @@ const SETTINGS_SECTIONS = {
 
   tvSource(input, options) {
     let url = optionalUrl(input.url, "Playlist URL", options) || DEFAULT_TV_SOURCE_URL;
-    // The recently retired sports.m3u lists are moved back to channels.json.
+    // Retired lists (sports.m3u, the svimran46 channels.json) move to the default.
     if (LEGACY_TV_SOURCE_URLS.includes(url)) url = DEFAULT_TV_SOURCE_URL;
     const wanted = String(input.defaultCategory ?? "").trim().toLowerCase();
     let defaultCategory = TV_CATEGORIES.find(category => category.toLowerCase() === wanted);
@@ -534,7 +535,8 @@ const SETTINGS_SECTIONS = {
       updateUrl,
       maintenanceEnabled: truthy(input.maintenanceEnabled),
       maintenanceMessage: cleanText(input.maintenanceMessage, 300),
-      channelsUrl: optionalUrl(input.channelsUrl, "Channel list URL", options),
+      // An app list still on a retired TV source follows the current default.
+      channelsUrl: (url => LEGACY_TV_SOURCE_URLS.includes(url) ? DEFAULT_TV_SOURCE_URL : url)(optionalUrl(input.channelsUrl, "Channel list URL", options)),
       streamProxyEnabled: input.streamProxyEnabled !== false && input.streamProxyEnabled !== "false",
       streamProxyUrl: optionalUrl(input.streamProxyUrl, "Stream proxy URL", options)
     };

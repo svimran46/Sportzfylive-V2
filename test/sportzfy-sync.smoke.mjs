@@ -28,9 +28,9 @@ class PolyfillResponse {
 }
 globalThis.Response = PolyfillResponse;
 
-const MAIN_PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
+const MAIN_PLAYLIST_URL = "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/channels.json";
 const SNAPSHOT_URL = "https://sportzfylive.svimranmy.workers.dev/sportzfy-channels.m3u";
-const TAPMAD_URL = "https://raw.githubusercontent.com/sm-monirulislam/Tapmad_Auto_Update_Playlist/refs/heads/main/tapmad_sm.m3u";
+const TAPMAD_URL = "https://raw.githubusercontent.com/svimran48/Playlist.m3u/main/tapmad.m3u";
 
 const fetchLog = [];
 let routes = {};
