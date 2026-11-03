@@ -30,13 +30,16 @@ globalThis.Response = PolyfillResponse;
 
 const MAIN_PLAYLIST_URL = "https://raw.githubusercontent.com/svimran46/playlist.m3u/main/channels.json";
 const SNAPSHOT_URL = "https://sportzfylive.svimranmy.workers.dev/sportzfy-channels.m3u";
+const TAPMAD_URL = "https://raw.githubusercontent.com/sm-monirulislam/Tapmad_Auto_Update_Playlist/refs/heads/main/tapmad_sm.m3u";
 
 const fetchLog = [];
 let routes = {};
 globalThis.fetch = async (url) => {
   const key = String(url);
   fetchLog.push(key);
-  const route = routes[key];
+  // The Tapmad snapshot is live upstream data; these cases pin it to an
+  // empty playlist so only the Sportzfy snapshot drives the counts.
+  const route = routes[key] || (key === TAPMAD_URL ? reply(200, "#EXTM3U\n") : null);
   if (!route) throw new Error("unexpected fetch: " + key);
   if (route instanceof Error) throw route;
   return route;
@@ -274,5 +277,31 @@ ok("ClearKey DASH channels proxy, license and travel through playlist and list")
   assert.ok(license.keys?.[0]?.kid, "the carried-over channel still serves its key");
 }
 ok("a carried-over ClearKey channel keeps serving its license");
+
+// Tapmad live matches merge with their logo and group, and a match that
+// leaves the upstream file leaves the catalog on the next sync.
+{
+  routes[MAIN_PLAYLIST_URL] = reply(200, channelsJs([
+    { name: "ESPN", logo: "", url: "https://tv.example/espn" }
+  ]));
+  routes[SNAPSHOT_URL] = reply(200, "#EXTM3U\n");
+  const match = (id, title) => '#EXTINF:-1 tvg-id="tapmad-' + id + '" tvg-logo="https://img.example/' + id + '.jpg" group-title="Football",' + title +
+    "\nhttps://multiregion-asia-cdn.tapmad.com/v1/" + id + "/main.m3u8\n";
+  routes[TAPMAD_URL] = reply(200, "#EXTM3U\n# comment header\n\n" + match(1, "Team A vs Team B - MATCHDAY 4") + "\n" + match(2, "Team C vs Team D - MATCHDAY 4"));
+  let result = await (await admin("/api/admin/tv/sync", "POST")).json();
+  assert.equal(result.extra.failed, 0, "tapmad playlist reads");
+  let list = await catalog();
+  const a = list.find(c => c.name === "Team A vs Team B - MATCHDAY 4");
+  assert.ok(a, "tapmad match merged");
+  assert.equal(a.logo, "https://img.example/1.jpg", "tvg-logo kept");
+  assert.equal(a.url, "https://multiregion-asia-cdn.tapmad.com/v1/1/main.m3u8");
+  routes[TAPMAD_URL] = reply(200, "#EXTM3U\n" + match(2, "Team C vs Team D - MATCHDAY 4"));
+  await admin("/api/admin/tv/sync", "POST");
+  list = await catalog();
+  assert.ok(!list.some(c => c.name === "Team A vs Team B - MATCHDAY 4"), "finished match pruned");
+  assert.ok(list.some(c => c.name === "Team C vs Team D - MATCHDAY 4"), "live match kept");
+  delete routes[TAPMAD_URL];
+}
+ok("tapmad live matches merge and finished ones are pruned");
 
 console.log("\nsportzfy-sync smoke: " + passed + " passed");

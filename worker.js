@@ -72,7 +72,11 @@ const TV_APP_PLAYLIST_URL = "https://sportzfylive.svimranmy.workers.dev/api/tv/p
 // hosts send Access-Control-Allow-Origin: *). Derived from the app playlist
 // origin so a custom domain deployment reads its own copy.
 const EXTRA_TV_SOURCES = [
-  { id: "sportzfy", url: new URL(TV_APP_PLAYLIST_URL).origin + "/sportzfy-channels.m3u" }
+  { id: "sportzfy", url: new URL(TV_APP_PLAYLIST_URL).origin + "/sportzfy-channels.m3u" },
+  // Tapmad live matches (sm-monirulislam/Tapmad_Auto_Update_Playlist), read
+  // straight from upstream, which rewrites the file as matches go live and
+  // end, so each sync picks up the current ones and prunes finished ones.
+  { id: "tapmad", url: "https://raw.githubusercontent.com/sm-monirulislam/Tapmad_Auto_Update_Playlist/refs/heads/main/tapmad_sm.m3u" }
 ];
 const TV_STATE_MEMO_MS = 30 * 1000;               // public routes reuse the parsed catalog this long per isolate
 const MAX_PLAYLIST_ENTRIES = 5000;
